@@ -75,9 +75,32 @@ release workflow chooses the path from the secrets:
 | `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. |
 | the two, plus `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` | Signed and notarized with a Developer ID. First open works normally. |
 
-A self-signed certificate is not trusted by macOS until each Mac trusts it once (Keychain
-Access, "Always Trust"), and it cannot remove the quarantine warning, because only notarization
-does that. Test two consecutive releases before you rely on the automatic update.
+A self-signed certificate is not trusted by macOS until each Mac trusts it once, and it cannot
+remove the quarantine warning, because only notarization does that:
+
+```sh
+# Once per Mac that runs the fork build:
+security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db cert.pem
+# Or Keychain Access: import the certificate, open it, Trust, "Always Trust", Code Signing.
+
+# Once per download, because the build is not notarized:
+xattr -dr com.apple.quarantine /Applications/OpenBot.app
+```
+
+The release workflow trusts the certificate on the runner itself, so CI does not need it.
+
+macOS builds are arm64 only (`macos-14`). Intel Macs are not built.
+
+If you make a new `.p12`, export it with the legacy algorithms. macOS `security import` cannot
+read the OpenSSL 3 defaults (AES/PBES2) and fails with "MAC verification failed":
+
+```sh
+openssl pkcs12 -export -inkey key.pem -in cert.pem -name "OpenBot Fork" -out cert.p12 \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+```
+
+Keep the certificate and its password outside the repository. Every build must use the same
+certificate, or Squirrel.Mac refuses the update.
 
 Create the Android key once and keep it safe. Every later APK must use it, or Android refuses the
 update over an installed copy:
