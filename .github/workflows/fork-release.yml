@@ -1,0 +1,364 @@
+name: Fork release
+
+# A fork release is cut from the fork tree, never from an upstream tag:
+#
+#   node scripts/fork/cut-release.mjs --push
+#
+# That command writes the fork version, commits it, tags `fork-v<version>` and pushes.
+# This workflow builds the desktop app and the Android APK and attaches both to one
+# GitHub release. The Windows and iOS builds of upstream are not built here: they need
+# the signing credentials of Synthetify Labs (Azure Artifact Signing, Apple App Store).
+
+on:
+  push:
+    tags:
+      - "fork-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing fork tag to build (e.g. fork-v0.63.0-fork.1)"
+        required: true
+        type: string
+
+concurrency:
+  group: fork-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  NODE_VERSION: "24"
+  BUN_VERSION: "1.4.2"
+
+jobs:
+  create-release:
+    name: Create the draft release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.SOURCE_TAG }}
+          fetch-depth: 0
+
+      - name: Resolve the fork release
+        shell: bash
+        run: node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+
+      - name: Create or reuse the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$FORK_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$FORK_TAG" --repo "$GITHUB_REPOSITORY" --draft \
+              --title "OpenBot fork $FORK_VERSION"
+            exit 0
+          fi
+          args=(
+            release create "$FORK_TAG"
+            --repo "$GITHUB_REPOSITORY"
+            --draft
+            --title "OpenBot fork $FORK_VERSION"
+            --generate-notes
+          )
+          if [[ -n "${PREVIOUS_FORK_TAG:-}" ]]; then
+            args+=(--notes-start-tag "$PREVIOUS_FORK_TAG")
+          fi
+          if [[ "$FORK_IS_PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh "${args[@]}"
+
+  desktop-linux:
+    name: Linux desktop
+    needs: [create-release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.SOURCE_TAG }}
+          fetch-depth: 0
+
+      - name: Resolve the fork release
+        shell: bash
+        run: node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply the fork version
+        run: node scripts/fork/apply-version.mjs --version "$FORK_VERSION"
+
+      - name: Build the AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EP_GH_IGNORE_TIME: true
+        run: bun run dist:linux -- --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
+
+      - name: Publish the Linux assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # electron-builder writes the packages and the update manifest to dist/.
+          shopt -s nullglob
+          assets=(dist/*.AppImage dist/*.blockmap dist/*.yml)
+          if (( ${#assets[@]} == 0 )); then
+            echo "electron-builder wrote no Linux assets." >&2
+            exit 1
+          fi
+          gh release upload "$FORK_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+  desktop-macos:
+    name: macOS desktop
+    needs: [create-release]
+    runs-on: macos-14
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.SOURCE_TAG }}
+          fetch-depth: 0
+
+      - name: Resolve the fork release
+        shell: bash
+        run: node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply the fork version
+        run: node scripts/fork/apply-version.mjs --version "$FORK_VERSION"
+
+      # A self-signed certificate is trusted on this runner only. Without it the build is
+      # unsigned and macOS shows the Gatekeeper warning on first open.
+      - name: Configure macOS signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
+            echo "No certificate configured; the macOS build is unsigned."
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >>"$GITHUB_ENV"
+            exit 0
+          fi
+          node -e 'require("node:fs").writeFileSync(process.env.RUNNER_TEMP + "/fork-cert.p12", Buffer.from(process.env.APPLE_CERTIFICATE, "base64"))'
+          echo "CSC_LINK=$RUNNER_TEMP/fork-cert.p12" >>"$GITHUB_ENV"
+          keychain="$RUNNER_TEMP/fork-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/fork-cert.p12" -k "$keychain" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+          cert_cn="$(security find-identity -p codesigning "$keychain" | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)"
+          if [[ -z "$cert_cn" ]]; then
+            echo "::error::APPLE_CERTIFICATE has no code-signing identity. Export the certificate and its private key together."
+            exit 1
+          fi
+          security find-certificate -c "$cert_cn" -p "$keychain" >"$RUNNER_TEMP/fork-cert.pem"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain "$RUNNER_TEMP/fork-cert.pem"
+
+      - name: Build the app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          EP_GH_IGNORE_TIME: true
+        run: |
+          if [[ -n "${CSC_LINK:-}" ]]; then
+            bun run dist:release -- --publish never --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
+          else
+            bun run dist:mac -- --publish never --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
+          fi
+
+      - name: Publish the macOS assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(dist/*.dmg dist/*.zip dist/*.blockmap dist/*.yml)
+          if (( ${#assets[@]} == 0 )); then
+            echo "electron-builder wrote no macOS assets." >&2
+            exit 1
+          fi
+          gh release upload "$FORK_TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+  android:
+    name: Android APK
+    needs: [create-release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.SOURCE_TAG }}
+          fetch-depth: 0
+
+      - name: Resolve the fork release
+        shell: bash
+        run: node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Give Gradle the memory that Skia, Reanimated and Worklets need
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g' \
+            'org.gradle.workers.max=2' >>~/.gradle/gradle.properties
+          sudo fallocate -l 8G /swapfile-build || true
+          sudo chmod 600 /swapfile-build 2>/dev/null || true
+          sudo mkswap /swapfile-build 2>/dev/null || true
+          sudo swapon /swapfile-build 2>/dev/null || true
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply the fork version
+        run: node scripts/fork/apply-version.mjs --version "$FORK_VERSION"
+
+      - name: Prebuild the Android project
+        working-directory: apps/mobile
+        env:
+          CI: "1"
+        run: bunx expo prebuild --platform android --clean --no-install
+
+      # The release key is stable across releases, so an installed APK accepts the next one.
+      # Without it, Expo would sign the release build with the debug key of this runner.
+      - name: Configure release signing
+        shell: bash
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not set. A release without a stable key cannot be updated."
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode >app/fork.keystore
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          path = Path("app/build.gradle")
+          text = path.read_text()
+          block = (
+              "        release {\n"
+              '            storeFile file("fork.keystore")\n'
+              '            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n'
+              '            keyAlias System.getenv("ANDROID_KEY_ALIAS")\n'
+              '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
+              "        }\n"
+          )
+          text, count = re.subn(r"signingConfigs \{\n", "signingConfigs {\n" + block, text, count=1)
+          if count != 1:
+              raise SystemExit("app/build.gradle has no signingConfigs block")
+          if "signingConfig signingConfigs.debug" not in text:
+              raise SystemExit("app/build.gradle does not sign the release build with the debug key")
+          path.write_text(text.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release"))
+          print("release signing configured")
+          PY
+
+      - name: Build the release APK
+        working-directory: apps/mobile/android
+        run: >-
+          ./gradlew assembleRelease --no-daemon --max-workers=2
+          -x lint -x lintVitalRelease -x generateReleaseLintModel
+
+      - name: Name the APK and publish it
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          apk="openbot-fork-${FORK_VERSION}-android.apk"
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
+          sha256sum "$apk" | tee "$apk.sha256"
+          gh release upload "$FORK_TAG" "$apk" "$apk.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+
+  finalize:
+    name: Publish the release
+    needs: [create-release, desktop-linux, desktop-macos, android]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.SOURCE_TAG }}
+          fetch-depth: 0
+          sparse-checkout: scripts
+
+      - name: Fail if a platform did not publish
+        shell: bash
+        env:
+          LINUX: ${{ needs.desktop-linux.result }}
+          MACOS: ${{ needs.desktop-macos.result }}
+          ANDROID: ${{ needs.android.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for platform in LINUX MACOS ANDROID; do
+            if [[ "${!platform}" != "success" ]]; then
+              echo "::error::$platform did not publish (${!platform})."
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Publish the draft release
+        if: ${{ success() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+          if [[ "$FORK_IS_PRERELEASE" == "true" ]]; then
+            gh release edit "$FORK_TAG" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          else
+            gh release edit "$FORK_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
+          fi

@@ -1,0 +1,102 @@
+# Fork releases
+
+This fork builds releases from its own tree and publishes them on this repository. It does not
+publish to Google Play, the App Store, or `openbot.run`. Nothing here is affiliated with
+Synthetify Labs.
+
+## Versions and tags
+
+- `package.json` holds the desktop version. It starts at the upstream version, such as `0.63.0`.
+- A fork release is `<base>-fork.<n>`, for example `0.63.0-fork.1`, and its tag is
+  `fork-v0.63.0-fork.1`.
+- `n` starts at 1 for each base version and grows. The desktop app shows the full version.
+- The mobile app keeps the upstream marketing version (`apps/mobile/app.json` `version`), because
+  it follows the store train of upstream. `scripts/fork/apply-version.mjs` writes only
+  `android.versionCode` and `ios.buildNumber`, from the fork version.
+
+The Android version code is `major*10^7 + minor*10^5 + patch*10^3 + n`. `0.63.0-fork.3` gives
+`6300003`. Keep `n` under 1000 and the patch under 100.
+
+## Cut a release
+
+```sh
+git checkout main
+git merge upstream/main            # or: node scripts/fork/sync-upstream.mjs
+node scripts/fork/cut-release.mjs   # writes the version, commits, tags; prints the push command
+node scripts/fork/cut-release.mjs --push
+```
+
+The tag starts `.github/workflows/fork-release.yml`. It builds:
+
+- Linux desktop: `bun run dist:linux`, AppImage plus the update manifest.
+- macOS desktop: `bun run dist:mac`, arm64. Signed with a self-signed certificate when
+  `APPLE_CERTIFICATE` is set; otherwise unsigned, and macOS asks the user to open it once with a
+  right-click.
+- Android APK: `expo prebuild` and `gradlew assembleRelease`, signed with the fork key.
+
+All assets go to one draft GitHub release, and the last job publishes it. A failed platform keeps
+the release as a draft.
+
+iOS and Windows are not built. Upstream signs them with App Store Connect and Azure Artifact
+Signing credentials that a fork does not have.
+
+## Repository secrets
+
+| Secret | Use |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The release keystore, base64 of the `.jks` file. Required. |
+| `ANDROID_KEYSTORE_PASSWORD` | Store password. |
+| `ANDROID_KEY_ALIAS` | Key alias inside the keystore. |
+| `ANDROID_KEY_PASSWORD` | Key password. |
+| `APPLE_CERTIFICATE` | Optional. Base64 `.p12` with the certificate and its private key. |
+| `APPLE_CERTIFICATE_PASSWORD` | Password of that `.p12`. |
+
+Create the Android key once and keep it safe. Every later APK must use it, or Android refuses the
+update over an installed copy:
+
+```sh
+keytool -genkeypair -v -keystore fork-release.jks -alias fork \
+  -keyalg RSA -keysize 4096 -validity 10000
+base64 -i fork-release.jks | pbcopy   # paste into ANDROID_KEYSTORE_BASE64
+```
+
+The keystore is not in this repository and must not be committed. Back it up: losing it means the
+next release has a different signature and every user must uninstall first.
+
+## CI
+
+Only the fork workflows run. Every workflow of upstream is disabled in the repository settings,
+because it needs the release credentials of `nightly-labs`. GitHub has no per-workflow switch in
+git: a workflow that a future upstream merge adds starts enabled. Disable it in
+**Actions → workflow → Disable workflow**.
+
+- `.github/workflows/account-image.yml` publishes `ghcr.io/lennartschoch/openbot-account`.
+- `.github/workflows/fork-release.yml` builds the releases above.
+
+## Sync with upstream
+
+```sh
+node scripts/fork/sync-upstream.mjs            # merges the newest upstream release tag
+node scripts/fork/sync-upstream.mjs --tag v0.64.0
+```
+
+The script writes `.fork/state.json` with the upstream tag and commit that the tree contains, so a
+release can report where it came from. Resolve conflicts by hand, then run
+`node scripts/fork/apply-version.mjs --print` to check the base version.
+
+## Differences from upstream that need care at each merge
+
+- `apps/mobile/app.json`: fork identifiers, no `eas.projectId`, updates disabled. The package is
+  `com.lennartschoch.openbot`. The scheme stays `openbot`, because the host emits
+  `openbot://mobile-connect` QR links and a different scheme would break pairing.
+- `apps/mobile/google-services.json` is absent. Push notifications over Firebase Cloud Messaging
+  are not part of the fork. A build without the file works; closed-app notifications do not.
+- `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
+- `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
+  them on the command line, so the file needs no edit.
+- The account service lives in `account/`. Upstream's `apps/auth-api` stays only for merges.
+
+## Licence
+
+The repository is under the PolyForm Noncommercial License 1.0.0. Keep `LICENSE` and `NOTICE`.
+Distribution of free builds is permitted; commercial use needs the licence from `licenses@openbot.run`.
