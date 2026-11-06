@@ -44,8 +44,6 @@ interface PushNotificationsInput {
   foreground: boolean;
   post(serverId: string, path: string, body: TeamProtocolV2Json): Promise<unknown>;
   supportsPush(serverId: string): boolean;
-  /** Whether the host takes the UnifiedPush registrations of `push-notifications-android-v2`. */
-  supportsUnified(serverId: string): boolean;
 }
 
 /** A request that failed is sent again after this time, or at the next change or connection. */
@@ -70,7 +68,6 @@ export function usePushNotifications({
   foreground,
   post,
   supportsPush,
-  supportsUnified,
 }: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
   // The level that the user chose for all of their devices replaces the level of this phone. The host
@@ -217,8 +214,9 @@ export function usePushNotifications({
         continue;
       }
       if (!supportsPush(server.id)) continue;
-      // A host that takes the ntfy registrations gets them; an older host gets Firebase Cloud Messaging.
-      const unified = isAndroid && supportsUnified(server.id);
+      // Fork: an Android phone always takes the ntfy transport of `push-notifications-android-v2`.
+      // The Firebase route of `push-notifications-android-v1` stays for a host that only has it.
+      const unified = isAndroid;
       const routes = unified ? UNIFIED_ROUTES : ROUTES;
       const setting = effectiveServerNotificationSetting(preference, synced[server.id], server.id);
       const muted = mutedUntil(setting, now);
@@ -283,7 +281,6 @@ export function usePushNotifications({
     liveActivities,
     activityHost,
     supportsPush,
-    supportsUnified,
     enqueue,
     attempt,
   ]);
