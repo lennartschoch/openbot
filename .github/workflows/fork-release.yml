@@ -184,15 +184,27 @@ jobs:
             -k /Library/Keychains/System.keychain "$RUNNER_TEMP/fork-cert.pem"
 
       - name: Build the app
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           EP_GH_IGNORE_TIME: true
         run: |
-          if [[ -n "${CSC_LINK:-}" ]]; then
-            bun run dist:release -- --publish never --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
+          set -euo pipefail
+          common=(--publish never
+            --config.publish.owner="${{ github.repository_owner }}"
+            --config.publish.repo="${{ github.event.repository.name }}")
+          if [[ -z "${CSC_LINK:-}" ]]; then
+            # Unsigned: the only path that always works without an Apple account.
+            bun run dist:mac -- "${common[@]}"
+          elif [[ -z "${APPLE_ID:-}" ]]; then
+            # A self-signed or Developer ID certificate without notarization: sign only.
+            bun run dist:release -- "${common[@]}" --config.mac.notarize=false
           else
-            bun run dist:mac -- --publish never --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
+            bun run dist:release -- "${common[@]}" --config.mac.notarize=true
           fi
 
       - name: Publish the macOS assets

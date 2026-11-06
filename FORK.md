@@ -62,6 +62,22 @@ Signing credentials that a fork does not have.
 | `ANDROID_KEY_PASSWORD` | Key password. |
 | `APPLE_CERTIFICATE` | Optional. Base64 `.p12` with the certificate and its private key. |
 | `APPLE_CERTIFICATE_PASSWORD` | Password of that `.p12`. |
+| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Optional, with a Developer ID certificate only. Turn on notarization. |
+
+### macOS signing
+
+`electron-builder.yml` says `mac.notarize: true`, which needs a paid Apple Developer ID. The
+release workflow chooses the path from the secrets:
+
+| Secrets | Result |
+| --- | --- |
+| none | Unsigned. Gatekeeper blocks the first open; no automatic update. |
+| `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. |
+| the two, plus `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` | Signed and notarized with a Developer ID. First open works normally. |
+
+A self-signed certificate is not trusted by macOS until each Mac trusts it once (Keychain
+Access, "Always Trust"), and it cannot remove the quarantine warning, because only notarization
+does that. Test two consecutive releases before you rely on the automatic update.
 
 Create the Android key once and keep it safe. Every later APK must use it, or Android refuses the
 update over an installed copy:
