@@ -329,8 +329,14 @@ jobs:
           print("release signing configured")
           PY
 
+      # The signing config reads the secrets from the environment, and Gradle runs in
+      # this step, not in the one that patched build.gradle.
       - name: Build the release APK
         working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: >-
           ./gradlew assembleRelease --no-daemon --max-workers=2
           -x lint -x lintVitalRelease -x generateReleaseLintModel
