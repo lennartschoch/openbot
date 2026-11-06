@@ -45,6 +45,8 @@ The tag starts `.github/workflows/fork-release.yml`. It builds:
   `APPLE_CERTIFICATE` is set; otherwise unsigned, and macOS asks the user to open it once with a
   right-click.
 - Android APK: `expo prebuild` and `gradlew assembleRelease`, signed with the fork key.
+  `reactNativeArchitectures=arm64-v8a`, as in the Paseo fork: one ABI, no 32-bit or emulator
+  libraries.
 
 All assets go to one draft GitHub release, and the last job publishes it. A failed platform keeps
 the release as a draft.

@@ -273,6 +273,20 @@ jobs:
           CI: "1"
         run: bunx expo prebuild --platform android --clean --no-install
 
+      # One ABI, as the Paseo fork does: every phone that runs the app in practice is arm64, and
+      # a fat APK carries three more ABIs that nobody installs. The emulator needs x86_64.
+      - name: Restrict the Android ABI
+        working-directory: apps/mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q '^reactNativeArchitectures=' gradle.properties; then
+            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' gradle.properties
+          else
+            echo 'reactNativeArchitectures=arm64-v8a' >>gradle.properties
+          fi
+          grep -q '^org.gradle.caching=' gradle.properties || echo 'org.gradle.caching=true' >>gradle.properties
+
       # The release key is stable across releases, so an installed APK accepts the next one.
       # Without it, Expo would sign the release build with the debug key of this runner.
       - name: Configure release signing
