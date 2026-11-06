@@ -108,6 +108,9 @@ openssl pkcs12 -export -inkey key.pem -in cert.pem -name "OpenBot Fork" -out cer
 Keep the certificate and its password outside the repository. Every build must use the same
 certificate, or Squirrel.Mac refuses the update.
 
+Use a specific key alias such as `openbot-release`. GitHub masks every occurrence of a
+secret value in the logs, so a value like `fork` hides the word in every log line.
+
 Create the Android key once and keep it safe. Every later APK must use it, or Android refuses the
 update over an installed copy:
 
@@ -147,7 +150,7 @@ The public halves are committed, so anyone can trust or verify a build without y
 | File | SHA-256 |
 | --- | --- |
 | `.fork/openbot-fork-code-signing.crt` | `D6:13:AA:E1:45:43:F8:21:83:74:A5:74:CF:ED:5F:85:5A:51:F4:E3:3C:C6:4B:E1:09:C6:8B:8E:EB:20:0F:70` |
-| `.fork/openbot-fork-android.crt` | `BE:5F:7D:A0:04:51:20:53:70:86:69:00:36:3A:F4:A2:F5:3C:F8:70:4B:6D:A1:3C:C3:FA:C7:42:D2:DA:F7:DE` |
+| `.fork/openbot-fork-android.crt` | `57:98:E3:50:E1:F8:56:3F:A0:40:D9:D4:3F:27:7A:2C:12:01:38:BD:41:AC:9C:8B:3D:2F:17:F6:9B:70:D4:A1` |
 
 A new certificate or key must change this table too.
 
