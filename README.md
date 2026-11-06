@@ -664,6 +664,8 @@ authentication records from D1. The embedded browser uses a separate sandboxed E
 cannot access `window.openbot` or managed local attachments.
 
 To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
+This fork uses the Bun service in [`account/`](account/README.md) instead of the Worker in
+`apps/auth-api`.
 
 To trigger routines from external services, see
 [Webhooks](docs/webhooks.md). Public webhook requests require the host to be online.

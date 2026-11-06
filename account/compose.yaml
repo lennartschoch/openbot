@@ -1,0 +1,31 @@
+name: openbot-account
+
+# The account service on its own. Signal and TURN are separate: see ../remote/compose.yaml.
+# Set OPENBOT_SIGNAL_URL and OPENBOT_AUTH_WEBHOOK_SECRET to the values of that stack.
+services:
+  account:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - account-data:/data
+    # The reverse proxy is the only client. Publish on the loopback interface, not on 0.0.0.0.
+    ports:
+      - "127.0.0.1:${OPENBOT_ACCOUNT_PUBLISH_PORT:-3100}:3100"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r=await fetch('http://127.0.0.1:3100/health/live');process.exit(r.ok?0:1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  account-data:
