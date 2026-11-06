@@ -63,7 +63,7 @@ const sessionToken: string = redeem.json.sessionToken;
 const register = await call(
   "POST",
   "/v2/remote/hosts/register",
-  { hostId: "agent-machine", name: "agent-machine", ownerMembershipId: "owner-1", devicePublicKey: "pk-1", rotateCredential: true },
+  { hostId: "host-1", name: "host-1", ownerMembershipId: "owner-1", devicePublicKey: "pk-1", rotateCredential: true },
   sessionToken,
 );
 assert(register.status === 200 && register.json.machineToken, "host registers and gets a machine token");
@@ -72,21 +72,21 @@ const machineToken: string = register.json.machineToken;
 
 // 4. List hosts.
 const list = await call("GET", "/v2/remote/hosts/", undefined, sessionToken);
-assert(list.status === 200 && list.json.hosts.length === 1 && list.json.hosts[0].hostId === "agent-machine", "host list shows the host");
+assert(list.status === 200 && list.json.hosts.length === 1 && list.json.hosts[0].hostId === "host-1", "host list shows the host");
 
 // 5. Host ticket.
-const hostTicket = await call("POST", "/v2/remote/hosts/agent-machine/ticket", { machineToken, signalHome: false });
+const hostTicket = await call("POST", "/v2/remote/hosts/host-1/ticket", { machineToken, signalHome: false });
 assert(hostTicket.status === 200 && hostTicket.json.ticket && hostTicket.json.signalUrl === config.signalUrl, "host ticket issued");
 
 // 6. Verify the ticket against the published JWKS, exactly as Signal and the app do.
 const jwksResponse = await call("GET", "/.well-known/jwks.json");
 const keySet = createLocalJWKSet(jwksResponse.json);
 const verified = await jwtVerify(hostTicket.json.ticket, keySet, { audience: REMOTE_TICKET_AUDIENCE, algorithms: ["ES256"] });
-assert(verified.payload.hostId === "agent-machine" && verified.payload.role === "host", "host ticket verifies with JWKS (ES256)");
+assert(verified.payload.hostId === "host-1" && verified.payload.role === "host", "host ticket verifies with JWKS (ES256)");
 assert(verified.payload.protocolMinimum === 2 && verified.payload.protocolMaximum === 2, "ticket protocol range is [2,2]");
 
 // 7. Client session + ticket.
-const started = await call("POST", "/v2/remote/sessions/", { hostId: "agent-machine" }, sessionToken);
+const started = await call("POST", "/v2/remote/sessions/", { hostId: "host-1" }, sessionToken);
 assert(started.status === 201 && started.json.sessionId, "client session starts");
 const clientTicket = await call(
   "POST",
@@ -101,7 +101,7 @@ assert(verifiedClient.payload.role === "owner" && verifiedClient.payload.clientP
 // 8. Resume validation, signed exactly as Signal signs it.
 const resumeClaims = {
   sessionId: verifiedClient.payload.sessionId,
-  hostId: "agent-machine",
+  hostId: "host-1",
   userId: verifiedClient.payload.userId,
   membershipId: "owner-1",
   role: "owner",
@@ -139,7 +139,7 @@ assert(emailStart.status === 400, "email sign-in is disabled when no OIDC connec
 const mobileTicket = await call(
   "POST",
   "/v1/mobile-auth/ticket",
-  { host: { hostId: "agent-machine", fingerprint: "fp" } },
+  { host: { hostId: "host-1", fingerprint: "fp" } },
   sessionToken,
 );
 assert(mobileTicket.status === 200 && mobileTicket.json.ticket, "host creates a Mobile Connect ticket");
@@ -150,7 +150,7 @@ const redeemed = await call("POST", "/v1/mobile-auth/redeem", {
   platform: "android",
 });
 assert(
-  redeemed.status === 200 && redeemed.json.sessionToken && redeemed.json.host?.hostId === "agent-machine",
+  redeemed.status === 200 && redeemed.json.sessionToken && redeemed.json.host?.hostId === "host-1",
   "phone redeems the ticket and is bound to the host",
 );
 const mobileToken: string = redeemed.json.sessionToken;
@@ -168,5 +168,43 @@ const reuse = await call("POST", "/v1/mobile-auth/redeem", {
   platform: "ios",
 });
 assert(reuse.status === 401, "a one-time Mobile Connect ticket cannot be redeemed twice");
+
+// 12. Mobile feature flags: the browser is on, the hosted server plans are off, no store update.
+const androidFeatures = await call("GET", "/v1/mobile/features?platform=android&version=1.4.6");
+assert(
+  androidFeatures.status === 200 &&
+    androidFeatures.json.features?.browser === true &&
+    androidFeatures.json.features?.cloudServers === false &&
+    androidFeatures.json.latestVersion === undefined,
+  "android gets the browser feature and no store update",
+);
+const unknownFeatures = await call("GET", "/v1/mobile/features?platform=desktop&version=1.4.6");
+assert(
+  unknownFeatures.status === 200 &&
+    unknownFeatures.json.features?.browser === false &&
+    unknownFeatures.json.features?.cloudServers === false,
+  "an unknown platform gets no features",
+);
+
+// 13. The routes that the apps use to edit the profile of the account.
+const named = await call("PATCH", "/v1/me/profile", { name: "  Lena  " }, mobileToken);
+assert(named.status === 200 && named.json.name === "Lena", "a mobile session saves the display name");
+const shortName = await call("PATCH", "/v1/me/profile", { name: "a" }, mobileToken);
+assert(shortName.status === 400, "a too-short display name is refused");
+const colored = await call("PUT", "/v1/me/chat-color", { chatColor: "#a1b2c3" }, mobileToken);
+assert(colored.status === 200 && colored.json.chatColor === "#a1b2c3", "a mobile session saves the chat colour");
+const badColor = await call("PUT", "/v1/me/chat-color", { chatColor: "purple" }, mobileToken);
+assert(badColor.status === 400, "an invalid chat colour is refused");
+const analyticsOn = await call("PUT", "/v1/me/analytics", { enabled: true, ageMs: 1000 }, mobileToken);
+assert(analyticsOn.status === 200 && analyticsOn.json.analyticsEnabled === true, "the analytics answer is saved");
+const analyticsOff = await call("PUT", "/v1/me/analytics", { enabled: false }, mobileToken);
+assert(
+  analyticsOff.status === 200 && analyticsOff.json.analyticsEnabled === false,
+  "the analytics answer can be turned off again",
+);
+const ready = await call("GET", "/health/ready");
+assert(ready.status === 200 && ready.json.status === "ok", "readiness answers when the database works");
+const oversized = await call("POST", "/v1/auth/company/start", { returnTo: "a".repeat(70 * 1024) });
+assert(oversized.status === 413, "an oversized request body is refused");
 
 console.log(`\nAll ${requests} requests passed.`);

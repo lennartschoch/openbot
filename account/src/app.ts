@@ -48,6 +48,7 @@ export function createApp(config: Config, db: Db) {
     try {
       // ── Health + JWKS ───────────────────────────────────────────────────
       if (method === "GET" && path === "/health/live") return json({ status: "ok" });
+      if (method === "GET" && path === "/health/ready") return healthReady(db);
       if (method === "GET" && path === "/.well-known/jwks.json") return json(jwks(db));
 
       // ── Human auth (Authelia OIDC) ──────────────────────────────────────
@@ -57,6 +58,10 @@ export function createApp(config: Config, db: Db) {
       if (method === "POST" && path === "/v1/auth/company/exchange") return await companyExchange(config, db, request);
       if (method === "POST" && path === "/v1/auth/logout") return logout(db, request);
       if (method === "GET" && path === "/v1/me") return me(db, request);
+      if (method === "PATCH" && path === "/v1/me/profile") return await updateProfile(db, request);
+      if (method === "PUT" && path === "/v1/me/analytics") return await updateAnalytics(db, request);
+      if (method === "PUT" && path === "/v1/me/chat-color") return await updateChatColor(db, request);
+      if (method === "GET" && path === "/v1/mobile/features") return mobileFeatures(url);
 
       // ── Mobile Connect (phone signs in by scanning a QR) ────────────────
       if (method === "POST" && path === "/v1/mobile-auth/ticket") return await createMobileTicket(db, request);
@@ -99,7 +104,10 @@ export function createApp(config: Config, db: Db) {
 
       return apiError(404, "not_found", `No route for ${method} ${path}.`);
     } catch (error) {
-      console.error(`${method} ${path}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === "body_too_large") return apiError(413, "body_too_large", "The request body is too large.");
+      if (message === "invalid_json") return apiError(400, "invalid_json", "The request body is not valid JSON.");
+      console.error(`${method} ${path}: ${message}`);
       return apiError(500, "internal_error", "The account service failed.");
     }
   };
@@ -118,8 +126,42 @@ function apiError(status: number, code: string, message: string): Response {
   return json({ error: { code, message } }, status);
 }
 
+/** The largest body that this service reads. Every route takes a few short fields. */
+const MAX_BODY_BYTES = 64 * 1024;
+
+/**
+ * Reads the body as text and stops at `limit` bytes. A request without a `Content-Length`
+ * header is read through the stream, so a chunked body cannot grow without a bound.
+ */
+async function readText(request: Request, limit = MAX_BODY_BYTES): Promise<string> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) throw new Error("body_too_large");
+  const body = request.body;
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error("body_too_large");
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))));
+}
+
 async function readJson(request: Request): Promise<Json> {
-  const value = (await request.json().catch(() => null)) as unknown;
+  let value: unknown;
+  try {
+    value = JSON.parse(await readText(request));
+  } catch (error) {
+    if (error instanceof Error && error.message === "body_too_large") throw error;
+    throw new Error("invalid_json");
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_json");
   return value as Json;
 }
@@ -129,12 +171,16 @@ function bearer(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-/** Behind Caddy, the client address arrives in `X-Forwarded-For`. This service is only
- * reachable through Caddy or the tailnet admin, so the header is trusted for limiting. */
+/**
+ * Behind Caddy, the client address arrives in `X-Forwarded-For`. A proxy appends the address
+ * that it saw, so the last entry is the one that the trust boundary added; a client can write
+ * the entries before it. This service is only reachable through the proxy or the tailnet admin.
+ */
 function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
-  return "unknown";
+  if (!forwarded) return "unknown";
+  const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+  return hops.at(-1) ?? "unknown";
 }
 
 function b64urlSha256(value: string): string {
@@ -350,10 +396,121 @@ function me(db: Db, request: Request): Response {
   return json(toAuthUser(user));
 }
 
+/** Readiness for an orchestrator: the process answers and the database reads. */
+function healthReady(db: Db): Response {
+  try {
+    db.raw.query("SELECT 1 AS ok").get();
+    return json({ status: "ok" });
+  } catch {
+    return json({ status: "unavailable" }, 503);
+  }
+}
+
+/** The limits of `INPUT_LIMITS` in the clients: 3 to 20 visible characters, 120 code units. */
+const PROFILE_NAME_MIN = 3;
+const PROFILE_NAME_MAX = 20;
+const PROFILE_NAME_MAX_UNITS = 120;
+const PROFILE_NAME_UNSAFE = /[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/u;
+const CHAT_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
+
+/**
+ * The display name in a `PATCH /v1/me/profile` body, as the clients normalize it: outer space
+ * removed, each run of inner space one space. Null when the name breaks a client rule.
+ */
+function normalizeProfileName(value: string): string | null {
+  const name = value.trim().replace(/\s+/gu, " ");
+  if (name.length > PROFILE_NAME_MAX_UNITS || PROFILE_NAME_UNSAFE.test(name)) return null;
+  const length =
+    typeof Intl.Segmenter === "function"
+      ? [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name)].length
+      : [...name].length;
+  return length >= PROFILE_NAME_MIN && length <= PROFILE_NAME_MAX ? name : null;
+}
+
+/** The client sends at most 20 profile changes in 15 minutes. */
+function profileChangeAllowed(db: Db, userId: string): boolean {
+  return rateLimit(db, `profile:${userId}`, 20, 900);
+}
+
+/** Saves the display name that the desktop app and the mobile app edit. */
+async function updateProfile(db: Db, request: Request): Promise<Response> {
+  const user = findUser(db, bearer(request));
+  if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+  const body = await readJson(request);
+  const name = typeof body.name === "string" ? normalizeProfileName(body.name) : null;
+  if (!name) return apiError(400, "invalid_profile_name", "Enter a valid display name.");
+  if (!profileChangeAllowed(db, user.id)) {
+    return apiError(429, "rate_limited", "Too many changes. Try again later.");
+  }
+  db.raw.query("UPDATE users SET name = ?, updated_at = ? WHERE id = ?").run(name, nowSeconds(), user.id);
+  return json(toAuthUser(loadUser(db, user.id)!));
+}
+
+/**
+ * Saves the analytics answer of the account. The desktop app and the mobile app follow this
+ * answer on every device: `true` identifies their events with the account, `false` uses the
+ * install ID of each device. The last write wins; a client sends only a choice that the account
+ * does not have yet, so this is normally the newest choice.
+ */
+async function updateAnalytics(db: Db, request: Request): Promise<Response> {
+  const user = findUser(db, bearer(request));
+  if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+  const body = await readJson(request);
+  const ageMs = body.ageMs === undefined ? 0 : body.ageMs;
+  if (
+    typeof body.enabled !== "boolean" ||
+    typeof ageMs !== "number" ||
+    !Number.isSafeInteger(ageMs) ||
+    ageMs < 0
+  ) {
+    return apiError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
+  }
+  if (!profileChangeAllowed(db, user.id)) {
+    return apiError(429, "rate_limited", "Too many changes. Try again later.");
+  }
+  db.raw
+    .query("UPDATE users SET analytics_enabled = ?, updated_at = ? WHERE id = ?")
+    .run(body.enabled ? 1 : 0, nowSeconds(), user.id);
+  return json(toAuthUser(loadUser(db, user.id)!));
+}
+
+/** Saves the chat colour that a member's avatar uses. A null colour returns to the automatic hue. */
+async function updateChatColor(db: Db, request: Request): Promise<Response> {
+  const user = findUser(db, bearer(request));
+  if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+  const body = await readJson(request);
+  const value = body.chatColor;
+  const color =
+    value === null ? null : typeof value === "string" && CHAT_COLOR_PATTERN.test(value) ? value : undefined;
+  if (color === undefined) return apiError(400, "invalid_chat_color", "The chat colour is not valid.");
+  if (!profileChangeAllowed(db, user.id)) {
+    return apiError(429, "rate_limited", "Too many changes. Try again later.");
+  }
+  db.raw.query("UPDATE users SET chat_color = ?, updated_at = ? WHERE id = ?").run(color, nowSeconds(), user.id);
+  return json(toAuthUser(loadUser(db, user.id)!));
+}
+
+/**
+ * The mobile feature flags of one platform. The app gates the agent browser live view and the
+ * hosted server plans on this answer, and reads it again at most once a minute. An older account
+ * service that has no route leaves every feature off.
+ *
+ * The browser is on: it is a host capability (`browser-view`) and the account service is not in
+ * its data path. The hosted server plans stay off: this deployment sells no servers.
+ *
+ * `latestVersion` is left out on purpose. A value would show an update header, and its link
+ * opens the official OpenBot app in the store, which is not the app of this service.
+ */
+function mobileFeatures(url: URL): Response {
+  const platform = url.searchParams.get("platform");
+  const supported = platform === "android" || platform === "ios";
+  return json({ features: { cloudServers: false, browser: supported } });
+}
+
 // ── server claims ─────────────────────────────────────────────────────────
 
 async function createServerClaim(config: Config, db: Db, request: Request): Promise<Response> {
-  if (bearer(request) !== config.serverClaimsAdminToken) return apiError(401, "unauthorized", "Bad admin token.");
+  if (!safeEqual(bearer(request) ?? "", config.serverClaimsAdminToken)) return apiError(401, "unauthorized", "Bad admin token.");
   const body = await readJson(request);
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email.includes("@")) return apiError(400, "invalid_email", "Enter a valid email address.");
@@ -657,7 +814,7 @@ function endSession(db: Db, sessionId: string, request: Request): Response {
 }
 
 async function resumeValidate(config: Config, db: Db, request: Request): Promise<Response> {
-  const raw = await request.text();
+  const raw = await readText(request, 8 * 1024);
   const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
   const signature = request.headers.get("OpenBot-Signature") ?? "";
   const expected = createHmac("sha256", config.authWebhookSecret).update(`${timestamp}.${raw}`).digest("base64url");

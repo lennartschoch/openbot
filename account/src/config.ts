@@ -4,7 +4,7 @@
 // one host, a handful of clients. See ../PROTOCOL.md for the protocol contract.
 
 export interface Config {
-  /** Public base URL of this service, e.g. https://openbot-account-api.lennart.codes. Used for the OIDC redirect URI. */
+  /** Public base URL of this service, e.g. https://account.example.com. Used for the OIDC redirect URI. */
   publicUrl: string;
   /** Where to listen. */
   host: string;
@@ -17,12 +17,12 @@ export interface Config {
   serverClaimsAdminToken: string;
   /** The `wss://` Signal URL handed to peers in a ticket. */
   signalUrl: string;
-  /** Authelia OIDC issuer, e.g. https://auth.lennart.codes. Empty disables company sign-in. */
+  /** Authelia OIDC issuer, e.g. https://auth.example.com. Empty disables company sign-in. */
   oidcIssuer: string;
   /** OIDC client credentials registered in Authelia for this service. */
   oidcClientId: string;
   oidcClientSecret: string;
-  /** The email domain that company sign-in accepts, e.g. lennart.codes. Empty = any domain. */
+  /** The email domain that company sign-in accepts, e.g. example.com. Empty = any domain. */
   oidcDomain: string;
   /** Comma-separated emails allowed to sign in. Empty = any user the issuer authenticates. */
   allowedEmails: string[];

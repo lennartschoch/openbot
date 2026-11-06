@@ -1,12 +1,12 @@
 // Bootstrap: create the signing key, register the Authelia company connection, and
 // optionally mint a server claim for the host's first login.
 //
-//   OPENBOT_ACCOUNT_PUBLIC_URL=https://openbot-account-api.lennart.codes \
+//   OPENBOT_ACCOUNT_PUBLIC_URL=https://account.example.com \
 //   OPENBOT_AUTH_WEBHOOK_SECRET=... OPENBOT_SERVER_CLAIMS_ADMIN_TOKEN=... \
-//   OPENBOT_SIGNAL_URL=wss://openbot-signal.lennart.codes/v1/signal \
-//   OPENBOT_OIDC_ISSUER=https://auth.lennart.codes OPENBOT_OIDC_CLIENT_ID=openbot-account \
-//   OPENBOT_OIDC_CLIENT_SECRET=... OPENBOT_OIDC_DOMAIN=lennart.codes \
-//   OPENBOT_BOOTSTRAP_EMAIL=you@lennart.codes \
+//   OPENBOT_SIGNAL_URL=wss://signal.example.com/v1/signal \
+//   OPENBOT_OIDC_ISSUER=https://auth.example.com OPENBOT_OIDC_CLIENT_ID=openbot-account \
+//   OPENBOT_OIDC_CLIENT_SECRET=... OPENBOT_OIDC_DOMAIN=example.com \
+//   OPENBOT_BOOTSTRAP_EMAIL=you@example.com \
 //   bun run src/seed.ts
 
 import { loadConfig } from "./config";
@@ -49,7 +49,7 @@ if (email) {
     .query("INSERT INTO server_claims (claim_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
     .run(hash(claim), user.id, now, expiresAt);
   console.log(`\nserver claim for ${email} (valid 15 min):\n  ${claim}\n`);
-  console.log(`run on the A6:  sudo openbot login --claim --name agent-machine`);
+  console.log(`run on the server:  sudo openbot login --claim --name my-host`);
 }
 
 console.log(`\nJWKS:`);

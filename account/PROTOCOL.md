@@ -33,6 +33,10 @@ app (`src/main/central-auth-manager.ts`), the host, and Signal
 | `POST /v2/remote/sessions/:id/end` (Bearer) | 204 |
 | `POST /v2/remote/resume/validate` (HMAC) | `{valid:boolean}` |
 | `GET /v1/me` (Bearer) | `CentralAuthUser` |
+| `PATCH /v1/me/profile` (Bearer) `{name}` | `CentralAuthUser`. Name 3-20 visible characters. |
+| `PUT /v1/me/analytics` (Bearer) `{enabled, ageMs?}` | `CentralAuthUser` with the new `analyticsEnabled`. |
+| `PUT /v1/me/chat-color` (Bearer) `{chatColor}` | `CentralAuthUser`. `#rrggbb` in lower case, or null. |
+| `GET /v1/mobile/features?platform=<android\|ios>&version=<x.y.z>` (no auth) | `{features:{cloudServers:boolean,browser:boolean}}`. `latestVersion` is optional and this service omits it. An unknown platform gets both features off. |
 | `POST /v1/auth/email/start` `{email}` | 409 `{error:{code:"company_sign_in_required"}}` when the domain uses company sign-in |
 | `POST /v1/auth/company/start` `{email,returnTo,clientState,clientChallenge}` | `{authorizationUrl}` |
 | `GET /v1/auth/company/callback` | 303 to `returnTo?state=<clientState>&code=<one-time>` (or `&error=<code>`) |

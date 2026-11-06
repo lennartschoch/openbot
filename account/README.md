@@ -1,6 +1,7 @@
 # Account service (Bun)
 
-A small account service for self-hosted OpenBot. This fork uses it instead of
+A small account service for self-hosted OpenBot. This is an unofficial fork of OpenBot and is
+not affiliated with Synthetify Labs. This fork uses the service instead of
 [`apps/auth-api`](../apps/auth-api), the Cloudflare Worker. The Worker stays in the tree only
 to keep merges with upstream simple. Nothing here imports it.
 
@@ -16,6 +17,12 @@ accept it. `PROTOCOL.md` is the wire contract that they require.
 - Host registry and remote sessions.
 - ES256 remote tickets, published at `/.well-known/jwks.json`. Signal verifies them from there.
 - Mobile Connect: QR ticket, redeem, session, device list, revoke.
+- The account edits that the apps make: display name (`PATCH /v1/me/profile`), chat colour
+  (`PUT /v1/me/chat-color`) and the analytics answer (`PUT /v1/me/analytics`). Each device
+  follows that answer.
+- Mobile feature flags (`GET /v1/mobile/features`). The agent browser live view is on for
+  Android and iOS. The hosted server plans are off. No `latestVersion` is sent, so the app
+  does not offer a store update.
 - Signal resume validation with an HMAC webhook.
 
 ## What it does not do
@@ -25,13 +32,9 @@ These features are absent. The clients turn them off or log a warning, and nothi
 - Push notifications. The Android relay (`/v2/remote/hosts/:id/android-notification`), the iOS
   relay (`/notification`) and Live Activities return 404. A host logs a warning. Notifications
   show only while the app is open.
-- `GET /v1/mobile/features`. Without it the mobile app turns the agent browser live view off
-  and shows no update header. To enable the browser, add the route and answer
-  `{ "features": { "cloudServers": false, "browser": true } }`. Omit `latestVersion`, or the
-  app offers a store update that this fork cannot install.
 - `GET /v1/mobile/changelog`. Release notes then come from the public web site.
 - Billing, hosted servers, marketplace, SMTP email, R2 and rate-limit bindings.
-- `PATCH /v1/me`. A client cannot change its profile or the analytics answer.
+- Avatars (`PUT /v1/me/avatar` and `GET /v1/avatars/:id`). The clients show the blobatar.
 
 ## Analytics
 
@@ -52,8 +55,9 @@ build time.
 cd account
 bun install --frozen-lockfile
 cp .env.example .env        # then fill in the values; chmod 0600
-bun run src/selftest.ts     # 14 requests; no network and no IdP
+bun run src/selftest.ts     # 23 requests; no network and no IdP
 bun run src/index.ts        # listens on OPENBOT_ACCOUNT_PORT
+bun run src/backup.ts       # a dated copy of the database next to it
 ```
 
 For a container:
@@ -70,6 +74,20 @@ sudo openbot login --claim --name my-host
 ```
 
 The seed script needs `OPENBOT_BOOTSTRAP_EMAIL`. The claim expires after 15 minutes.
+
+## Backup and restore
+
+The database holds the ES256 ticket key and the admin token. If it is lost, every paired
+client must sign in again. Back it up as one file:
+
+```sh
+docker compose exec account bun run src/backup.ts /data/account-backup.sqlite
+docker compose cp account:/data/account-backup.sqlite ./account-backup.sqlite
+```
+
+`VACUUM INTO` reads a snapshot, so the service can keep running. The copy is as secret as the
+volume. To restore, stop the stack, put the copy at `OPENBOT_ACCOUNT_DB` (default
+`/data/account.sqlite`), remove the `-wal` and `-shm` files next to it, and start the stack.
 
 ## Configuration
 
