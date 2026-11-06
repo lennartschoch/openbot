@@ -173,5 +173,7 @@ if (mergeFailed) {
 
 const { forkTag } = cutAndPush(tag);
 const url = git(root, ["config", "--get", `remote.${args.forkRemote}.url`]);
-const slug = url.replace(/^git@github\.com:/u, "").replace(/\.git$/u, "") || "lennartschoch/openbot";
-process.stdout.write(`Release: https://github.com/${slug}/releases/tag/${forkTag}\n`);
+const slug = /github\.com[:/](?<slug>[^/]+\/[^/]+?)(?:\.git)?$/u.exec(url)?.groups?.slug;
+process.stdout.write(
+  slug ? `Release: https://github.com/${slug}/releases/tag/${forkTag}\n` : `Release tag: ${forkTag}\n`,
+);
