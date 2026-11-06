@@ -19,12 +19,24 @@ The Android version code is `major*10^7 + minor*10^5 + patch*10^3 + n`. `0.63.0-
 
 ## Cut a release
 
+After an upstream release, one command syncs and releases:
+
 ```sh
-git checkout main
-git merge upstream/main            # or: node scripts/fork/sync-upstream.mjs
-node scripts/fork/cut-release.mjs   # writes the version, commits, tags; prints the push command
+node scripts/fork/sync-upstream.mjs --push
+```
+
+It merges the newest upstream release tag, writes `.fork/state.json`, bumps the
+fork version, commits, tags `fork-v<version>` and pushes both. Exit code `2`
+means the merge has conflicts: resolve them, `git add -A`, then run
+`node scripts/fork/sync-upstream.mjs --continue --tag <tag> --push`.
+
+For a release of fork-only fixes on the current upstream base:
+
+```sh
 node scripts/fork/cut-release.mjs --push
 ```
+
+The scheduled sync task runs `/.agents/skills/fork-sync/SKILL.md`.
 
 The tag starts `.github/workflows/fork-release.yml`. It builds:
 

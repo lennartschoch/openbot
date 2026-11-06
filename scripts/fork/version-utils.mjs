@@ -3,7 +3,7 @@ const forkVersionPattern =
   /^(?<base>\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)-fork\.(?<build>\d+)$/;
 
 const stableTagPattern = /^v\d+\.\d+\.\d+$/;
-const upstreamReleaseTagPattern = /^v\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
+const upstreamReleaseTagPattern = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
 const forkTagPattern = /^fork-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-fork\.\d+)$/;
 
 export function isBaseVersion(value) {

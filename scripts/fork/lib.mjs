@@ -126,6 +126,15 @@ export function assertCleanWorktree(root) {
   }
 }
 
+export function mergeHeadExists(root) {
+  return git(root, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"]).length > 0;
+}
+
+export function hasUnmergedPaths(root) {
+  return git(root, ["ls-files", "--unmerged"]).length > 0;
+}
+
+/** The merge commits that are in progress: one for a merge, none otherwise. */
 export function commitAll(root, message) {
   run("git", ["add", "--all"], { cwd: root });
   run("git", ["commit", "--message", message], { cwd: root });
