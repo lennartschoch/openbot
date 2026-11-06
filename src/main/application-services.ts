@@ -3009,7 +3009,8 @@ export async function createApplicationServices({
     throw new Error(`Unsupported analytics platform: ${analyticsPlatform}`);
   }
   performance.mark("openbot:services.remote-desktop");
-  const analyticsEnabled = (app.isPackaged && appVariant === "production") || analyticsCaptureUrl !== null;
+  // Fork: analytics is always off. Restore the production rule on merge if needed.
+  const analyticsEnabled = false;
   const analyticsInstallId = analyticsEnabled
     ? await Effect.runPromise(
         readAnalyticsInstallId(join(app.getPath("userData"), ANALYTICS_INSTALL_ID_FILE), Date.now()),

@@ -45,7 +45,11 @@ function filterMobilePayload(event: TrackHandlerPayload): boolean {
   return true;
 }
 
+// Fork: analytics is always off.
+const FORK_ANALYTICS_ENABLED = false;
+
 export const mobileAnalytics = new MobileAnalytics(() => {
+  if (!FORK_ANALYTICS_ENABLED) return null;
   const clientId = process.env.EXPO_PUBLIC_OPENPANEL_CLIENT_ID;
   const clientSecret = process.env.EXPO_PUBLIC_OPENPANEL_CLIENT_SECRET;
   if (

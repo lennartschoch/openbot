@@ -729,8 +729,9 @@ const UPDATE_PHASES = new Set([
   "unsupported",
 ]);
 
-function shouldEnableDesktopAnalytics(appInfo: AppInfo, productionBuild: boolean): boolean {
-  return appInfo.analyticsCaptureUrl !== undefined || (productionBuild && appInfo.variant === "production");
+function shouldEnableDesktopAnalytics(_appInfo: AppInfo, _productionBuild: boolean): boolean {
+  // Fork: analytics is always off.
+  return false;
 }
 
 function sanitizeDesktopAnalyticsEvent(
