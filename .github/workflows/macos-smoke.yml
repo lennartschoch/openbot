@@ -1,0 +1,10 @@
+name: macOS smoke
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - run: sw_vers && uname -m && xcodebuild -version | head -1
