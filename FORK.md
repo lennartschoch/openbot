@@ -80,7 +80,7 @@ remove the quarantine warning, because only notarization does that:
 
 ```sh
 # Once per Mac that runs the fork build:
-security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db cert.pem
+security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db .fork/openbot-fork-code-signing.crt
 # Or Keychain Access: import the certificate, open it, Trust, "Always Trust", Code Signing.
 
 # Once per download, because the build is not notarized:
@@ -123,6 +123,27 @@ git: a workflow that a future upstream merge adds starts enabled. Disable it in
 
 - `.github/workflows/account-image.yml` publishes `ghcr.io/lennartschoch/openbot-account`.
 - `.github/workflows/fork-release.yml` builds the releases above.
+
+## Back up the signing material
+
+The private parts are not in this repository, and GitHub cannot give them back: repository
+secrets are write-only, and no API returns a stored value. Keep a copy of the folder that holds
+them (here `~/.config/openbot-fork/`) in a password manager:
+
+| File | What it is | If it is lost |
+| --- | --- | --- |
+| `fork-release.jks` + `keystore.env` | Android release key and its passwords | The next APK has a different signature. Every installed copy must be uninstalled first. |
+| `fork-signing.p12` + `apple-cert.env` | macOS signing identity and its password | A new identity, and Squirrel.Mac refuses updates over an installed copy. |
+| `fork-signing.crt` + `fork-signing.key` | The pair behind the `.p12` | The `.p12` cannot be rebuilt from the secrets. |
+
+The public halves are committed, so anyone can trust or verify a build without you:
+
+| File | SHA-256 |
+| --- | --- |
+| `.fork/openbot-fork-code-signing.crt` | `D6:13:AA:E1:45:43:F8:21:83:74:A5:74:CF:ED:5F:85:5A:51:F4:E3:3C:C6:4B:E1:09:C6:8B:8E:EB:20:0F:70` |
+| `.fork/openbot-fork-android.crt` | `BE:5F:7D:A0:04:51:20:53:70:86:69:00:36:3A:F4:A2:F5:3C:F8:70:4B:6D:A1:3C:C3:FA:C7:42:D2:DA:F7:DE` |
+
+A new certificate or key must change this table too.
 
 ## Sync with upstream
 
