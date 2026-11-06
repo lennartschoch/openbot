@@ -100,6 +100,7 @@ import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { PROVIDERS_V8_CAPABILITY } from "./providers-v8";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
+import { ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v2";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
@@ -372,6 +373,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_HISTORY_EXTENT_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
@@ -539,6 +541,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_HISTORY_EXTENT_CAPABILITY &&
     capability !== PUSH_NOTIFICATIONS_CAPABILITY &&
     capability !== ANDROID_PUSH_NOTIFICATIONS_CAPABILITY &&
+    capability !== ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY &&
     capability !== PROVIDER_ACCOUNTS_CAPABILITY &&
     capability !== ONEPASSWORD_CONNECTOR_CAPABILITY &&
     capability !== HOST_TIMEZONE_CAPABILITY &&
@@ -667,6 +670,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
   CODEX_API_KEY_CAPABILITY,
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -710,6 +714,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_HISTORY_EXTENT_CAPABILITY &&
       capability !== PUSH_NOTIFICATIONS_CAPABILITY &&
       capability !== ANDROID_PUSH_NOTIFICATIONS_CAPABILITY &&
+      capability !== ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY &&
       capability !== PROVIDER_ACCOUNTS_CAPABILITY &&
       capability !== ONEPASSWORD_CONNECTOR_CAPABILITY &&
       capability !== HOST_TIMEZONE_CAPABILITY &&

@@ -12,6 +12,7 @@ import {
   NOTIFICATION_SEALED_LIMIT,
   type NotificationRelayPush,
   type NotificationSound,
+  type UnifiedNotificationRelayPush,
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { resolveLocale, translateFor } from "@openbot/i18n";
@@ -71,7 +72,8 @@ const RESEND_DELAYS_MS = [10_000, 60_000] as const;
 /** One notification for the relay route of its platform. */
 export type NotificationRelayRequest =
   | { platform: "ios"; push: NotificationRelayPush }
-  | { platform: "android"; push: AndroidNotificationRelayPush };
+  | { platform: "android"; push: AndroidNotificationRelayPush }
+  | { platform: "android-unified"; push: UnifiedNotificationRelayPush };
 
 type PushNotificationAgents = Pick<
   TeamApiAgents,
@@ -351,7 +353,7 @@ export class PushNotificationService {
       // The Live Activity of an iPhone shows the event, and a notification would repeat it. With a
       // sound, the activity also lights up the screen and plays it; without one, it updates silently.
       // A message that did not start has no turn, so the activity does not show it.
-      if (stored.platform !== "android") {
+      if (stored.platform !== "android" && stored.platform !== "android-unified") {
         const sound = soundOf(stored.value);
         const startedAt =
           stored.value.liveActivityStartedAt === null ? null : stored.value.liveActivityStartedAt * 1_000;
@@ -557,6 +559,9 @@ function relayRequest(
   const sound = soundOf(value);
   if (stored.platform === "android") {
     return { platform: "android", push: { token: stored.value.token, sessionId, sealed, sound, timestamp } };
+  }
+  if (stored.platform === "android-unified") {
+    return { platform: "android-unified", push: { endpoint: stored.value.token, sessionId, sealed, sound, timestamp } };
   }
   const { token, environment } = stored.value;
   return token === null ? null : { platform: "ios", push: { token, environment, sessionId, sealed, sound, timestamp } };

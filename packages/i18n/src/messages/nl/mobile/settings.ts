@@ -113,6 +113,11 @@ export const messages = {
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Apple en de accountdienst van OpenBot kunnen dit niet lezen.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Google en de accountdienst van OpenBot kunnen dit niet lezen.",
+  "mobile.settings.notifications.pushService": "Pushdienst",
+  "mobile.settings.notifications.pushServiceFooter":
+    "OpenBot stuurt meldingen via UnifiedPush, bijvoorbeeld de ntfy-app. Kies de app hier, en stel de server en het onderwerp in die app in.",
+  "mobile.settings.notifications.pushServicePick": "Kies de pushdienst",
+  "mobile.settings.notifications.pushServiceNone": "Geen pushdienst gekozen. Tik om er een te kiezen, zoals ntfy.",
   "mobile.settings.notifications.sound": "Geluid",
   "mobile.settings.notifications.playSound": "Geluid afspelen",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

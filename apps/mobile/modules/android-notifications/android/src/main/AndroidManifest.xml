@@ -12,5 +12,16 @@
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
       </intent-filter>
     </service>
+    <!--
+      The UnifiedPush distributor (for example the ntfy app) gives each message to this service. The
+      app registers with `AndroidNotificationsModule`.
+    -->
+    <service
+      android:name="run.openbot.mobile.notifications.OpenBotUnifiedPushService"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+      </intent-filter>
+    </service>
   </application>
 </manifest>

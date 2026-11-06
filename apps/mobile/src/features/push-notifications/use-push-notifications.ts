@@ -2,6 +2,7 @@ import {
   ANDROID_PUSH_NOTIFICATIONS_ROUTES,
   type AndroidPushNotificationRegistration,
 } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
+import { ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push-notifications-android-v2";
 import {
   PUSH_NOTIFICATIONS_ROUTES,
   type PushNotificationRegistration,
@@ -30,6 +31,7 @@ import { isAndroid } from "@/shared/lib/platform";
 import { usePushEnvironment } from "@/shared/lib/push-environment";
 import { currentLocale } from "@/shared/lib/text";
 import { pushNotificationsNative as native } from "./push-notifications-native";
+import { unifiedPushNotifications as unifiedNative } from "./unified-push";
 
 interface PushNotificationsInput {
   servers: readonly Pick<MobileServer, "id" | "name" | "state">[];
@@ -42,12 +44,16 @@ interface PushNotificationsInput {
   foreground: boolean;
   post(serverId: string, path: string, body: TeamProtocolV2Json): Promise<unknown>;
   supportsPush(serverId: string): boolean;
+  /** Whether the host takes the UnifiedPush registrations of `push-notifications-android-v2`. */
+  supportsUnified(serverId: string): boolean;
 }
 
 /** A request that failed is sent again after this time, or at the next change or connection. */
 const RETRY_MS = 30_000;
-/** An iPhone registers through `push-notifications-v1`, an Android phone through `push-notifications-android-v1`. */
+/** An iPhone registers through `push-notifications-v1`, an Android phone through a capability of its own. */
 const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATIONS_ROUTES;
+/** The ntfy registration of `push-notifications-android-v2`, for a host that takes it. */
+const UNIFIED_ROUTES = ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES;
 
 /**
  * Gives each connected server that supports the notifications of this platform the push token of the
@@ -64,6 +70,7 @@ export function usePushNotifications({
   foreground,
   post,
   supportsPush,
+  supportsUnified,
 }: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
   // The level that the user chose for all of their devices replaces the level of this phone. The host
@@ -75,9 +82,11 @@ export function usePushNotifications({
   // An iPhone registers only when it knows which Apple environment its token is for.
   const environment = usePushEnvironment();
   const [token, setToken] = useState<string | null>(null);
+  /** The UnifiedPush endpoint of this phone, for a host that takes `push-notifications-android-v2`. */
+  const [endpoint, setEndpoint] = useState<string | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
   /** What the phone last told each host, so an unchanged state is not sent again. */
-  const registered = useRef(new Map<string, { key: string; removed: boolean }>());
+  const registered = useRef(new Map<string, { key: string; removed: boolean; unified: boolean }>());
   const postRef = useRef(post);
   postRef.current = post;
   const queues = useRef(new Map<string, Promise<void>>());
@@ -146,6 +155,29 @@ export function usePushNotifications({
 
   useEffect(() => native?.onDeviceToken(setToken), []);
 
+  // The UnifiedPush endpoint follows the same path as the push token of the other platform.
+  useEffect(() => {
+    const unified = unifiedNative;
+    if (!unified || !enabled || !foreground) return;
+    let current = true;
+    let again: ReturnType<typeof setTimeout> | null = null;
+    const readEndpoint = async () => {
+      try {
+        const value = await unified.deviceToken();
+        if (current) setEndpoint(value);
+      } catch {
+        if (current) again = setTimeout(() => void readEndpoint(), RETRY_MS);
+      }
+    };
+    void readEndpoint().catch(() => undefined);
+    return () => {
+      current = false;
+      if (again) clearTimeout(again);
+    };
+  }, [enabled, foreground]);
+
+  useEffect(() => unifiedNative?.onDeviceToken(setEndpoint), []);
+
   // The file is written again only when a server or its name changes. A list that did not load would
   // remove the keys, and each notification would then show the app name only.
   useEffect(() => {
@@ -185,6 +217,9 @@ export function usePushNotifications({
         continue;
       }
       if (!supportsPush(server.id)) continue;
+      // A host that takes the ntfy registrations gets them; an older host gets Firebase Cloud Messaging.
+      const unified = isAndroid && supportsUnified(server.id);
+      const routes = unified ? UNIFIED_ROUTES : ROUTES;
       const setting = effectiveServerNotificationSetting(preference, synced[server.id], server.id);
       const muted = mutedUntil(setting, now);
       let registration: PushNotificationRegistration | AndroidPushNotificationRegistration | null = null;
@@ -199,8 +234,10 @@ export function usePushNotifications({
           preview: preference.preview,
           sound: registeredSound(preference),
         };
-        if (isAndroid) registration = token ? { ...common, token } : null;
-        else {
+        if (isAndroid) {
+          const transport = unified ? endpoint : token;
+          registration = transport ? { ...common, token: transport } : null;
+        } else {
           registration = {
             ...common,
             token: deliverable ? token : null,
@@ -213,15 +250,15 @@ export function usePushNotifications({
         }
       }
       // A retry after a failed request sends the state again.
-      const key = `${attempt}:${JSON.stringify(registration)}`;
+      const key = `${attempt}:${unified ? "v2" : "v1"}:${JSON.stringify(registration)}`;
       if (registered.current.get(server.id)?.key === key) continue;
-      registered.current.set(server.id, { key, removed: registration === null });
+      registered.current.set(server.id, { key, removed: registration === null, unified });
       const serverId = server.id;
       enqueue(serverId, async () => {
         try {
           await postRef.current(
             serverId,
-            registration ? ROUTES.register : ROUTES.remove,
+            registration ? routes.register : routes.remove,
             registration ? { ...registration } : {},
           );
         } catch {
@@ -238,6 +275,7 @@ export function usePushNotifications({
     servers,
     foreground,
     token,
+    endpoint,
     secret,
     environment,
     preference,
@@ -245,6 +283,7 @@ export function usePushNotifications({
     liveActivities,
     activityHost,
     supportsPush,
+    supportsUnified,
     enqueue,
     attempt,
   ]);
@@ -258,8 +297,9 @@ export function usePushNotifications({
       // open a notification of it. The requests go at once: the server connections close after this
       // cleanup. A host that does not get one learns it from the account service, which refuses the
       // ended session.
-      for (const [serverId, { removed }] of sent) {
-        if (!removed) void postRef.current(serverId, ROUTES.remove, {}).catch(() => undefined);
+      for (const [serverId, { removed, unified }] of sent) {
+        if (!removed)
+          void postRef.current(serverId, (unified ? UNIFIED_ROUTES : ROUTES).remove, {}).catch(() => undefined);
       }
       sent.clear();
       try {

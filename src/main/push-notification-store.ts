@@ -5,6 +5,11 @@ import {
   type AndroidPushNotificationRegistration,
 } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import {
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CODECS,
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES,
+  type AndroidUnifiedPushNotificationRegistration,
+} from "@openbot/contracts/team-protocol/push-notifications-android-v2";
+import {
   PUSH_NOTIFICATION_SOUNDS,
   PUSH_NOTIFICATIONS_CODECS,
   PUSH_NOTIFICATIONS_ROUTES,
@@ -16,11 +21,13 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 
 /**
  * What a phone registered: an iPhone through `push-notifications-v1`, or an Android phone through
- * `push-notifications-android-v1`. An iPhone entry has no `platform`, as in the files of earlier hosts.
+ * `push-notifications-android-v1` (Firebase Cloud Messaging) or `push-notifications-android-v2`
+ * (a UnifiedPush endpoint). An iPhone entry has no `platform`, as in the files of earlier hosts.
  */
 export type PushTarget =
   | { platform?: undefined; value: PushNotificationRegistration }
-  | { platform: "android"; value: AndroidPushNotificationRegistration };
+  | { platform: "android"; value: AndroidPushNotificationRegistration }
+  | { platform: "android-unified"; value: AndroidUnifiedPushNotificationRegistration };
 
 /** One phone that gets notifications, with what the host needs to know what its member can see. */
 export type StoredPushRegistration = {
@@ -36,6 +43,9 @@ const REGISTRATION_LIMIT = 500;
 const decodeRegistration = PUSH_NOTIFICATIONS_CODECS.get(PUSH_NOTIFICATIONS_ROUTES.register)?.request;
 const decodeAndroidRegistration = ANDROID_PUSH_NOTIFICATIONS_CODECS.get(
   ANDROID_PUSH_NOTIFICATIONS_ROUTES.register,
+)?.request;
+const decodeAndroidUnifiedRegistration = ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CODECS.get(
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES.register,
 )?.request;
 
 /**
@@ -91,7 +101,8 @@ export class PushNotificationStore {
 
 /** Each platform has its own registration type, so each branch keeps its own. */
 function startAway(registration: StoredPushRegistration): StoredPushRegistration {
-  if (registration.platform === "android") return { ...registration, value: { ...registration.value, away: true } };
+  if (registration.platform === "android" || registration.platform === "android-unified")
+    return { ...registration, value: { ...registration.value, away: true } };
   return { ...registration, value: { ...registration.value, away: true } };
 }
 
@@ -116,6 +127,10 @@ function decodeFile(parsed: unknown): StoredPushRegistration[] {
       if (entry.platform === "android") {
         const value = readAndroidPushRegistration(decodeAndroidRegistration?.(entry.value));
         return value ? [{ sessionId, memberId, protocol, capabilities, platform: "android", value }] : [];
+      }
+      if (entry.platform === "android-unified") {
+        const value = readAndroidUnifiedPushRegistration(decodeAndroidUnifiedRegistration?.(entry.value));
+        return value ? [{ sessionId, memberId, protocol, capabilities, platform: "android-unified", value }] : [];
       }
       if (entry.platform !== undefined) return [];
       const value = readPushRegistration(decodeRegistration?.(entry.value));
@@ -177,4 +192,12 @@ export function readAndroidPushRegistration(value: unknown): AndroidPushNotifica
   if (typeof away !== "boolean" || typeof preview !== "boolean") return null;
   if (mutedUntil !== null && typeof mutedUntil !== "number") return null;
   return { serverId, token, secret, locale, away, level, mutedUntil, preview, sound: choice };
+}
+
+/**
+ * Reads a registration that the frozen `push-notifications-android-v2` codec has accepted. Its fields
+ * are the v1 fields, with the token of a UnifiedPush endpoint.
+ */
+export function readAndroidUnifiedPushRegistration(value: unknown): AndroidUnifiedPushNotificationRegistration | null {
+  return readAndroidPushRegistration(value);
 }

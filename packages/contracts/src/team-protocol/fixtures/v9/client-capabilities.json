@@ -82,6 +82,7 @@
   "history-extent-v1",
   "push-notifications-v1",
   "push-notifications-android-v1",
+  "push-notifications-android-v2",
   "provider-accounts-v1",
   "onepassword-connector-v1",
   "host-timezone-v1",

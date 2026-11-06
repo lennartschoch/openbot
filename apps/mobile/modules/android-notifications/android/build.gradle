@@ -35,4 +35,6 @@ dependencies {
   implementation expoNotificationsDependency()
   // The version that `expo-notifications` uses.
   implementation 'com.google.firebase:firebase-messaging:25.0.1'
+  // UnifiedPush: the ntfy transport, without Google Play Services.
+  implementation 'org.unifiedpush.android:connector:3.3.5'
 }

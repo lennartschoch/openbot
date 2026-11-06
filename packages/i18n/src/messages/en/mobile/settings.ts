@@ -112,6 +112,11 @@ export const messages = defineMessages("mobile.settings", {
     "Shows the start of a reply, a question, or the action to approve. Apple and the OpenBot account service cannot read it.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Shows the start of a reply, a question, or the action to approve. Google and the OpenBot account service cannot read it.",
+  "mobile.settings.notifications.pushService": "Push service",
+  "mobile.settings.notifications.pushServiceFooter":
+    "OpenBot sends notifications through UnifiedPush, for example the ntfy app. Choose the app here, and set the server and the topic in that app.",
+  "mobile.settings.notifications.pushServicePick": "Choose the push service",
+  "mobile.settings.notifications.pushServiceNone": "No push service chosen. Tap to choose one, such as ntfy.",
   "mobile.settings.notifications.sound": "Sound",
   "mobile.settings.notifications.playSound": "Play sound",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

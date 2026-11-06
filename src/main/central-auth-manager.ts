@@ -1002,8 +1002,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   /**
    * Sends one notification through the account service to Apple for an iPhone, or to Firebase Cloud
-   * Messaging for an Android phone. The host sealed the agent name and the text with keys that only
-   * the phone has. Returns `gone` when the session of the phone ended or Apple or Google refused the
+   * Messaging for an Android phone, or straight to the ntfy endpoint of an Android phone that uses
+   * UnifiedPush. The host sealed the agent name and the text with keys that only
+   * the phone has. Returns `gone` when the session of the phone ended or Apple, Google or ntfy refused the
    * token.
    */
   readonly sendPushNotification = Effect.fn("CentralAuth.sendPushNotification")(
@@ -1012,6 +1013,23 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       hostId: string,
       request: NotificationRelayRequest,
     ): Effect.fn.Return<"sent" | "gone", CentralAuthOperationError, CentralAuthTransport> {
+      if (request.platform === "android-unified") {
+        // The ntfy server needs no host credential: the topic name is the secret of the endpoint.
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            fetch(request.push.endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({ sealed: request.push.sealed, sound: request.push.sound }),
+            }),
+          catch: (cause) => new CentralAuthOperationError({ cause: new Error(String(cause)) }),
+        });
+        if (response.ok) return "sent" as const;
+        if (response.status === 404 || response.status === 410) return "gone" as const;
+        return yield* Effect.fail(
+          new CentralAuthOperationError({ cause: new Error(`ntfy refused the notification: ${response.status}`) }),
+        );
+      }
       const machineToken = yield* this.#hostMachineToken(hostId);
       const route = request.platform === "android" ? "android-notification" : "notification";
       return yield* this.#requestEffect(

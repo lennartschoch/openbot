@@ -6,6 +6,7 @@ import { useUniwind } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { NotificationMatrix } from "@/features/push-notifications/components/notification-matrix";
 import { pushNotificationsNative } from "@/features/push-notifications/push-notifications-native";
+import { pickUnifiedPushDistributor, unifiedPushDistributor } from "@/features/push-notifications/unified-push";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { saveLiveActivitiesPreference, useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
@@ -132,6 +133,20 @@ export function NotificationsSettingsScreen() {
           ) : null}
         </SettingsSection>
       )}
+      {isAndroid ? (
+        <SettingsSection
+          title={t("mobile.settings.notifications.pushService")}
+          footer={t("mobile.settings.notifications.pushServiceFooter")}
+        >
+          <SettingsRow disclosure={false} onPress={() => pickUnifiedPushDistributor()}>
+            <Typography.Paragraph>
+              {unifiedPushDistributor()
+                ? t("mobile.settings.notifications.pushServicePick")
+                : t("mobile.settings.notifications.pushServiceNone")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
       <SettingsSection
         title={t("mobile.settings.notifications.sound")}
         footer={t(

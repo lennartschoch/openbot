@@ -3,11 +3,20 @@ import {
   ANDROID_PUSH_NOTIFICATIONS_ROUTES,
 } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import {
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY,
+  ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/push-notifications-android-v2";
+import {
   PUSH_NOTIFICATIONS_CAPABILITY,
   PUSH_NOTIFICATIONS_ROUTES,
 } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { type PushTarget, readAndroidPushRegistration, readPushRegistration } from "../push-notification-store";
+import {
+  type PushTarget,
+  readAndroidPushRegistration,
+  readAndroidUnifiedPushRegistration,
+  readPushRegistration,
+} from "../push-notification-store";
 import type { PushNotificationService } from "../push-notifications";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -40,7 +49,11 @@ export async function routePushNotifications(
   return json(200, {});
 }
 
-function pushRoute(pathname: string) {
+function pushRoute(pathname: string): {
+  capability: string;
+  android: "fcm" | "unified" | false;
+  remove: boolean;
+} | null {
   switch (pathname) {
     case PUSH_NOTIFICATIONS_ROUTES.register:
     case PUSH_NOTIFICATIONS_ROUTES.remove:
@@ -53,18 +66,29 @@ function pushRoute(pathname: string) {
     case ANDROID_PUSH_NOTIFICATIONS_ROUTES.remove:
       return {
         capability: ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
-        android: true,
+        android: "fcm",
         remove: pathname === ANDROID_PUSH_NOTIFICATIONS_ROUTES.remove,
+      };
+    case ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES.register:
+    case ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES.remove:
+      return {
+        capability: ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY,
+        android: "unified",
+        remove: pathname === ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES.remove,
       };
     default:
       return null;
   }
 }
 
-function readTarget(android: boolean, body: unknown): PushTarget | null {
-  if (android) {
+function readTarget(android: "fcm" | "unified" | false, body: unknown): PushTarget | null {
+  if (android === "fcm") {
     const value = readAndroidPushRegistration(body);
     return value ? { platform: "android", value } : null;
+  }
+  if (android === "unified") {
+    const value = readAndroidUnifiedPushRegistration(body);
+    return value ? { platform: "android-unified", value } : null;
   }
   const value = readPushRegistration(body);
   return value ? { value } : null;

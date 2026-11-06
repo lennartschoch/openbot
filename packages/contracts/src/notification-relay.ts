@@ -50,6 +50,25 @@ export interface AndroidNotificationRelayPush {
 }
 
 /**
+ * One Android notification that a host sends through UnifiedPush: the host posts the sealed
+ * notification and the sound to the phone's ntfy endpoint, and the app opens the seal before Android
+ * shows the notification. No account service and no Google service sit between the host and the
+ * ntfy server, so the ntfy server sees the app name only.
+ */
+export interface UnifiedNotificationRelayPush {
+  /** The full URL of the phone's ntfy topic (`ANDROID_UNIFIED_PUSH_ENDPOINT_PATTERN`). */
+  endpoint: string;
+  /** The account session of the phone on this host, as for `NotificationRelayPush`. */
+  sessionId: string;
+  /** The sealed notification, base64url. */
+  sealed: string;
+  /** The sound that the app plays, or `null` for none. */
+  sound: NotificationSound | null;
+  /** When the host made the notification, in seconds. */
+  timestamp: number;
+}
+
+/**
  * A sealed notification above this size would not fit the 4 KB Apple payload with its envelope.
  * Firebase Cloud Messaging data messages have the same 4 KB limit.
  */

@@ -49,6 +49,7 @@ import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/p
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
+import { ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-android-v2";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
@@ -737,12 +738,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ),
     [],
   );
+  const supportsUnifiedNotifications = useCallback(
+    (serverId: string) =>
+      isAndroid && hasCapability(serverCapabilities.current, serverId, ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY),
+    [],
+  );
   usePushNotifications({
     servers,
     serversReady: serverDirectoryState === "ready",
     foreground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
+    supportsUnified: supportsUnifiedNotifications,
   });
   /** The shared Team API requests, sent to one server. */
   const teamApi = useCallback(
