@@ -9,9 +9,8 @@
     "scheme": "openbot",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "run.openbot.mobile",
+      "bundleIdentifier": "com.lennartschoch.openbot",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
         "NSAppTransportSecurity": {
@@ -22,7 +21,7 @@
       "icon": "./assets/icons/app-icon.icon"
     },
     "android": {
-      "package": "run.openbot.mobile",
+      "package": "com.lennartschoch.openbot",
       "icon": "./assets/icons/app-icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/android-adaptive-eyes.png",
@@ -125,8 +124,8 @@
         {
           "ios": {
             "enabled": true,
-            "appGroupId": "group.run.openbot.mobile",
-            "extensionBundleIdentifier": "run.openbot.mobile.ShareExtension",
+            "appGroupId": "group.com.lennartschoch.openbot",
+            "extensionBundleIdentifier": "com.lennartschoch.openbot.ShareExtension",
             "activationRule": {
               "supportsText": true,
               "supportsWebUrlWithMaxCount": 1,
@@ -208,8 +207,8 @@
       [
         "expo-widgets",
         {
-          "bundleIdentifier": "run.openbot.mobile.ExpoWidgetsTarget",
-          "groupIdentifier": "group.run.openbot.mobile",
+          "bundleIdentifier": "com.lennartschoch.openbot.widgets",
+          "groupIdentifier": "group.com.lennartschoch.openbot",
           "enablePushNotifications": true,
           "frequentUpdates": true
         }
@@ -218,8 +217,8 @@
         "./plugins/with-notification-service",
         {
           "targetName": "OpenBotNotificationService",
-          "bundleIdentifier": "run.openbot.mobile.NotificationService",
-          "groupIdentifier": "group.run.openbot.mobile"
+          "bundleIdentifier": "com.lennartschoch.openbot.notification-service",
+          "groupIdentifier": "group.com.lennartschoch.openbot"
         }
       ]
     ],
@@ -228,17 +227,10 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "eeec730f-c8f4-42c0-a750-64df8af14940"
-      }
-    },
-    "owner": "openbot",
-    "runtimeVersion": {
-      "policy": "fingerprint"
+      "router": {}
     },
     "updates": {
-      "url": "https://u.expo.dev/eeec730f-c8f4-42c0-a750-64df8af14940"
+      "enabled": false
     }
   }
 }

@@ -23,13 +23,15 @@ import { isIOS } from "@/shared/lib/platform";
 export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: string; version: string };
 
 // The store pages of the app. The web pages are the fallback when the store app does not open.
-const IOS_STORE_URL = "itms-apps://apps.apple.com/app/id6807024266";
-const IOS_STORE_WEB_URL = "https://apps.apple.com/app/id6807024266";
-const ANDROID_STORE_URL = "market://details?id=run.openbot.mobile";
-const ANDROID_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=run.openbot.mobile";
+// This fork ships from GitHub Releases, not from the stores. The entry opens the release
+// page, where the newest APK is the first asset.
+const IOS_STORE_URL = "https://github.com/lennartschoch/openbot/releases/latest";
+const IOS_STORE_WEB_URL = IOS_STORE_URL;
+const ANDROID_STORE_URL = "https://github.com/lennartschoch/openbot/releases/latest";
+const ANDROID_STORE_WEB_URL = ANDROID_STORE_URL;
 
 /** The public changelog, for when the notes cannot load. */
-export const MOBILE_CHANGELOG_URL = "https://openbot.run/changelog?platform=mobile";
+export const MOBILE_CHANGELOG_URL = "https://github.com/lennartschoch/openbot/releases";
 const NOTES_TIMEOUT_MS = 10_000;
 // The notes of a version do not change after the store has it.
 const NOTES_STALE_MS = 10 * 60_000;

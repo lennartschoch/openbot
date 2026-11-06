@@ -55,7 +55,7 @@ declare class ShareExtensionModule extends NativeModule {
 const native = requireOptionalNativeModule<ShareExtensionModule>("OpenBotShareExtension");
 
 /** The App Group of the app and its extensions. `app.json` names the same group. */
-const APP_GROUP = "group.run.openbot.mobile";
+const APP_GROUP = "group.com.lennartschoch.openbot";
 /** `plugins/share-extension/ShareExtensionData.swift` and `NotificationService.swift` read this file. */
 const DIRECTORY_FILE = "share-extension.json";
 /**
