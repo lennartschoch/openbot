@@ -56,7 +56,7 @@ if (currentBranch(root) !== args.branch) {
 assertCleanWorktree(root);
 
 const baseVersion = stripForkSuffix(readRootVersion(root));
-const buildNumber = nextForkNumber(root, baseVersion);
+const buildNumber = nextForkNumber(root);
 const version = formatForkVersion(baseVersion, buildNumber);
 
 const applied = applyVersion(root, version);

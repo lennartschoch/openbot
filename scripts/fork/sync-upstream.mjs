@@ -102,7 +102,7 @@ function cutAndPush(tag) {
   const commit = git(root, ["rev-list", "-n", "1", tag]);
   // The base version comes from the upstream tag, not from the file: a sync moves the base.
   const baseVersion = tag.replace(/^v/u, "");
-  const version = formatForkVersion(baseVersion, nextForkNumber(root, baseVersion));
+  const version = formatForkVersion(baseVersion, nextForkNumber(root));
 
   const applied = applyVersion(root, version);
   writeState(root, { upstreamTag: tag, upstreamCommit: commit });

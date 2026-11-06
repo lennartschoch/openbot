@@ -48,16 +48,37 @@ export function readRootVersion(root) {
 }
 
 /**
- * The Android version code of a fork build. It must grow with each release, because Android
- * refuses to install a lower code over a higher one. 0.63.0-fork.3 gives 6300003: room for 100
- * patches and 1000 fork builds for each patch.
+ * The Android version code of a fork build, in the shape of the Paseo fork:
+ *
+ *   (major*10^6 + minor*10^3 + patch) * 10000 + forkBuildNumber
+ *
+ * The fork build number keeps rising across upstream bases, so it also orders a
+ * prerelease and the stable release that follows it. 0.63.0-fork.1 gives 630000001.
  */
+const FORK_BUILD_SLOTS = 10_000;
+const MAX_FORK_BUILD = 9_999;
+
 export function androidVersionCode(baseVersion, buildNumber) {
   const [major, minor, patch] = stripForkSuffix(baseVersion)
     .split("-")[0]
     .split(".")
     .map((part) => Number.parseInt(part, 10));
-  return major * 10_000_000 + minor * 100_000 + patch * 1_000 + buildNumber;
+  if (![major, minor, patch].every((part) => Number.isSafeInteger(part) && part >= 0)) {
+    throw new Error(`Cannot read a version from ${baseVersion}.`);
+  }
+  if (minor > 999 || patch > 999) {
+    throw new Error(`Cannot make a collision-free Android version code from ${baseVersion}.`);
+  }
+  if (!Number.isSafeInteger(buildNumber) || buildNumber < 1 || buildNumber > MAX_FORK_BUILD) {
+    throw new Error(`The fork build number must be between 1 and ${MAX_FORK_BUILD}.`);
+  }
+  const code = (major * 1_000_000 + minor * 1_000 + patch) * FORK_BUILD_SLOTS + buildNumber;
+  // Google Play and Android accept at most 2,100,000,000. This scheme reaches that
+  // near minor version 200, so it has room for years of upstream releases.
+  if (code > 2_100_000_000) {
+    throw new Error(`The Android version code is out of range: ${code}.`);
+  }
+  return code;
 }
 
 /**
@@ -105,11 +126,14 @@ export function applyVersion(root, version) {
   return { baseVersion, buildNumber, versionCode };
 }
 
-/** The next fork build number for a base version: one above the highest `fork-v<base>-fork.N` tag. */
-export function nextForkNumber(root, baseVersion) {
-  const tags = git(root, ["tag", "--list", `fork-v${baseVersion}-fork.*`]).split("\n").filter(Boolean);
+/**
+ * The next fork build number: one above the highest of all fork tags. It does not
+ * restart at 1 for a new upstream base, because the Android version code and the
+ * macOS update both need one rising number.
+ */
+export function nextForkNumber(root) {
   let highest = 0;
-  for (const tag of tags) {
+  for (const tag of git(root, ["tag", "--list", "fork-v*"]).split("\n").filter(Boolean)) {
     const match = tag.match(/-fork\.(\d+)$/u);
     if (match) highest = Math.max(highest, Number.parseInt(match[1], 10));
   }

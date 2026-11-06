@@ -9,13 +9,17 @@ Synthetify Labs.
 - `package.json` holds the desktop version. It starts at the upstream version, such as `0.63.0`.
 - A fork release is `<base>-fork.<n>`, for example `0.63.0-fork.1`, and its tag is
   `fork-v0.63.0-fork.1`.
-- `n` starts at 1 for each base version and grows. The desktop app shows the full version.
+- `n` is global: it does not restart at 1 for a new upstream base. `0.63.0-fork.4` is followed by
+  `0.64.0-fork.5`, as in the Paseo fork. The Android version code and the macOS update both need
+  one number that only rises.
+- The desktop app shows the full version.
 - The mobile app keeps the upstream marketing version (`apps/mobile/app.json` `version`), because
   it follows the store train of upstream. `scripts/fork/apply-version.mjs` writes only
   `android.versionCode` and `ios.buildNumber`, from the fork version.
 
-The Android version code is `major*10^7 + minor*10^5 + patch*10^3 + n`. `0.63.0-fork.3` gives
-`6300003`. Keep `n` under 1000 and the patch under 100.
+The Android version code is `(major*10^6 + minor*10^3 + patch) * 10000 + n`. `0.63.0-fork.3`
+gives `630000003`, `0.64.0-fork.4` gives `640000004`. `n` must stay under 10,000, `minor` and
+`patch` under 1000; the code reaches the Android limit of 2.1 billion near minor version 200.
 
 ## Cut a release
 
