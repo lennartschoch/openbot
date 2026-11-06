@@ -1,4 +1,3 @@
-import { ANDROID_PUSH_TOKEN_PATTERN } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import { File, Paths } from "expo-file-system";
 import * as Notifications from "expo-notifications";
 import type { NotificationPermission } from "@/features/settings/model/push-notifications";
@@ -23,12 +22,12 @@ export const androidPushNotifications: PushNotificationsNative = {
     return answer;
   },
   async deviceToken() {
-    // A build without the Firebase file of the app has no token, and the promise rejects.
-    return fcmToken((await Notifications.getDevicePushTokenAsync()).data);
+    // Fork: Firebase Cloud Messaging is off. A later push transport supplies the token.
+    return null;
   },
-  onDeviceToken(listener) {
-    const subscription = Notifications.addPushTokenListener((device) => listener(fcmToken(device.data)));
-    return () => subscription.remove();
+  onDeviceToken() {
+    // Fork: Firebase Cloud Messaging is off, so the phone gives no new token.
+    return () => undefined;
   },
   writeKeys(servers) {
     const text = JSON.stringify({ version: 1, servers });
@@ -52,9 +51,4 @@ export const androidPushNotifications: PushNotificationsNative = {
 function permissionOf(status: Notifications.NotificationPermissionsStatus): NotificationPermission {
   if (status.granted) return "granted";
   return status.status === "undetermined" ? "undetermined" : "denied";
-}
-
-/** The Firebase Cloud Messaging token, or `null` when Android gave something else. */
-function fcmToken(value: unknown): string | null {
-  return typeof value === "string" && ANDROID_PUSH_TOKEN_PATTERN.test(value) ? value : null;
 }
