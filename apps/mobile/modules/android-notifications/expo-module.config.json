@@ -1,4 +1,6 @@
 {
   "platforms": ["android"],
-  "modules": ["run.openbot.mobile.notifications.AndroidNotificationsModule"]
+  "android": {
+    "modules": ["run.openbot.mobile.notifications.AndroidNotificationsModule"]
+  }
 }

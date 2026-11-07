@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
+import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.unifiedpush.android.connector.INSTANCE_DEFAULT
@@ -102,6 +103,7 @@ class AndroidNotificationsModule : Module() {
     }
 
     OnStartObserving {
+      val context = appContext.reactContext ?: return@OnStartObserving
       receiver =
         object : BroadcastReceiver() {
           override fun onReceive(context: Context, intent: Intent) {
@@ -109,7 +111,14 @@ class AndroidNotificationsModule : Module() {
           }
         }
           .also {
-            appContext.reactContext?.registerReceiver(it, IntentFilter(ACTION_ENDPOINT))
+            // Android 13+ wants an export flag; the broadcast comes from this app's own UnifiedPush
+            // service, so the receiver needs no other app.
+            ContextCompat.registerReceiver(
+              context,
+              it,
+              IntentFilter(ACTION_ENDPOINT),
+              ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
           }
     }
 
