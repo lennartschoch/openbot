@@ -6,6 +6,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.63.0-fork.3] - 2026-11-07
+
+### Fixed
+
+- Phone: the Notifications settings now show your push service (ntfy) again. The Android notifications module was not linked into the app, so the Push service row listed no distributors on any phone.
+- Hosted servers: OpenBot keeps its session bus across restarts. Before, a start that died left its bus running, and after enough restarts the service user ran out of file handles and OpenBot exited with "Failed to connect to the bus".
+
 ## [0.63.0-fork.2] - 2026-11-07
 
 ### Fixed
