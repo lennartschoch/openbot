@@ -23,10 +23,22 @@ state="$HOME/.config/openbot-hosted"
 mode=hosted
 if [ -r /opt/OpenBot/hosted/mode ] && [ "$(</opt/OpenBot/hosted/mode)" = self ]; then mode=self; fi
 
+# The unit gives a bus that outlives a restart (openbot-session-bus.service). Use it when it is
+# there: a bus that `exec dbus-run-session` starts dies with this process, and one that a killed
+# start leaves behind is never reaped, so a restart loop leaks one bus and one inotify instance per
+# start until the service user reaches fs.inotify.max_user_instances. An install without that unit
+# still gets a bus, it just gets the old behaviour with it.
+enter_session() {
+  if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    exec "$0" --in-session
+  fi
+  exec dbus-run-session -- "$0" --in-session
+}
+
 if [ "${1:-}" != --in-session ] && [ "$mode" = self ]; then
   mkdir -p "$state"
   chmod 0700 "$state"
-  exec dbus-run-session -- "$0" --in-session
+  enter_session
 fi
 if [ "${1:-}" != --in-session ]; then
   # The setup script starts after the sandbox is ready, so on the first boot this runs first.
@@ -35,7 +47,7 @@ if [ "${1:-}" != --in-session ]; then
     sleep 2
   done
   [ -s "$state/env" ] || { echo "The hosted server env file is missing." >&2; exit 1; }
-  exec dbus-run-session -- "$0" --in-session
+  enter_session
 fi
 
 # Read only the expected keys. The file is data, not a script.

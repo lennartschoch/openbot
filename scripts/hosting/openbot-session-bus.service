@@ -1,0 +1,27 @@
+# The D-Bus session bus of OpenBot, which openbot.service joins instead of starting its own.
+#
+# Why this is its own unit: openbot-hosted-server used to run `dbus-run-session`, so every start of
+# openbot.service made a new bus. A start that died without the wrapper reaping the bus (a stop that
+# timed out, a SIGKILL, a crash inside the session) left it reparented to init, holding its inotify
+# instance for good. On a host of 2026-11-07, 268 of them had piled up and the service user reached
+# fs.inotify.max_user_instances: every new dbus-daemon logged "Cannot initialize inotify: Too many
+# open files", the session bus was dead, OpenBot exited with "Failed to connect to the bus", systemd
+# restarted it after 10 s, and each restart leaked one more bus. 174 restarts in 35 minutes. The same
+# exhausted cap made Metro print EMFILE, which looks like an unrelated watcher bug.
+#
+# One bus that outlives a restart breaks that loop: the count can no longer grow.
+[Unit]
+Description=OpenBot session bus
+Before=openbot.service
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+RuntimeDirectory=openbot-bus
+RuntimeDirectoryMode=0700
+ExecStart=/usr/bin/dbus-daemon --session --nofork --address=unix:path=/run/openbot-bus/bus
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

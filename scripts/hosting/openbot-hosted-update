@@ -42,7 +42,7 @@ REQUESTS=/run/openbot
 STATE=/run/openbot-update.state
 UNIT_DIRECTORY=/etc/systemd/system
 REQUEST_UNITS=(openbot-update-request.path openbot-update-request.service)
-UNITS=(openbot.service openbot-update.service openbot-update.timer openbot-update-apply.service "${REQUEST_UNITS[@]}")
+UNITS=(openbot.service openbot-session-bus.service openbot-update.service openbot-update.timer openbot-update-apply.service "${REQUEST_UNITS[@]}")
 # boat runs this file as `user` before it saves the disk at a stop (openbot-boat-pre-stop).
 BOAT_USER=user
 BOAT_PRE_STOP=/home/$BOAT_USER/.boat/pre-stop
@@ -247,8 +247,8 @@ install_hosting() {
   done
   rm -f "$INSTALL/hosted/.unit.new"
   if [ "$changed" -eq 1 ]; then systemctl daemon-reload; fi
-  systemctl enable --quiet openbot.service openbot-update-apply.service openbot-update.timer \
-    openbot-update-request.path
+  systemctl enable --quiet openbot.service openbot-session-bus.service openbot-update-apply.service \
+    openbot-update.timer openbot-update-request.path
   # The terminal command of a self-hosted server. A hosted server has no person at a terminal.
   if self_hosted; then
     ln -sfn "$INSTALL/hosted/openbot" /usr/local/bin/openbot

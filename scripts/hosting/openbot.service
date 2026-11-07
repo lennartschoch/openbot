@@ -4,7 +4,8 @@
 [Unit]
 Description=OpenBot hosted server
 Wants=network-online.target openbot-update-apply.service
-After=network-online.target display-manager.service
+Requires=openbot-session-bus.service
+After=network-online.target display-manager.service openbot-session-bus.service
 # openbot-boat-pre-stop stops OpenBot before boat saves the disk, and makes this file so that nothing
 # starts it again before the save. /run is empty at each boot.
 ConditionPathExists=!/run/openbot-pre-stop
@@ -15,6 +16,9 @@ User=@SERVICE_USER@
 RuntimeDirectory=openbot
 RuntimeDirectoryMode=0700
 Environment=XDG_RUNTIME_DIR=/run/openbot
+# The bus of openbot-session-bus.service, which outlives a restart. openbot-hosted-server used to
+# start its own with dbus-run-session and leaked one per start; that unit says what it cost.
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/openbot-bus/bus
 # As root (+), and OpenBot starts when it fails (-). It repairs the modes of the release, and installs
 # the update request units when an older release moved this one into place; openbot-hosted-update
 # says why.
