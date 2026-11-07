@@ -202,7 +202,9 @@ export function usePushNotifications({
     // Wait for iOS and the token, so a phone that has notifications does not remove them at launch.
     if (preference.enabled && preference.permission === null) return;
     const deliverable = preference.enabled && preference.permission === "granted";
-    if (deliverable && !token) return;
+    // Fork: Firebase Cloud Messaging is off, so an Android phone has no token to wait for. It
+    // registers the UnifiedPush endpoint that the distributor gave it, read by the effect above.
+    if (deliverable && !(isAndroid ? endpoint : token)) return;
     // With notifications off, the Live Activity of an iPhone can still play the sound, which the host
     // starts. Android has no Live Activity.
     const activitySound = !isAndroid && liveActivities.enabled && preference.playSound;
