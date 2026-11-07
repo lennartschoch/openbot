@@ -14,6 +14,9 @@ declare class UnifiedPushModule extends NativeModule {
   getEndpoint(): string | null;
   getDistributor(): string | null;
   pickDistributor(): void;
+  distributors(): string[];
+  registerWith(distributor: string, messageForDistributor: string | null): void;
+  openDistributor(distributor: string): void;
   addListener(event: "onEndpoint", listener: (event: { endpoint: string | null }) => void): EventSubscription;
 }
 
@@ -28,6 +31,33 @@ export function pickUnifiedPushDistributor(): void {
 /** The distributor app of this registration, such as the ntfy app's package, or `null`. */
 export function unifiedPushDistributor(): string | null {
   return native?.getDistributor() ?? null;
+}
+
+/**
+ * Every distributor app that answers. The connector knows the v3 distributors (a service); ntfy
+ * answers with a v2 receiver, which the native module adds to this list.
+ */
+export function unifiedPushDistributors(): string[] {
+  return native?.distributors() ?? [];
+}
+
+/** Chooses one distributor by package, which is how a v2 distributor such as ntfy is picked. */
+export function registerWithUnifiedPushDistributor(distributor: string): void {
+  native?.registerWith(distributor, "OpenBot");
+}
+
+/** Opens the distributor app, where the user picks the ntfy server and confirms the topic. */
+export function openUnifiedPushDistributor(distributor: string): void {
+  native?.openDistributor(distributor);
+}
+
+/** The app label of a distributor package, with the app's own name as the last resort. */
+export function unifiedPushDistributorLabel(distributor: string): string {
+  const known: Record<string, string> = {
+    "io.heckel.ntfy": "ntfy",
+    "org.unifiedpush.android.distributor": "UnifiedPush Distributions",
+  };
+  return known[distributor] ?? distributor.split(".").filter(Boolean).at(-1) ?? distributor;
 }
 
 /**

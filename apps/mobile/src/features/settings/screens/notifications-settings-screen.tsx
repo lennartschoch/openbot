@@ -6,7 +6,14 @@ import { useUniwind } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { NotificationMatrix } from "@/features/push-notifications/components/notification-matrix";
 import { pushNotificationsNative } from "@/features/push-notifications/push-notifications-native";
-import { pickUnifiedPushDistributor, unifiedPushDistributor } from "@/features/push-notifications/unified-push";
+import {
+  openUnifiedPushDistributor,
+  pickUnifiedPushDistributor,
+  registerWithUnifiedPushDistributor,
+  unifiedPushDistributor,
+  unifiedPushDistributorLabel,
+  unifiedPushDistributors,
+} from "@/features/push-notifications/unified-push";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { saveLiveActivitiesPreference, useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
@@ -145,6 +152,22 @@ export function NotificationsSettingsScreen() {
                 : t("mobile.settings.notifications.pushServiceNone")}
             </Typography.Paragraph>
           </SettingsRow>
+          {/*
+            The system picker only sees the v3 distributors (a service). ntfy answers with a v2
+            receiver, so the phone's list is shown here too and one tap registers with it.
+          */}
+          {unifiedPushDistributors().map((distributor) => (
+            <SettingsRow
+              key={distributor}
+              disclosure={false}
+              onPress={() => {
+                registerWithUnifiedPushDistributor(distributor);
+                openUnifiedPushDistributor(distributor);
+              }}
+            >
+              <Typography.Paragraph>{unifiedPushDistributorLabel(distributor)}</Typography.Paragraph>
+            </SettingsRow>
+          ))}
         </SettingsSection>
       ) : null}
       <SettingsSection

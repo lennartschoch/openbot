@@ -67,6 +67,36 @@ class AndroidNotificationsModule : Module() {
       UnifiedPush.tryPickDistributor(activity) { }
     }
 
+    /**
+     * Every distributor app that answers, in the order the settings screen shows them. The
+     * connector's list is the source of truth, and a phone with only ntfy installed has one entry:
+     * ntfy answers as a v2 receiver, which the connector queries.
+     */
+    Function("distributors") {
+      val context = appContext.reactContext ?: return@Function emptyList<String>()
+      UnifiedPush.getDistributors(context).filter { it != context.packageName }
+    }
+
+    /**
+     * Registers with one distributor by package. `tryPickDistributor` needs the v3 link activity,
+     * which ntfy answers through a dialog of its own; saving the distributor and registering works
+     * with both, and is the only way to choose when more than one distributor answers.
+     */
+    Function("registerWith") { distributor: String, messageForDistributor: String? ->
+      val context = appContext.reactContext ?: return@Function Unit
+      UnifiedPush.saveDistributor(context, distributor)
+      UnifiedPush.register(context, INSTANCE_DEFAULT, messageForDistributor, null)
+      Unit
+    }
+
+    /** Opens the distributor app, where the user picks the server and confirms the topic. */
+    Function("openDistributor") { distributor: String ->
+      val context = appContext.reactContext ?: return@Function Unit
+      val launch = context.packageManager.getLaunchIntentForPackage(distributor) ?: return@Function Unit
+      context.startActivity(launch)
+      Unit
+    }
+
     OnStartObserving {
       receiver =
         object : BroadcastReceiver() {
