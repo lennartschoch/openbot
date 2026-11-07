@@ -38,7 +38,9 @@ export function unifiedPushDistributor(): string | null {
  * answers with a v2 receiver, which the native module adds to this list.
  */
 export function unifiedPushDistributors(): string[] {
-  return native?.distributors() ?? [];
+  const found = native?.distributors() ?? [];
+  console.log(`[push] distributors: ${found.length ? found.join(", ") : "none"} (module=${Boolean(native)})`);
+  return found;
 }
 
 /** Chooses one distributor by package, which is how a v2 distributor such as ntfy is picked. */

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.unifiedpush.android.connector.INSTANCE_DEFAULT
@@ -74,7 +75,9 @@ class AndroidNotificationsModule : Module() {
      */
     Function("distributors") {
       val context = appContext.reactContext ?: return@Function emptyList<String>()
-      UnifiedPush.getDistributors(context).filter { it != context.packageName }
+      val found = UnifiedPush.getDistributors(context).filter { it != context.packageName }
+      Log.i("OpenBotPush", "distributors() -> $found")
+      found
     }
 
     /**
@@ -84,6 +87,7 @@ class AndroidNotificationsModule : Module() {
      */
     Function("registerWith") { distributor: String, messageForDistributor: String? ->
       val context = appContext.reactContext ?: return@Function Unit
+      Log.i("OpenBotPush", "registerWith($distributor, $messageForDistributor)")
       UnifiedPush.saveDistributor(context, distributor)
       UnifiedPush.register(context, INSTANCE_DEFAULT, messageForDistributor, null)
       Unit
