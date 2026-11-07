@@ -40,6 +40,7 @@
       ]
     },
     "plugins": [
+      "./plugins/with-no-mlkit",
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
       "expo-router",
@@ -66,7 +67,7 @@
           "cameraPermission": "Allow OpenBot to use your camera to scan QR codes.",
           "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
           "recordAudioAndroid": false,
-          "barcodeScannerEnabled": true
+          "barcodeScannerEnabled": false
         }
       ],
       [

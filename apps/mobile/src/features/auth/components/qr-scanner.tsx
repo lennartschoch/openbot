@@ -6,7 +6,7 @@ import { Alert, Button, Card, Spinner, Surface, Typography } from "heroui-native
 import { useThemeColor } from "heroui-native/hooks";
 import Camera from "lucide-react-native/icons/camera";
 import ScanLine from "lucide-react-native/icons/scan-line";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import Animated, {
@@ -24,6 +24,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { decodeQrCode } from "./decode-qr-code";
 import { ScanAgainButton } from "./scan-again-button";
 
 type ScanState =
@@ -36,7 +37,10 @@ export type ScannerMode = "pending" | "permission" | "camera";
 export type ScanStatus = ScanState["status"];
 // The dark backdrop under an immersive camera, before its first frame.
 const CAMERA_BACKDROP = "radial-gradient(90% 60% at 50% 46%, #2c2a30 0%, #121114 70%)";
-const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
+/** How often a still is taken and decoded while the frame is live. */
+const SCAN_INTERVAL_MS = 700;
+/** The first still waits for the preview to settle, so it is not a blurry one. */
+const FIRST_SCAN_DELAY_MS = 350;
 
 function ScannerStatus({
   pairing,
@@ -141,20 +145,21 @@ function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanSt
 
 // Mount with the session so readiness resets on close, focus loss and background.
 function ScannerCamera({
-  onBarcodeScanned,
+  camera,
   onCameraReady,
   onMountError,
-}: Pick<CameraViewProps, "onBarcodeScanned" | "onCameraReady" | "onMountError">) {
+}: Pick<CameraViewProps, "onCameraReady" | "onMountError"> & { camera: RefObject<CameraView | null> }) {
   const opacity = useSharedValue(0);
   const previewStyle = useAnimatedStyle(() => ({ opacity: opacity.get() }));
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, previewStyle]}>
       <CameraView
+        ref={camera}
         style={StyleSheet.absoluteFill}
         facing="back"
-        barcodeScannerSettings={QR_SCANNER_SETTINGS}
-        onBarcodeScanned={onBarcodeScanned}
+        // The shutter of a still that only feeds the decoder is silent; there is no photo to keep.
+        animateShutter={false}
         onMountError={onMountError}
         onCameraReady={() => {
           opacity.set(onCameraReady ? 1 : withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
@@ -214,6 +219,7 @@ export function QrScanner({
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [permission, requestPermission, getPermission] = useCameraPermissions();
+  const camera = useRef<CameraView>(null);
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
   const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { width: windowWidth } = useWindowDimensions();
@@ -301,6 +307,35 @@ export function QrScanner({
     scanLocked.current = false;
     setScanState({ status: "idle" });
   }
+
+  // The decode loop: a still every `SCAN_INTERVAL_MS` while the frame is live, decoded off the
+  // camera. `connect` guards an open or pending scan, so a still that lands late is dropped.
+  const connectRef = useRef(connect);
+  connectRef.current = connect;
+  useEffect(() => {
+    if (!scanEnabled || !cameraLive || !previewReady) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = async () => {
+      if (cancelled || scanLocked.current) return;
+      try {
+        const photo = await camera.current?.takePictureAsync({ quality: 0.6, shutterSound: false });
+        const data = photo && !cancelled ? await decodeQrCode(photo.uri) : null;
+        if (data && !cancelled) {
+          await connectRef.current(data);
+          return;
+        }
+      } catch {
+        // A still without a QR, or a camera that is not ready yet, is not an error: take another.
+      }
+      if (!cancelled && !scanLocked.current) timer = setTimeout(() => void attempt(), SCAN_INTERVAL_MS);
+    };
+    timer = setTimeout(() => void attempt(), FIRST_SCAN_DELAY_MS);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [cameraLive, previewReady, scanEnabled]);
 
   if (!permission) {
     return (
@@ -413,6 +448,7 @@ export function QrScanner({
         {cameraLive ? (
           <ScannerCamera
             key={cameraAttempt}
+            camera={camera}
             onCameraReady={() => {
               setReadyFor(cameraKey);
             }}
@@ -420,9 +456,6 @@ export function QrScanner({
               setScanState({ status: "error", source: "camera", message: t("mobile.auth.scanner.cameraFailed") });
               setReadyFor(cameraKey);
             }}
-            // Expo enables native scanning from the presence of this callback.
-            // Keep it enabled from startup; connect guards opening and pending scans.
-            onBarcodeScanned={({ data }) => void connect(data)}
           />
         ) : null}
 

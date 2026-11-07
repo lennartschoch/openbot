@@ -193,8 +193,19 @@ release can report where it came from. Resolve conflicts by hand, then run
   `expo-notifications` bump cannot silently bring Firebase back; check `strip-google`'s assertions
   when you bump it. What the strip removes with it: `firebase-installations`,
   `com.google.android.datatransport`, `play-services-*`, `com.google.android.c2dm.permission.RECEIVE`
-  and the Play install-referrer permission. Still Google and still in the APK: ML Kit's
-  `barcode-scanning`, pulled by `expo-camera` for the QR pairing screen (on-device, no request).
+  and the Play install-referrer permission.
+  ML Kit is **not in the APK** either. `expo-camera` stays — it draws the preview for the QR screen
+  and the chat camera — but its barcode and document scanners are off (`"barcodeScannerEnabled":
+  false` in `app.json`, and `apps/mobile/plugins/with-no-mlkit.js`, which also sets
+  `expo.camera.document-scanner-enabled=false`). expo-camera then declares
+  `com.google.mlkit:barcode-scanning`, `com.google.android.gms:play-services-code-scanner`,
+  `androidx.camera:camera-mlkit-vision` and `play-services-mlkit-document-scanner` as `compileOnly`,
+  so neither they nor their models nor their Play-services manifest entries are packaged, and the
+  plugin marks `com.google.mlkit.vision.DEPENDENCIES` for removal from the merged manifest. QR
+  decoding moved into the app: `qr-scanner.tsx` takes a silent still every 700 ms while the frame is
+  live and `decode-qr-code.ts` decodes it with `jsqr` over the pixels that Skia reads (after a resize
+  to 1024 px with `expo-image-manipulator`). Do not pass `barcodeScannerSettings` or
+  `onBarcodeScanned` to a `CameraView`: the classes behind them are absent, so that path throws.
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.
