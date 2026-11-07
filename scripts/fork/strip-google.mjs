@@ -23,15 +23,23 @@
  *   package-dir defaults to the installed `expo-notifications`; a checkout of the npm tarball works
  *   for a dry run.
  */
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
 
-const packageDir = process.argv[2]
-  ? resolve(process.argv[2])
+/**
+ * Optional: a directory that holds the packages by name, as `node_modules` does. Without it the
+ * installed packages are stripped. A copy of the npm tarballs works for a dry run.
+ */
+const packagesRoot = process.argv[2] ? resolve(process.argv[2]) : null;
+const packageDir = packagesRoot
+  ? join(packagesRoot, "expo-notifications")
   : dirname(require.resolve("expo-notifications/package.json"));
+const cameraDir = packagesRoot
+  ? join(packagesRoot, "expo-camera")
+  : dirname(require.resolve("expo-camera/package.json"));
 const androidDir = join(packageDir, "android");
 const sourceDir = join(androidDir, "src", "main", "java", "expo", "modules", "notifications");
 const manifestPath = join(androidDir, "src", "main", "AndroidManifest.xml");
@@ -80,7 +88,7 @@ replace(
   gradlePath,
   [
     [
-      "  // release notes in https://firebase.google.com/support/release-notes/android - cmd + f \"Cloud Messaging version\"\n" +
+      '  // release notes in https://firebase.google.com/support/release-notes/android - cmd + f "Cloud Messaging version"\n' +
         "  implementation 'com.google.firebase:firebase-messaging:25.0.1'\n\n",
       "",
     ],
@@ -98,17 +106,6 @@ replace(
     ],
   ],
   '"com.google.firebase.MESSAGING_EVENT"',
-);
-
-// The three native modules that only wrap Firebase.
-replace(
-  moduleConfigPath,
-  [
-    ['      "expo.modules.notifications.notifications.background.ExpoBackgroundNotificationTasksModule",\n', ""],
-    ['      "expo.modules.notifications.tokens.PushTokenModule",\n', ""],
-    ['      "expo.modules.notifications.topics.TopicSubscriptionModule",\n', ""],
-  ],
-  "PushTokenModule",
 );
 
 // A remote message that a notification carries only exists with Firebase. The local notifications
@@ -143,10 +140,7 @@ replace(
   join(sourceDir, "notifications", "handling", "NotificationsHandler.kt"),
   [
     ["import expo.modules.notifications.notifications.model.RemoteNotificationContent\n", ""],
-    [
-      "    val content = notification.notificationRequest.content\n",
-      "",
-    ],
+    ["    val content = notification.notificationRequest.content\n", ""],
     [
       "    if (content is RemoteNotificationContent && content.isDataOnly) {\n" +
         "      // We do not notify JS about data-only notifications, for consistency with iOS.\n" +
@@ -227,6 +221,42 @@ remove("notifications/RemoteMessageSerializer.java");
 remove("notifications/background/BackgroundRemoteNotificationTaskConsumer.kt");
 remove("notifications/background/ExpoBackgroundNotificationTasksModule.kt");
 
+/** The native modules that only wrapped Firebase, unregistered so nothing asks for them. */
+function removeFirebaseModules() {
+  const configPath = join(packageDir, "expo-module.config.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  const modules = config.android?.modules ?? [];
+  const kept = modules.filter(
+    (name) => !/PushTokenModule|TopicSubscriptionModule|BackgroundNotificationTasks/u.test(name),
+  );
+  if (kept.length === modules.length) return;
+  config.android.modules = kept;
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  edited.push("expo-notifications/expo-module.config.json");
+}
+
+/**
+ * Turns a package that ships a prebuilt AAR into a source build.
+ *
+ * `expo-notifications` and `expo-camera` are published with `android.publication`, and Expo's Gradle
+ * plugin then adds `api "host.exp.exponent:expo.modules.<name>:<version>"` — the AAR from the
+ * package's `local-maven-repo`, not the sources. Editing or flagging the sources of such a package
+ * changes nothing: the first attempt at this strip crossed the prebuild untouched because the AAR
+ * carried Firebase anyway. Without the `publication` block the module becomes a Gradle project and
+ * its `build.gradle` (and its `barcodeScannerEnabled` switch) applies.
+ */
+function buildFromSource(name, directory) {
+  const configPath = join(directory, "expo-module.config.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  if (config.android?.publication === undefined) return;
+  delete config.android.publication;
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  edited.push(`${name}/expo-module.config.json`);
+  // Nothing may resolve the prebuilt artifact after this; a stale AAR would reintroduce Firebase.
+  rmSync(join(directory, "local-maven-repo"), { recursive: true, force: true });
+  removed.push(`${name}/local-maven-repo`);
+}
+
 /** Prune the directories that held only removed files, so `find` shows nothing left behind. */
 function pruneEmptyDirectories(directory) {
   for (const entry of readdirSync(directory)) {
@@ -236,9 +266,7 @@ function pruneEmptyDirectories(directory) {
     if (readdirSync(path).length === 0) rmSync(path, { recursive: true, force: true });
   }
 }
-pruneEmptyDirectories(sourceDir);
-
-/** The point of the script: no Firebase identifier left in the Android sources or the manifest. */
+/** The point of the script: no Firebase and no prebuilt AAR left behind. */
 const leftovers = [];
 function scan(directory) {
   for (const entry of readdirSync(directory)) {
@@ -265,14 +293,27 @@ function scan(directory) {
     }
   }
 }
+
+removeFirebaseModules();
+buildFromSource("expo-notifications", packageDir);
+buildFromSource("expo-camera", cameraDir);
+pruneEmptyDirectories(sourceDir);
+
 scan(androidDir);
-const androidModules = JSON.parse(readFileSync(moduleConfigPath, "utf8")).android?.modules ?? [];
-for (const module of androidModules)
-  if (/PushTokenModule|TopicSubscriptionModule|BackgroundNotificationTasks/u.test(module))
-    leftovers.push(`expo-module.config.json: ${module}`);
-if (leftovers.length > 0) throw new Error(`strip-google: Firebase is still referenced:\n${leftovers.join("\n")}`);
+for (const name of ["expo-notifications", "expo-camera"]) {
+  const directory = name === "expo-camera" ? cameraDir : packageDir;
+  const config = JSON.parse(readFileSync(join(directory, "expo-module.config.json"), "utf8"));
+  if (config.android?.publication !== undefined) leftovers.push(`${name}: still published as a prebuilt AAR`);
+  if (existsSync(join(directory, "local-maven-repo"))) leftovers.push(`${name}/local-maven-repo still exists`);
+  for (const module of config.android?.modules ?? [])
+    if (/PushTokenModule|TopicSubscriptionModule|BackgroundNotificationTasks/u.test(module))
+      leftovers.push(`${name}/expo-module.config.json: ${module}`);
+}
+if (leftovers.length > 0) throw new Error(`strip-google: Google is still referenced:\n${leftovers.join("\n")}`);
 
 const version = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")).version;
+const cameraVersion = JSON.parse(readFileSync(join(cameraDir, "package.json"), "utf8")).version;
 process.stdout.write(
-  `strip-google: expo-notifications ${version} has no Firebase: ${removed.length} paths removed, ${edited.length} files edited.\n`,
+  `strip-google: no Firebase, no ML Kit — expo-notifications ${version} and expo-camera ${cameraVersion}\n` +
+    `  build from source now: ${removed.length} paths removed, ${edited.length} files edited.\n`,
 );

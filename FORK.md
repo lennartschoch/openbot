@@ -172,6 +172,13 @@ release can report where it came from. Resolve conflicts by hand, then run
   `openbot://mobile-connect` QR links and a different scheme would break pairing.
 - `apps/mobile/google-services.json` is absent. Push notifications over Firebase Cloud Messaging
   are not part of the fork. A build without the file works; closed-app notifications do not.
+- **The prebuilt expo modules are source builds.** `expo-notifications` and `expo-camera` ship an
+  `android.publication` block and a `local-maven-repo` AAR, and Expo's Gradle plugin then links the
+  AAR instead of the sources — so neither `strip-google.mjs`'s source edits nor expo-camera's
+  `barcodeScannerEnabled` flag would do anything (the first attempt at this shipped Firebase inside
+  the unchanged AAR). `scripts/fork/strip-google.mjs` deletes the `publication` block from both and
+  removes their `local-maven-repo`, which makes them Gradle projects. If an Expo bump adds another
+  module that must be edited or flagged, it needs the same treatment.
 - **No analytics or telemetry leaves the app.** Four switches carry it, and a merge must keep all
   four: `FORK_ANALYTICS_ENABLED = false` in `apps/mobile/src/features/analytics/mobile-analytics.ts`,
   `FORK_FAILURE_REPORTS_ENABLED = false` in `apps/mobile/src/features/analytics/failure-reports.ts`

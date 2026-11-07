@@ -267,10 +267,12 @@ jobs:
       - name: Apply the fork version
         run: node scripts/fork/apply-version.mjs --version "$FORK_VERSION"
 
-      # Keeps firebase-messaging, firebase-installations, datatransport and play-services out of the
-      # APK. The fork pushes over UnifiedPush (ntfy), so expo-notifications' FCM transport is dead
-      # code; the script deletes it and fails the build if the upstream code it targets has moved.
-      - name: Take Firebase out of expo-notifications
+      # Keeps firebase-messaging, firebase-installations, datatransport, play-services and ML Kit out
+      # of the APK. The fork pushes over UnifiedPush (ntfy) and decodes QR codes in JS, so both
+      # transports are dead code; the script deletes or flags them, forces the two packages to build
+      # from source instead of from their prebuilt AARs, and fails the build if the upstream code it
+      # targets has moved.
+      - name: Take Firebase and ML Kit out of the expo modules
         run: bun run fork:strip-google
 
       - name: Prebuild the Android project
