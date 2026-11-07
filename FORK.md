@@ -172,6 +172,23 @@ release can report where it came from. Resolve conflicts by hand, then run
   `openbot://mobile-connect` QR links and a different scheme would break pairing.
 - `apps/mobile/google-services.json` is absent. Push notifications over Firebase Cloud Messaging
   are not part of the fork. A build without the file works; closed-app notifications do not.
+- **No analytics or telemetry leaves the app.** Four switches carry it, and a merge must keep all
+  four: `FORK_ANALYTICS_ENABLED = false` in `apps/mobile/src/features/analytics/mobile-analytics.ts`,
+  `FORK_FAILURE_REPORTS_ENABLED = false` in `apps/mobile/src/features/analytics/failure-reports.ts`
+  and in `src/renderer/src/error-reports.ts` (product events *and* failure reports), the
+  `analyticsEnabled = false` in `src/main/application-services.ts` (host events and its report
+  queue), and `shouldEnableDesktopAnalytics() { return false }` in `src/renderer/src/analytics.ts`.
+  `src/main/content-security-policy.ts` also drops `https://analytics.openbot.run` from
+  `connect-src`, so a re-enabled sender still cannot reach upstream's collector; the upstream
+  OpenPanel client id stays in the bundle but no client is ever constructed. Upstream's
+  `apps/auth-api` FCM relay is not deployed — our account service is `account/`.
+  What remains of Google in the APK is inert, not absent: `firebase-messaging`,
+  `firebase-installations` and `com.google.android.datatransport` (pulled in by
+  `expo-notifications`), plus ML Kit's barcode models (pulled in by `expo-camera`). With no
+  `google-services.json` there is no `FirebaseApp` and no FCM/Datatransport request; the
+  permissions list carries `com.google.android.c2dm.permission.RECEIVE` and the Play install
+  referrer permission, but no `AD_ID`. Removing the libraries means dropping `expo-notifications`
+  and the camera barcode scanner, which is a separate change.
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.

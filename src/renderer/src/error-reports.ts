@@ -20,6 +20,8 @@ export const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop;
 
 let queue: ReportQueue | undefined;
 let enabled = false;
+/** Fork: failure reports are telemetry too, so this app sends none, whatever the preference says. */
+const FORK_FAILURE_REPORTS_ENABLED = false;
 let configured = false;
 const startup: { properties: FailureProperties; timestamp: number }[] = [];
 let profileId: string | null = null;
@@ -41,6 +43,13 @@ export function configureDesktopReports(
   tracking: boolean,
   user: Pick<CentralAuthUser, "id" | "email"> | null,
 ): void {
+  if (!FORK_FAILURE_REPORTS_ENABLED) {
+    // `configured` and an empty buffer keep `reportNotification` from holding startup reports for
+    // a queue that never exists.
+    configured = true;
+    startup.length = 0;
+    return;
+  }
   const capture = info.analyticsCaptureUrl;
   if (capture === undefined && (!import.meta.env.PROD || info.variant !== "production")) return;
   queue ??= new ReportQueue(
@@ -128,6 +137,7 @@ function webAnalyticsDefault(): boolean {
 }
 
 export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> | null): void {
+  if (!FORK_FAILURE_REPORTS_ENABLED) return;
   webSignedIn = user !== null;
   if (!import.meta.env.PROD || window.location.origin !== "https://openbot.run") return;
   queue ??= new ReportQueue(

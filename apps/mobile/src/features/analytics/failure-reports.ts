@@ -14,6 +14,9 @@ import { randomUUID } from "expo-crypto";
 import { Alert, type AlertButton, Platform } from "react-native";
 import { currentText } from "@/shared/lib/text";
 
+/** Fork: off like the product events in `mobile-analytics.ts`. */
+const FORK_FAILURE_REPORTS_ENABLED = false;
+
 const storage: ReportStorage = {
   read: () =>
     telemetryIO(async () => {
@@ -39,6 +42,9 @@ const storage: ReportStorage = {
 
 let reports: ReportQueue | undefined;
 export function mobileReportQueue(): ReportQueue | undefined {
+  // Fork: failure reports are telemetry too, so a phone sends none even if a build carries the
+  // OpenPanel values that `mobile-analytics.ts` needs for the product events.
+  if (!FORK_FAILURE_REPORTS_ENABLED) return undefined;
   if (reports) return reports;
   const clientId = process.env.EXPO_PUBLIC_OPENPANEL_CLIENT_ID;
   const clientSecret = process.env.EXPO_PUBLIC_OPENPANEL_CLIENT_SECRET;
