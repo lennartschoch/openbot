@@ -388,7 +388,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+          # `>>$GITHUB_ENV` only reaches the *next* step, so keep the values in this shell too.
+          eval "$(node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" | tee -a "$GITHUB_ENV")"
           if [[ "$FORK_IS_PRERELEASE" == "true" ]]; then
             gh release edit "$FORK_TAG" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
           else
