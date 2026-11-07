@@ -7,17 +7,17 @@ import {
 import type { PushNotificationsNative } from "./push-notifications-native.types";
 
 /**
- * The Firebase Cloud Messaging transport. The phone gives the app a token, and the host sends the
- * sealed notification through the OpenBot relay and Google. `OpenBotMessagingService.kt` opens it.
+ * The parts of a notification that do not belong to a transport: the permission, the key file, and the
+ * sound preview. The fork pushes over UnifiedPush only (`unified-push.android.ts`); Firebase Cloud
+ * Messaging is gone from the build (`scripts/fork/strip-google.mjs`), so there is no device token.
  */
 export const androidPushNotifications: PushNotificationsNative = {
   permission: androidPermission,
   async deviceToken() {
-    // A build without the Firebase file of the app has no token, and the promise rejects.
     return null;
   },
   onDeviceToken() {
-    // Fork: Firebase Cloud Messaging is off, so the phone gives no new token.
+    // Without Firebase the phone has no token to give, and no token to renew.
     return () => undefined;
   },
   writeKeys: writeAndroidKeys,

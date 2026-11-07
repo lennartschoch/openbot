@@ -90,6 +90,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/install-git-hooks.ts",
+    "fork:strip-google": "node scripts/fork/strip-google.mjs",
     "postinstall": "bun scripts/electron-dist-cache.ts restore && bun scripts/install-electron.ts && bun scripts/electron-dist-cache.ts save && bun scripts/stamp-install.ts",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",

@@ -182,13 +182,19 @@ release can report where it came from. Resolve conflicts by hand, then run
   `connect-src`, so a re-enabled sender still cannot reach upstream's collector; the upstream
   OpenPanel client id stays in the bundle but no client is ever constructed. Upstream's
   `apps/auth-api` FCM relay is not deployed — our account service is `account/`.
-  What remains of Google in the APK is inert, not absent: `firebase-messaging`,
-  `firebase-installations` and `com.google.android.datatransport` (pulled in by
-  `expo-notifications`), plus ML Kit's barcode models (pulled in by `expo-camera`). With no
-  `google-services.json` there is no `FirebaseApp` and no FCM/Datatransport request; the
-  permissions list carries `com.google.android.c2dm.permission.RECEIVE` and the Play install
-  referrer permission, but no `AD_ID`. Removing the libraries means dropping `expo-notifications`
-  and the camera barcode scanner, which is a separate change.
+  Firebase is **not in the APK**: `scripts/fork/strip-google.mjs` (run by the Android job of
+  `fork-release.yml`, and by `bun run fork:strip-google`) deletes `expo-notifications`' FCM
+  transport — `ExpoFirebaseMessagingService`, `PushTokenModule`, `TopicSubscriptionModule`, the
+  background remote-message task, `RemoteMessageSerializer`, `RemoteNotificationContent`,
+  `FirebaseNotificationTrigger` — drops `com.google.firebase:firebase-messaging` from its
+  `build.gradle` and the `MESSAGING_EVENT` service from its manifest, and removes our own
+  `OpenBotMessagingService`. Channels, permissions, the `NotificationsService` receiver and the tap
+  handling stay. The script fails the build when the upstream code it targets has moved, so an
+  `expo-notifications` bump cannot silently bring Firebase back; check `strip-google`'s assertions
+  when you bump it. What the strip removes with it: `firebase-installations`,
+  `com.google.android.datatransport`, `play-services-*`, `com.google.android.c2dm.permission.RECEIVE`
+  and the Play install-referrer permission. Still Google and still in the APK: ML Kit's
+  `barcode-scanning`, pulled by `expo-camera` for the QR pairing screen (on-device, no request).
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.

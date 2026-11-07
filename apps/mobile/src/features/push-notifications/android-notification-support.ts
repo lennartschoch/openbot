@@ -4,7 +4,7 @@ import type { NotificationPermission } from "@/features/settings/model/push-noti
 import { androidChannelId, createAndroidChannels } from "./android-notification-channels";
 import { SOUND_PREVIEW_KEY } from "./push-notifications-native.types";
 
-/** `OpenBotMessagingService.kt` and `OpenBotUnifiedPushService.kt` read this file in the app files. */
+/** `OpenBotUnifiedPushService.kt` and `NotificationPresenter.kt` read this file in the app files. */
 const KEYS_FILE = "push-notifications.json";
 
 /** The shared parts of both Android transports: permission, the key file, and the sound preview. */

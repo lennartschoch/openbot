@@ -6,7 +6,7 @@ const { setNotificationSounds } = require("expo-notifications/plugin/build/withN
 // Adds the notification sounds to the app. The `expo-notifications` plugin would also copy its
 // `sounds` into the Android resources, which reject the `-` in the names. The names stay on iOS,
 // because the account service sends them to released iPhone builds (`NOTIFICATION_SOUND_FILES`), so
-// Android gets copies with `_` in place of `-`. `OpenBotMessagingService.kt` and the notification
+// Android gets copies with `_` in place of `-`. `NotificationPresenter.kt` and the notification
 // channels (`android-notification-channels.ts`) use those names.
 
 /** @type {import('expo/config-plugins').ConfigPlugin<{ sounds: string[] }>} */

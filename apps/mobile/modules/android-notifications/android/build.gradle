@@ -33,8 +33,7 @@ def expoNotificationsDependency() {
 
 dependencies {
   implementation expoNotificationsDependency()
-  // The version that `expo-notifications` uses.
-  implementation 'com.google.firebase:firebase-messaging:25.0.1'
-  // UnifiedPush: the ntfy transport, without Google Play Services.
+  // No Firebase: `scripts/fork/strip-google.mjs` takes the FCM transport out of `expo-notifications`,
+  // and UnifiedPush is the only transport this app has.
   implementation 'org.unifiedpush.android:connector:3.3.5'
 }

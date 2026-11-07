@@ -13,9 +13,8 @@ import java.util.UUID
 
 /**
  * Opens one sealed notification and gives it to `expo-notifications`, which shows it, or asks the app
- * first when the app is on screen. `OpenBotMessagingService` calls this for Firebase Cloud Messaging
- * and `OpenBotUnifiedPushService` calls it for UnifiedPush (ntfy), so both transports show the same
- * notification. A notification that no key opens shows the app name only.
+ * first when the app is on screen. `OpenBotUnifiedPushService` calls this for UnifiedPush (ntfy),
+ * the only transport of this fork. A notification that no key opens shows the app name only.
  */
 object NotificationPresenter {
   fun show(context: Context, sealed: String, sound: String?, sentTime: Long) {

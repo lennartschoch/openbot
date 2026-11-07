@@ -5,7 +5,7 @@ import { currentText } from "@/shared/lib/text";
 
 /**
  * Android 8 and later play the sound of the notification channel, and a channel keeps its sound.
- * So each sound has a channel, and `OpenBotMessagingService.kt` shows a notification in the channel
+ * So each sound has a channel, and `NotificationPresenter.kt` shows a notification in the channel
  * of the sound that the host sent. Both use these ids.
  */
 export function androidChannelId(sound: NotificationSound | null): string {

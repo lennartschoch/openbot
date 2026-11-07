@@ -5,7 +5,7 @@ import { supportLog, supportLogValue } from "@/features/support/model/support-lo
 import { type AvatarFileAgent, agentAvatarFile, syncAvatarFolder } from "@/features/workspace/model/agent-avatar-file";
 
 /**
- * `OpenBotMessagingService.kt` reads this file and the pictures of its folder in the files folder of
+ * `NotificationPresenter.kt` reads this file and the pictures of its folder in the files folder of
  * the app (`Paths.document`), and shows the picture of the agent as the large icon of its
  * notification. iOS reads the pictures of the share extension (`share-extension.ts`).
  */

@@ -13,8 +13,7 @@ import java.nio.charset.StandardCharsets
  * Receives the notifications of OpenBot hosts from a UnifiedPush distributor (for example the ntfy
  * app), also while the app does not run. A host posts the sealed agent name and text, and the sound,
  * as JSON to the phone's ntfy endpoint, and the ntfy server passes the body on. This service opens
- * the seal and shows the notification (`NotificationPresenter`), as `OpenBotMessagingService` does
- * for the Firebase Cloud Messaging transport of the same notifications.
+ * the seal and shows the notification (`NotificationPresenter`).
  */
 class OpenBotUnifiedPushService : PushService() {
   override fun onMessage(message: PushMessage, instance: String) {

@@ -1,20 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application>
     <!--
-      Firebase gives each message to the service with the highest priority. `expo-notifications`
-      declares its own service with priority -1, so this one gets the messages and gives the others
-      to it.
-    -->
-    <service
-      android:name="run.openbot.mobile.notifications.OpenBotMessagingService"
-      android:exported="false">
-      <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-      </intent-filter>
-    </service>
-    <!--
       The UnifiedPush distributor (for example the ntfy app) gives each message to this service. The
-      app registers with `AndroidNotificationsModule`.
+      app registers with `AndroidNotificationsModule`. This is the only transport: the fork took
+      Firebase Cloud Messaging out of `expo-notifications` (`scripts/fork/strip-google.mjs`).
     -->
     <service
       android:name="run.openbot.mobile.notifications.OpenBotUnifiedPushService"
