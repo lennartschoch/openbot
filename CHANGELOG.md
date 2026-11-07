@@ -6,6 +6,12 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.63.0-fork.2] - 2026-11-07
+
+### Fixed
+
+- Phone: the push service row now lists the distributors on the phone, such as ntfy, and one tap registers with it. Before, the row opened nothing when no distributor offered the UnifiedPush link screen, so an ntfy-only phone could not choose a push service at all.
+
 ## [0.63.0] - 2026-11-06
 
 ### Added
