@@ -6,6 +6,14 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.64.0-fork.12] - 2026-11-08
+
+### Fixed
+
+- Phone: the app starts again after the Google services strip. The shrunk release APK missed the
+  `com.google.android.gms.tasks` classes that the code scanner of `expo-camera` uses, so
+  `with-no-mlkit` now adds the matching `-dontwarn` rule beside the ML Kit ones.
+
 ## [0.64.0-fork.11] - 2026-11-08
 
 ### Fixed
