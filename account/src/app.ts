@@ -2,7 +2,7 @@
 // server and Signal expect; see ../SPEC.md. Responses are intentionally small.
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import type { Config } from "./config";
+import { PERSISTENT_SESSION_EXPIRES_AT_SECONDS, type Config } from "./config";
 import { hash, newId, newToken, nowSeconds, prune, rateLimit, type Db } from "./db";
 import { authorizationUrl, discover, redeemCode } from "./oidc";
 import { machineTokenHash, mintTicket, jwks, type RemoteRole } from "./tickets";
@@ -693,7 +693,7 @@ async function hostTicket(config: Config, db: Db, hostId: string, request: Reque
   if (!owner || owner.status !== "active") return apiError(403, "forbidden", "The host has no active owner.");
   const now = nowSeconds();
   const sessionId = `host:${hostId}`;
-  const expiresAt = now + config.sessionTtlSeconds;
+  const expiresAt = PERSISTENT_SESSION_EXPIRES_AT_SECONDS;
   db.raw
     .query(
       `INSERT INTO remote_sessions (session_id, host_id, user_id, membership_id, started_at, expires_at)
@@ -755,7 +755,7 @@ async function startSession(config: Config, db: Db, request: Request): Promise<R
   if (!membership || membership.status !== "active") return apiError(403, "forbidden", "No access to this host.");
   const now = nowSeconds();
   const sessionId = newId();
-  const expiresAt = now + config.sessionTtlSeconds;
+  const expiresAt = PERSISTENT_SESSION_EXPIRES_AT_SECONDS;
   db.raw
     .query(
       "INSERT INTO remote_sessions (session_id, host_id, user_id, membership_id, started_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",

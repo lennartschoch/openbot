@@ -3,6 +3,13 @@
 // Everything is read once at startup. The service is single-tenant by design: one human,
 // one host, a handful of clients. See ../PROTOCOL.md for the protocol contract.
 
+/**
+ * Upstream product policy: remote (host and device) sessions do not expire with time; logout or
+ * device/membership revocation ends them. Ticket JWTs still live for `ticketTtlSeconds`. Keep a
+ * finite, Date-compatible deadline for the numeric contract (`8_640_000_000_000_000` ms, Date's
+ * maximum), matching `PERSISTENT_SESSION_EXPIRES_AT` in `apps/auth-api/src/server/session-policy.ts`.
+ */
+export const PERSISTENT_SESSION_EXPIRES_AT_SECONDS = 8_640_000_000_000_000 / 1_000;
 export interface Config {
   /** Public base URL of this service, e.g. https://account.example.com. Used for the OIDC redirect URI. */
   publicUrl: string;
@@ -26,9 +33,8 @@ export interface Config {
   oidcDomain: string;
   /** Comma-separated emails allowed to sign in. Empty = any user the issuer authenticates. */
   allowedEmails: string[];
-  /** Ticket/session lifetimes, seconds. */
+  /** Ticket lifetime, seconds. Remote sessions themselves are persistent. */
   ticketTtlSeconds: number;
-  sessionTtlSeconds: number;
   /** Session lifetime for a human login (desktop/phone), seconds. */
   authSessionTtlSeconds: number;
 }
@@ -70,7 +76,6 @@ export function loadConfig(): Config {
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean),
     ticketTtlSeconds: intEnv("OPENBOT_TICKET_TTL_SECONDS", 300),
-    sessionTtlSeconds: intEnv("OPENBOT_SESSION_TTL_SECONDS", 3600),
     authSessionTtlSeconds: intEnv("OPENBOT_AUTH_SESSION_TTL_SECONDS", 60 * 60 * 24 * 30),
   };
 }

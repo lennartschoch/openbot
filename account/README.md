@@ -104,7 +104,7 @@ volume. To restore, stop the stack, put the copy at `OPENBOT_ACCOUNT_DB` (defaul
 | `OPENBOT_OIDC_DOMAIN` | no | The only email domain that company sign-in accepts. |
 | `OPENBOT_ALLOWED_EMAILS` | no | Comma-separated allow-list. Empty accepts each user of the issuer. |
 | `OPENBOT_BOOTSTRAP_EMAIL` | for seed | Owner email for the first claim. |
-| `OPENBOT_TICKET_TTL_SECONDS`, `OPENBOT_SESSION_TTL_SECONDS`, `OPENBOT_AUTH_SESSION_TTL_SECONDS` | no | Lifetimes. Defaults 300, 3600 and 30 days. |
+| `OPENBOT_TICKET_TTL_SECONDS`, `OPENBOT_AUTH_SESSION_TTL_SECONDS` | no | Lifetimes. Defaults 300 and 30 days. Remote host/device sessions do not expire with time; logout or revocation ends them. |
 
 Signal must read the ticket keys from this service. Use
 `REMOTE_TICKET_JWKS_URL=http://account:3100/.well-known/jwks.json` on the same Docker network,
