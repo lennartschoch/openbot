@@ -3,7 +3,7 @@
 # docs/docker.md#several-instances-on-one-host.
 services:
   openbot:
-    image: ghcr.io/nightly-labs/openbot:${OPENBOT_TAG:-latest}
+    image: ghcr.io/lennartschoch/openbot:${OPENBOT_TAG:-latest}
     container_name: openbot-${OPENBOT_NAME:?}
     restart: unless-stopped
     security_opt:

@@ -244,6 +244,9 @@ release can report where it came from. Resolve conflicts by hand, then run
   version: `-fork.14` is newer than `-fork.13`, and a plain release of that base is not newer than
   a fork build of it. Keep that too: with the upstream comparison the app offered the same version
   forever.
+- `docker/compose.yaml`, `docker/instances/compose.yaml` and `docs/docker.md` name
+  `ghcr.io/lennartschoch/openbot`, the fork image (amd64 only). The container asks its host to
+  pull that image, so a merge must keep the name here too.
 - Upstream publishes a Linux arm64 AppImage. The fork builds Linux x64 only (`dist:linux`), so
   `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
   there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.

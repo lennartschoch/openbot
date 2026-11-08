@@ -2,16 +2,15 @@
 
 The OpenBot image is the Linux release, run as a [self-hosted server](self-hosted-server.md) in a
 container. It is a normal Remote host of your account. You use it from the desktop app, the iPhone
-app or `openbot.run/app`. The image is `ghcr.io/nightly-labs/openbot`, for `linux/amd64` and
-`linux/arm64`.
+app or `openbot.run/app`. The image is `ghcr.io/lennartschoch/openbot`, for `linux/amd64`.
 
 ## Run
 
 With Docker Compose:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/compose.yaml
-curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+curl -fsSLO https://raw.githubusercontent.com/lennartschoch/openbot/main/docker/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/lennartschoch/openbot/main/docker/seccomp.json
 docker compose up -d
 docker compose exec openbot openbot login
 ```
@@ -19,12 +18,12 @@ docker compose exec openbot openbot login
 With `docker run`:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+curl -fsSLO https://raw.githubusercontent.com/lennartschoch/openbot/main/docker/seccomp.json
 docker run -d --name openbot --restart unless-stopped \
   --security-opt seccomp=seccomp.json --security-opt no-new-privileges:true \
   --shm-size 1g --stop-timeout 60 \
   -v openbot-data:/data \
-  ghcr.io/nightly-labs/openbot:latest
+  ghcr.io/lennartschoch/openbot:latest
 docker exec -it openbot openbot login
 ```
 
@@ -390,7 +389,7 @@ is the machine-readable source for the newest full release. For example, this re
 prints its tag:
 
 ```sh
-gh api repos/nightly-labs/openbot/releases/latest --jq '.tag_name'
+gh api repos/lennartschoch/openbot/releases/latest --jq '.tag_name'
 ```
 
 Automation can poll that metadata and download an image. Installation needs these checks:
@@ -470,7 +469,7 @@ environment of OpenBot, so they can read these values.
 - **Check the image.** Each release image has a build provenance attestation:
 
   ```sh
-  gh attestation verify oci://ghcr.io/nightly-labs/openbot:<version> --repo nightly-labs/openbot
+  gh attestation verify oci://ghcr.io/lennartschoch/openbot:<version> --repo lennartschoch/openbot
   ```
 
 ## How it works
