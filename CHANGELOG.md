@@ -6,6 +6,14 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.64.0-fork.11] - 2026-11-08
+
+### Fixed
+
+- Release builds reuse the Bun, Electron and Gradle downloads between runs, and a release
+  download retries a server error five times with a growing delay, so a GitHub asset edge that
+  answers 504 no longer fails a platform.
+
 ## [0.64.0-fork.10] - 2026-11-08
 
 ### Fixed
