@@ -9,7 +9,7 @@
 [![Fork release](https://github.com/lennartschoch/openbot/actions/workflows/fork-release.yml/badge.svg)](https://github.com/lennartschoch/openbot/actions/workflows/fork-release.yml)
 [![License](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-blue.svg)](LICENSE)
 
-This fork changes three things about OpenBot, and keeps everything else in step with upstream:
+This fork changes four things about OpenBot, and keeps everything else in step with upstream:
 
 - **A de-Googled Android app.** The APK carries no Google dependencies: no Firebase Cloud
   Messaging, no ML Kit, no Play Services libraries. QR codes decode in the app with a pure
