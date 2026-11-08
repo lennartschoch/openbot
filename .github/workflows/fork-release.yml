@@ -450,6 +450,18 @@ jobs:
           sha256sum "$apk" | tee "$apk.sha256"
           gh release upload "$FORK_TAG" "$apk" "$apk.sha256" --clobber --repo "$GITHUB_REPOSITORY"
 
+  # The container image that docker/compose.yaml pulls. It runs after the release is published, so
+  # `latest` never points at an image that the release does not have.
+  docker-image:
+    name: Container image
+    needs: [finalize]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/fork-docker.yml
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+
   finalize:
     name: Publish the release
     needs: [create-release, desktop-linux, desktop-macos, android]

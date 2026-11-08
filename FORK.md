@@ -132,6 +132,7 @@ git: a workflow that a future upstream merge adds starts enabled. Disable it in
 
 - `.github/workflows/account-image.yml` publishes `ghcr.io/lennartschoch/openbot-account`.
 - `.github/workflows/fork-release.yml` builds the releases above.
+- `.github/workflows/fork-docker.yml` builds `ghcr.io/lennartschoch/openbot` from a release.
 
 ## Back up the signing material
 
@@ -246,7 +247,14 @@ release can report where it came from. Resolve conflicts by hand, then run
   forever.
 - `docker/compose.yaml`, `docker/instances/compose.yaml` and `docs/docker.md` name
   `ghcr.io/lennartschoch/openbot`, the fork image (amd64 only). The container asks its host to
-  pull that image, so a merge must keep the name here too.
+  pull that image, so a merge must keep the name here too. `.github/workflows/fork-docker.yml`
+  builds it from the AppImage of each published release, checks that AppImage against
+  `latest-linux.yml`, starts the image once, and pushes `v<version>` and `latest`. A fork release
+  runs it after the release is published; for a tag that is already out, run it alone:
+
+  ```sh
+  gh workflow run fork-docker.yml --ref main -f tag=fork-v<version>
+  ```
 - **A server does not update itself from a client.** `src/main/application-services.ts` builds no
   `HostedUpdateAdapter` (the file is deleted), so `host-update-v1` cannot ask root to install a
   release, and a container never asks its host. `HostReleaseService` still reads this fork's feed,

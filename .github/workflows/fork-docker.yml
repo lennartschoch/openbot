@@ -1,0 +1,119 @@
+name: Fork Docker image
+
+# The container image of a fork release, for docs/docker.md and docker/compose.yaml. It unpacks the
+# AppImage of that release, starts the image once, and pushes it to ghcr.io/<owner>/<repo> as
+# `v<version>` and `latest`. A fork release runs this after the release is published; a dispatch runs
+# it alone for a tag that is already out.
+#
+# The image is amd64 only: an arm64 runner is not used, and upstream's arm64 image is not ours.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing fork tag to build (e.g. fork-v0.64.0-fork.14)"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: "Fork tag to build"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    name: Container image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Resolve the fork release
+        shell: bash
+        run: node scripts/fork/release-env.mjs --tag "$SOURCE_TAG" >>"$GITHUB_ENV"
+
+      - name: Download the AppImage of the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir image
+          gh release download "$FORK_TAG" --repo "$GITHUB_REPOSITORY" --dir image \
+            --pattern "latest-linux.yml" \
+            --pattern "OpenBot-$FORK_VERSION-x86_64.AppImage"
+
+      # The manifest is the one that the desktop and server updaters read, so the image and the
+      # update feed cannot disagree about the version.
+      - name: Check the AppImage against the release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=image/latest-linux.yml
+          version=$(sed -n 's/^version: *//p' "$manifest" | head -n 1)
+          path=$(sed -n 's/^path: *//p' "$manifest" | head -n 1)
+          sha512=$(sed -n 's/^sha512: *//p' "$manifest" | head -n 1)
+          [ "$version" = "$FORK_VERSION" ] || { echo "::error::The manifest names $version, not $FORK_VERSION."; exit 1; }
+          [ "$path" = "OpenBot-$FORK_VERSION-x86_64.AppImage" ] ||
+            { echo "::error::The manifest names $path."; exit 1; }
+          [ "$(openssl dgst -sha512 -binary "image/$path" | openssl base64 -A)" = "$sha512" ] ||
+            { echo "::error::The AppImage does not match the release manifest."; exit 1; }
+          mv "image/$path" image/OpenBot.AppImage
+
+      - name: Build the image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --file docker/Dockerfile \
+            --build-arg "VERSION=$FORK_VERSION" \
+            --build-arg "REVISION=$(git rev-parse HEAD)" \
+            --tag openbot:release image
+
+      # The image starts with the sandbox on, its control socket answers, and a stop lets OpenBot
+      # exit by itself. A signed-out server needs no account.
+      - name: Start and stop the image
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker logs openbot' ERR
+          docker run --detach --name openbot --shm-size 1g \
+            --security-opt seccomp=docker/seccomp.json --security-opt no-new-privileges:true openbot:release
+          status=
+          for _ in $(seq 1 120); do
+            if docker exec openbot test -S /run/openbot/control.sock; then
+              status=$(docker exec openbot openbot status)
+              grep -Fxq "Account: loading" <<<"$status" || break
+            fi
+            sleep 1
+          done
+          echo "$status"
+          grep -Fxq "OpenBot $FORK_VERSION" <<<"$status" ||
+            { echo "::error::The image does not report OpenBot $FORK_VERSION."; exit 1; }
+          grep -Fxq "Account: signed out. Sign in with: openbot login" <<<"$status" ||
+            { echo "::error::The image did not reach a signed-out state."; exit 1; }
+          docker stop --time 60 openbot
+          test "$(docker inspect openbot --format '{{.State.ExitCode}}')" = 0
+
+      - name: Push the image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker tag openbot:release "$image:v$FORK_VERSION"
+          docker tag openbot:release "$image:latest"
+          docker push "$image:v$FORK_VERSION"
+          docker push "$image:latest"
+          echo "Pushed \`$image:v$FORK_VERSION\` and \`$image:latest\`." >>"$GITHUB_STEP_SUMMARY"
