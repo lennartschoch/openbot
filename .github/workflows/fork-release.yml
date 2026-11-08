@@ -310,6 +310,15 @@ jobs:
           CI: "1"
         run: bunx expo prebuild --platform android --clean --no-install
 
+      - name: Show what the prebuild wrote for the camera scanners
+        working-directory: apps/mobile/android
+        shell: bash
+        run: |
+          # `expo-camera` packages ML Kit unless these are `false`. They come from the config plugins,
+          # so a plugin that did not run leaves them out and Google code ships. Print them, and let
+          # the APK check below fail the build if they were absent.
+          grep -E '^expo\.camera\.' gradle.properties || echo 'no expo.camera properties in gradle.properties'
+
       # One ABI, as the Paseo fork does: every phone that runs the app in practice is arm64, and
       # a fat APK carries three more ABIs that nobody installs. The emulator needs x86_64.
       - name: Restrict the Android ABI
@@ -379,6 +388,10 @@ jobs:
 
       # The signing config reads the secrets from the environment, and Gradle runs in
       # this step, not in the one that patched build.gradle.
+      #
+      # The two `-P` flags turn off the ML Kit scanners of `expo-camera` again. They are command-line
+      # project properties, which take precedence over `gradle.properties`, so the scanners stay off
+      # even if a config plugin did not write its properties during prebuild.
       - name: Build the release APK
         working-directory: apps/mobile/android
         env:
@@ -387,7 +400,44 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: >-
           ./gradlew assembleRelease --no-daemon --max-workers=2
+          -Pexpo.camera.barcode-scanner-enabled=false
+          -Pexpo.camera.document-scanner-enabled=false
           -x lint -x lintVitalRelease -x generateReleaseLintModel
+
+      # A release that carries Google code, or that drops a native module its JavaScript requires,
+      # starts and then breaks on the phone. The first fork build with this strip crashed at launch
+      # on `Cannot find native module 'ExpoPushTokenManager'`, and a later one shipped ML Kit anyway,
+      # so the artifact is checked here rather than trusted.
+      - name: Check the APK for Google code and the notification modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          classes=$(mktemp)
+          for entry in $(unzip -Z1 "$apk" | grep '\.dex$'); do
+            unzip -p "$apk" "$entry" >>"$classes"
+          done
+          failed=0
+          for marker in Lcom/google/mlkit/common/internal/MlKitInitProvider \
+            Lcom/google/firebase/FirebaseInitProvider \
+            Lcom/google/mlkit/vision/documentscanner/internal/GmsDocumentScanningDelegateActivity; do
+            if grep -aqF "$marker" "$classes"; then
+              echo "::error::$apk contains $marker"
+              failed=1
+            fi
+          done
+          if unzip -Z1 "$apk" | grep -qE '^(firebase-|play-services-mlkit-)'; then
+            echo "::error::$apk contains Google resource markers"
+            failed=1
+          fi
+          for module in ExpoPushTokenManager ExpoTopicSubscriptionModule ExpoBackgroundNotificationTasksModule; do
+            if ! grep -aqF "$module" "$classes"; then
+              echo "::error::$apk does not register $module, which expo-notifications requires at load"
+              failed=1
+            fi
+          done
+          rm -f "$classes"
+          exit "$failed"
 
       - name: Name the APK and publish it
         shell: bash

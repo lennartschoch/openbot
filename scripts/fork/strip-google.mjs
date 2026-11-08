@@ -23,7 +23,7 @@
  *   package-dir defaults to the installed `expo-notifications`; a checkout of the npm tarball works
  *   for a dry run.
  */
-import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 
@@ -44,12 +44,24 @@ const androidDir = join(packageDir, "android");
 const sourceDir = join(androidDir, "src", "main", "java", "expo", "modules", "notifications");
 const manifestPath = join(androidDir, "src", "main", "AndroidManifest.xml");
 const gradlePath = join(androidDir, "build.gradle");
-const moduleConfigPath = join(packageDir, "expo-module.config.json");
 
 if (!existsSync(sourceDir)) throw new Error(`strip-google: no expo-notifications sources at ${sourceDir}`);
 
 const removed = [];
 const edited = [];
+
+/**
+ * Writes a file with its own inode.
+ *
+ * Bun installs `node_modules` by hardlinking the files of its download cache, so writing a package
+ * file in place also rewrites the cache entry. A later install then starts from a package that is
+ * already stripped, which made the Android build differ between the release runner (whose cache was
+ * warm) and a fresh install. Unlinking first leaves the cache intact.
+ */
+function writeDetached(path, contents) {
+  if (existsSync(path)) rmSync(path, { force: true });
+  writeFileSync(path, contents);
+}
 
 /** A file or directory that only exists for Firebase Cloud Messaging. */
 function remove(relativePath) {
@@ -57,6 +69,24 @@ function remove(relativePath) {
   if (!existsSync(path)) return;
   rmSync(path, { recursive: true, force: true });
   removed.push(relativePath);
+}
+
+/**
+ * Writes a replacement source file.
+ *
+ * `expo-notifications` requires its native modules at module scope: `PushTokenManager.native.js`,
+ * `TopicSubscriptionModule.android.js` and `BackgroundNotificationTasksModule.native.js` each call
+ * `requireNativeModule(...)` as the bundle loads. Deleting those modules made every
+ * `import "expo-notifications"` throw `Cannot find native module 'ExpoPushTokenManager'` before the
+ * app rendered, which is what crashed the fork on Android. The modules stay registered, with the
+ * Firebase code replaced by a stub that has no Google dependency and reports the transport as
+ * unavailable when something calls it.
+ */
+function stub(relativePath, source) {
+  const path = join(sourceDir, relativePath);
+  mkdirSync(dirname(path), { recursive: true });
+  writeDetached(path, source);
+  edited.push(`expo-notifications/${relativePath}`);
 }
 
 /** An edit that must apply, or that a previous run already applied. */
@@ -74,7 +104,7 @@ function replace(path, edits, already) {
     }
     after = after.replace(from, to);
   }
-  writeFileSync(path, after);
+  writeDetached(path, after);
   edited.push(path.replace(packageDir, "expo-notifications").replaceAll("\\", "/"));
 }
 
@@ -212,28 +242,115 @@ replace(
 remove("service/ExpoFirebaseMessagingService.kt");
 remove("service/delegates/FirebaseMessagingDelegate.kt");
 remove("service/interfaces/FirebaseMessagingDelegate.kt");
-remove("tokens/PushTokenModule.kt");
 remove("tokens/interfaces/FirebaseTokenListener.kt");
-remove("topics/TopicSubscriptionModule.kt");
 remove("notifications/model/RemoteNotificationContent.kt");
 remove("notifications/model/triggers/FirebaseNotificationTrigger.kt");
 remove("notifications/RemoteMessageSerializer.java");
 remove("notifications/background/BackgroundRemoteNotificationTaskConsumer.kt");
-remove("notifications/background/ExpoBackgroundNotificationTasksModule.kt");
 
-/** The native modules that only wrapped Firebase, unregistered so nothing asks for them. */
-function removeFirebaseModules() {
-  const configPath = join(packageDir, "expo-module.config.json");
-  const config = JSON.parse(readFileSync(configPath, "utf8"));
-  const modules = config.android?.modules ?? [];
-  const kept = modules.filter(
-    (name) => !/PushTokenModule|TopicSubscriptionModule|BackgroundNotificationTasks/u.test(name),
-  );
-  if (kept.length === modules.length) return;
-  config.android.modules = kept;
-  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-  edited.push("expo-notifications/expo-module.config.json");
+// The native modules stay registered, because the JavaScript of the package requires them as the
+// bundle loads. They carry no Firebase and report the missing transport instead.
+stub(
+  "tokens/PushTokenModule.kt",
+  `package expo.modules.notifications.tokens
+
+import expo.modules.kotlin.Promise
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+
+private const val REGISTRATION_FAIL_CODE = "E_REGISTRATION_FAILED"
+
+/**
+ * Keeps the \`ExpoPushTokenManager\` native module registered without Firebase Cloud Messaging.
+ *
+ * The app sends notifications over UnifiedPush and never asks for a device token, but
+ * \`expo-notifications\` imports this module at module scope, so it must exist for the bundle to load.
+ */
+class PushTokenModule : Module() {
+  override fun definition() = ModuleDefinition {
+    Name("ExpoPushTokenManager")
+
+    Events("onDevicePushToken")
+
+    AsyncFunction("getDevicePushTokenAsync") { promise: Promise ->
+      promise.reject(
+        REGISTRATION_FAIL_CODE,
+        "This build has no Firebase Cloud Messaging. Notifications arrive over UnifiedPush.",
+        null
+      )
+    }
+
+    AsyncFunction("unregisterForNotificationsAsync") { promise: Promise ->
+      promise.resolve(null)
+    }
+  }
 }
+`,
+);
+stub(
+  "topics/TopicSubscriptionModule.kt",
+  `package expo.modules.notifications.topics
+
+import expo.modules.kotlin.Promise
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+
+private const val TOPIC_SUBSCRIBE_FAIL_CODE = "E_TOPIC_SUBSCRIBE_FAILED"
+private const val TOPIC_UNSUBSCRIBE_FAIL_CODE = "E_TOPIC_UNSUBSCRIBE_FAILED"
+
+/**
+ * Keeps the \`ExpoTopicSubscriptionModule\` native module registered without Firebase Cloud Messaging.
+ *
+ * \`expo-notifications\` requires it as the bundle loads. Broadcast topics need Firebase, so the two
+ * operations reject.
+ */
+class TopicSubscriptionModule : Module() {
+  override fun definition() = ModuleDefinition {
+    Name("ExpoTopicSubscriptionModule")
+
+    AsyncFunction("subscribeToTopicAsync") { topic: String, promise: Promise ->
+      promise.reject(
+        TOPIC_SUBSCRIBE_FAIL_CODE,
+        "This build has no Firebase Cloud Messaging, so it cannot subscribe to the topic '$topic'.",
+        null
+      )
+    }
+
+    AsyncFunction("unsubscribeFromTopicAsync") { topic: String, promise: Promise ->
+      promise.reject(
+        TOPIC_UNSUBSCRIBE_FAIL_CODE,
+        "This build has no Firebase Cloud Messaging, so it cannot unsubscribe from the topic '$topic'.",
+        null
+      )
+    }
+  }
+}
+`,
+);
+stub(
+  "notifications/background/ExpoBackgroundNotificationTasksModule.kt",
+  `package expo.modules.notifications.notifications.background
+
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+
+/**
+ * Keeps the \`ExpoBackgroundNotificationTasksModule\` native module registered without Firebase.
+ *
+ * \`expo-notifications\` requires it as the bundle loads. A background task that only handled remote
+ * messages has nothing to run, so both operations resolve without registering anything.
+ */
+class ExpoBackgroundNotificationTasksModule : Module() {
+  override fun definition() = ModuleDefinition {
+    Name("ExpoBackgroundNotificationTasksModule")
+
+    AsyncFunction("registerTaskAsync") { _: String -> null }
+
+    AsyncFunction("unregisterTaskAsync") { _: String -> null }
+  }
+}
+`,
+);
 
 /**
  * Turns a package that ships a prebuilt AAR into a source build.
@@ -248,12 +365,16 @@ function removeFirebaseModules() {
 function buildFromSource(name, directory) {
   const configPath = join(directory, "expo-module.config.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
-  if (config.android?.publication === undefined) return;
-  delete config.android.publication;
-  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-  edited.push(`${name}/expo-module.config.json`);
+  if (config.android?.publication !== undefined) {
+    delete config.android.publication;
+    writeDetached(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    edited.push(`${name}/expo-module.config.json`);
+  }
   // Nothing may resolve the prebuilt artifact after this; a stale AAR would reintroduce Firebase.
-  rmSync(join(directory, "local-maven-repo"), { recursive: true, force: true });
+  // This runs on a second pass too, when `publication` is already gone.
+  const mavenRepo = join(directory, "local-maven-repo");
+  if (!existsSync(mavenRepo)) return;
+  rmSync(mavenRepo, { recursive: true, force: true });
   removed.push(`${name}/local-maven-repo`);
 }
 
@@ -294,7 +415,6 @@ function scan(directory) {
   }
 }
 
-removeFirebaseModules();
 buildFromSource("expo-notifications", packageDir);
 buildFromSource("expo-camera", cameraDir);
 pruneEmptyDirectories(sourceDir);
@@ -305,9 +425,15 @@ for (const name of ["expo-notifications", "expo-camera"]) {
   const config = JSON.parse(readFileSync(join(directory, "expo-module.config.json"), "utf8"));
   if (config.android?.publication !== undefined) leftovers.push(`${name}: still published as a prebuilt AAR`);
   if (existsSync(join(directory, "local-maven-repo"))) leftovers.push(`${name}/local-maven-repo still exists`);
-  for (const module of config.android?.modules ?? [])
-    if (/PushTokenModule|TopicSubscriptionModule|BackgroundNotificationTasks/u.test(module))
-      leftovers.push(`${name}/expo-module.config.json: ${module}`);
+  if (name === "expo-notifications") {
+    const modules = config.android?.modules ?? [];
+    for (const module of ["tokens.PushTokenModule", "topics.TopicSubscriptionModule"]) {
+      if (!modules.some((entry) => entry.endsWith(module)))
+        leftovers.push(`expo-notifications/expo-module.config.json: ${module} is not registered`);
+    }
+    if (!modules.some((entry) => entry.endsWith("background.ExpoBackgroundNotificationTasksModule")))
+      leftovers.push("expo-notifications/expo-module.config.json: the background task module is not registered");
+  }
 }
 if (leftovers.length > 0) throw new Error(`strip-google: Google is still referenced:\n${leftovers.join("\n")}`);
 

@@ -195,12 +195,22 @@ release can report where it came from. Resolve conflicts by hand, then run
   background remote-message task, `RemoteMessageSerializer`, `RemoteNotificationContent`,
   `FirebaseNotificationTrigger` — drops `com.google.firebase:firebase-messaging` from its
   `build.gradle` and the `MESSAGING_EVENT` service from its manifest, and removes our own
-  `OpenBotMessagingService`. Channels, permissions, the `NotificationsService` receiver and the tap
+  `OpenBotMessagingService`.
+  **The three native modules stay registered as stubs.** `expo-notifications` requires
+  `ExpoPushTokenManager`, `ExpoTopicSubscriptionModule` and `ExpoBackgroundNotificationTasksModule`
+  at module scope as its JavaScript bundle loads (`requireNativeModule`), so deleting them made every
+  `import "expo-notifications"` throw `Cannot find native module 'ExpoPushTokenManager'` and the app
+  died at launch. `strip-google.mjs` writes Firebase-free Kotlin stubs under those names instead;
+  they report the transport as unavailable when something calls them. Do not go back to deleting
+  the modules.
+  Channels, permissions, the `NotificationsService` receiver and the tap
   handling stay. The script fails the build when the upstream code it targets has moved, so an
   `expo-notifications` bump cannot silently bring Firebase back; check `strip-google`'s assertions
   when you bump it. What the strip removes with it: `firebase-installations`,
   `com.google.android.datatransport`, `play-services-*`, `com.google.android.c2dm.permission.RECEIVE`
   and the Play install-referrer permission.
+  `strip-google.mjs` also writes with a fresh inode: Bun hardlinks `node_modules` from its download
+  cache, so an in-place edit also rewrites the cache entry and a later install starts half stripped.
   ML Kit is **not in the APK** either. `expo-camera` stays — it draws the preview for the QR screen
   and the chat camera — but its barcode and document scanners are off (`"barcodeScannerEnabled":
   false` in `app.json`, and `apps/mobile/plugins/with-no-mlkit.js`, which also sets
@@ -213,6 +223,11 @@ release can report where it came from. Resolve conflicts by hand, then run
   live and `decode-qr-code.ts` decodes it with `jsqr` over the pixels that Skia reads (after a resize
   to 1024 px with `expo-image-manipulator`). Do not pass `barcodeScannerSettings` or
   `onBarcodeScanned` to a `CameraView`: the classes behind them are absent, so that path throws.
+  The Android job passes both switches as `-P` properties to Gradle as well, because a command-line
+  property wins over `gradle.properties` and one fork build shipped ML Kit when the property was
+  missing from the generated file. The job then inspects the finished APK: it fails when
+  `MlKitInitProvider`, `FirebaseInitProvider`, the document-scanner activity, or a `firebase-`/
+  `play-services-mlkit-` resource is inside, and when one of the three notification modules is not.
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.
