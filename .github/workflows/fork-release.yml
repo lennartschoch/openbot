@@ -95,6 +95,15 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
+      - name: Cache the Bun and Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/electron
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -147,6 +156,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache the Bun and Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/Library/Caches/electron
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -265,6 +283,13 @@ jobs:
           sudo mkswap /swapfile-build 2>/dev/null || true
           sudo swapon /swapfile-build 2>/dev/null || true
 
+      - name: Cache the Bun downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -340,6 +365,17 @@ jobs:
           path.write_text(text.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release"))
           print("release signing configured")
           PY
+
+      # The wrapper distribution and the dependency cache: a fresh runner downloads over 100 MB
+      # from services.gradle.org, and that host returns 504 as often as GitHub's asset edge.
+      - name: Cache the Gradle wrapper and dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('bun.lock', 'apps/mobile/package.json', 'apps/mobile/app.json') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
       # The signing config reads the secrets from the environment, and Gradle runs in
       # this step, not in the one that patched build.gradle.

@@ -15,7 +15,7 @@ import {
   runtimeTargetParts,
   sha256,
 } from "./remote-desktop-runtime-release";
-import { download, installValidatedTree, isCurrentInstallation } from "./runtime-install";
+import { download, fetchWithRetry, installValidatedTree, isCurrentInstallation } from "./runtime-install";
 
 const githubReleaseSchema = z.object({
   tag_name: z.string(),
@@ -52,8 +52,10 @@ export async function installRemoteDesktopRuntime(
     return "current";
   }
 
-  const releaseResponse = await fetchImpl(
+  const releaseResponse = await fetchWithRetry(
+    fetchImpl,
     `https://api.github.com/repos/${release.repository}/releases/tags/${encodeURIComponent(release.tag)}`,
+    "Runtime release lookup",
     {
       headers: {
         Accept: "application/vnd.github+json",
@@ -62,7 +64,6 @@ export async function installRemoteDesktopRuntime(
       },
     },
   );
-  if (!releaseResponse.ok) throw new Error(`Runtime release lookup failed with HTTP ${releaseResponse.status}.`);
   const githubRelease = githubReleaseSchema.parse(await releaseResponse.json());
   validateGitHubRelease(githubRelease, release.tag);
 

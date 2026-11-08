@@ -14,33 +14,49 @@ export async function isCurrentInstallation(verify: () => Promise<void>): Promis
 }
 
 /**
- * Downloads one file. A network error, HTTP 429 or HTTP 5xx gets two more attempts, because a
- * release runner can lose its connection (v0.40.0 timed out on the Grok runtime). Callers check
- * the SHA-256 of the result, so a retry cannot change what they install.
+ * One request, retried. A network error, HTTP 429 or HTTP 5xx gets four more attempts, because a
+ * release runner can lose its connection (v0.40.0 timed out on the Grok runtime) and because a
+ * release asset download through the edge can return 504. The delay doubles per attempt and
+ * jitters, so a fleet of runners does not stampede the same origin.
  */
-export async function download(fetchImpl: typeof fetch, url: string, label: string): Promise<Buffer> {
-  const attempts = 3;
+export async function fetchWithRetry(
+  fetchImpl: typeof fetch,
+  url: string,
+  label: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const attempts = 5;
   for (let attempt = 1; ; attempt += 1) {
     let response: Response | undefined;
     let failure: unknown;
     try {
-      response = await fetchImpl(url, {
-        headers: { "User-Agent": "OpenBot-runtime-installer" },
-        redirect: "follow",
-      });
-      if (response.ok) return Buffer.from(await response.arrayBuffer());
+      response = await fetchImpl(url, { ...init, redirect: "follow" });
+      if (response.ok) return response;
     } catch (error) {
       failure = error;
     }
     if (response && !response.ok) {
-      failure = new Error(`${label} download failed with HTTP ${response.status}.`);
+      failure = new Error(`${label} request failed with HTTP ${response.status}.`);
       if (response.status !== 429 && response.status < 500) throw failure;
       await response.body?.cancel();
     }
     if (attempt === attempts) throw failure;
-    logger.warn(`${label} download failed (attempt ${attempt} of ${attempts}): ${String(failure)}`);
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 5_000));
+    logger.warn(`${label} request failed (attempt ${attempt} of ${attempts}): ${String(failure)}`);
+    await sleepWithJitter(attempt);
   }
+}
+
+function sleepWithJitter(attempt: number): Promise<void> {
+  const base = Math.min(5_000 * 2 ** (attempt - 1), 40_000);
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, base + Math.random() * 2_000));
+}
+
+/** Downloads one file. The caller checks the SHA-256 of the result, so a retry cannot change what it installs. */
+export async function download(fetchImpl: typeof fetch, url: string, label: string): Promise<Buffer> {
+  const response = await fetchWithRetry(fetchImpl, url, label, {
+    headers: { "User-Agent": "OpenBot-runtime-installer" },
+  });
+  return Buffer.from(await response.arrayBuffer());
 }
 
 /** Splits a relative archive path into parts and rejects absolute, drive, `.` and `..` paths. */
