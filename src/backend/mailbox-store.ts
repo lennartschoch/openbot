@@ -87,7 +87,7 @@ interface StoredMessage {
   taskId?: string;
   /**
    * The side thread an agent sent this message from. An answer to it runs in that thread, and the
-   * sender's own chat does not show it. Never sent to a client.
+   * sender's own chat does not show it. The recipient's chat gets it, so the sender link opens that thread.
    */
   senderTaskId?: string;
   id: string;
@@ -444,11 +444,31 @@ export class MailboxStore {
    * in the chats.
    */
   #answerReturn(input: EnqueueInput, recipients: readonly string[]): MessagingOrigin | undefined {
-    if (input.sender.kind !== "agent" || !input.replyToMessageId || recipients.length !== 1) return undefined;
-    const request = this.#state.messages.find((message) => message.id === input.replyToMessageId);
-    if (!request?.messagingReturn || request.sender.kind !== "agent" || request.sender.agentId !== recipients[0])
+    if (input.sender.kind !== "agent" || !input.replyToMessageId) return undefined;
+    return this.answerReturn([input.replyToMessageId], recipients);
+  }
+
+  /**
+   * The external conversation that an agent's answer to these requests goes back to, when they all
+   * came from that one conversation and the answer goes to the agent that sent them, and to no one else.
+   */
+  answerReturn(requestIds: readonly string[], recipients: readonly string[]): MessagingOrigin | undefined {
+    if (recipients.length !== 1) return undefined;
+    const origins = requestIds.map((requestId) => {
+      const request = this.#state.messages.find((message) => message.id === requestId);
+      return request?.sender.kind === "agent" && request.sender.agentId === recipients[0]
+        ? request.messagingReturn
+        : undefined;
+    });
+    const [origin] = origins;
+    if (
+      !origin ||
+      origins.some(
+        (candidate) => candidate?.linkId !== origin.linkId || candidate.platformMessageId !== origin.platformMessageId,
+      )
+    )
       return undefined;
-    return structuredClone(request.messagingReturn);
+    return structuredClone(origin);
   }
 
   /**
@@ -1421,6 +1441,7 @@ export class MailboxStore {
                   recipientAgentIds: deliveries.map((item) => item.recipientAgentId),
                   replyToMessageId: message.replyToMessageId,
                   ...(message.expectsReply === false ? { expectsReply: false } : {}),
+                  ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
                   deliveries: deliveries.map((item) => {
                     const publicItem = this.#publicDelivery(item, positions, message);
                     return {
@@ -1936,6 +1957,15 @@ export class MailboxStore {
       message = parent;
     }
     return null;
+  }
+
+  /**
+   * The stored message that a reply reference names. An agent's history and tool results show the id of
+   * a delivery, so a delivery id names its message. Null when the id names neither.
+   */
+  replyReferenceMessageId(id: string): string | null {
+    if (this.#state.messages.some((message) => message.id === id)) return id;
+    return this.#state.deliveries.find((delivery) => delivery.id === id)?.messageId ?? null;
   }
 
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */

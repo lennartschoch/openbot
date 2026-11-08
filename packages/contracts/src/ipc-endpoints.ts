@@ -59,6 +59,14 @@ import type {
   UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type {
+  AgentDockAction,
+  AgentDockDisplayInfo,
+  AgentDockDragPhase,
+  AgentDockOffset,
+  AgentDockPresentation,
+  SetAgentDockInteractiveInput,
+} from "./ipc-agent-dock";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type {
   AddAgentFolderInput,
@@ -120,10 +128,12 @@ import type {
 import type {
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
   StartAgentTaskInput,
@@ -263,6 +273,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
   ConversationFileSearchPage,
@@ -333,6 +344,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type {
@@ -793,8 +805,9 @@ export const IPC_ENDPOINTS = {
     // The main window marks each chat that has a window, so main tells it when one opens or closes.
     chatWindows: event<ChatWindowTarget[]>()("app:chat-windows"),
     // Main reads `Cmd + Q` before the page does, so it tells the window when to show the hint that
-    // the key must be held or pressed twice. True shows the hint, and false removes it.
-    quitShortcutHint: event<boolean>()("app:quit-shortcut-hint"),
+    // the key must be held or pressed twice. The hint names the local agents that work, which a quit
+    // stops. An empty list removes it.
+    quitShortcutHint: event<ClientAgentSummary[]>()("app:quit-shortcut-hint"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),
@@ -866,6 +879,12 @@ export const IPC_ENDPOINTS = {
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
+    /**
+     * Whether the Claude agents of this computer load the user's own Claude Code setup. This computer
+     * only: a joined server has no route for it.
+     */
+    getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
+    setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
@@ -980,6 +999,27 @@ export const IPC_ENDPOINTS = {
     setFrame: request<BrowserDockFrame, void>()("browser-dock:set-frame"),
     /** Whether the overlay shows the dock over the page. While it does, the dock in the renderer is inert. */
     shown: event<boolean>()("browser-dock:shown"),
+  },
+  /**
+   * The agent dock in its own window at the right edge of the screen. The main renderer publishes it and
+   * does its actions; the dock window shows it and sends the actions back. Main sends the messages.
+   */
+  agentDock: {
+    /** Null hides the dock window. */
+    publishPresentation: request<AgentDockPresentation | null, void>()("agent-dock:publish-presentation"),
+    getPresentation: request<undefined, AgentDockPresentation | null>()("agent-dock:get-presentation"),
+    presentation: event<AgentDockPresentation | null>()("agent-dock:presentation"),
+    performAction: request<AgentDockAction, void>()("agent-dock:perform-action"),
+    action: event<AgentDockAction>()("agent-dock:action"),
+    setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
+    /** Closes the chat of a dock window, because the dock on another display opened a chat. */
+    closeChat: event<undefined>()("agent-dock:close-chat"),
+    /** The connected displays, for the display setting of the dock. */
+    listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
+    /** A drag of the dock body moves its window up or down the screen edge. */
+    drag: request<AgentDockDragPhase, void>()("agent-dock:drag"),
+    /** The position where a drag left the dock, for the main renderer to save. */
+    moved: event<AgentDockOffset>()("agent-dock:moved"),
   },
   computerUse: {
     getState: request<undefined, ComputerUseState>()("computer-use:get-state"),
@@ -1106,7 +1146,7 @@ export const IPC_ENDPOINTS = {
     signOut: scopedRequest<AgentProviderId, void, "required">()("provider-admin:sign-out"),
     // A sign-in that a joined server's host starts and that opens in this computer's browser
     // (`sign-in-relay-v1`). This computer takes the callback and sends its query to the host.
-    // `openRelaySignIn` opens the page when the user asks, and `pasteRelaySignIn` takes the address
+    // `openRelaySignIn` opens the page again, and `pasteRelaySignIn` takes the address
     // the browser shows when the callback cannot reach this computer.
     startRelaySignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:start-relay-sign-in"),
     // The relayed sign-in of an account after the first (`provider-account-relay-v1` or `-v2`). The
@@ -1270,6 +1310,10 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    // The server personality: how the server's agents talk while they work. Any member can read it;
+    // only an owner or admin can set it.
+    getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
+    setPersonality: scopedRequest<HostPersonality, HostPersonality, "required">()("host-admin:set-personality"),
     // How many memories each agent of the server can keep, and the values its host permits.
     getAgentMemoryLimit: scopedQuery<HostAgentMemoryLimit, "required">()("host-admin:get-agent-memory-limit"),
     setAgentMemoryLimit: scopedRequest<number, HostAgentMemoryLimit, "required">()("host-admin:set-agent-memory-limit"),
@@ -1566,6 +1610,10 @@ export const IPC_ENDPOINTS = {
     deleteChannelMessage: scopedRequest<DeleteChannelMessageInput, void>()("agent:channels:delete-message"),
     // Only this computer keeps a channel image. A joined server has no route for it.
     setChannelImage: scopedRequest<SetChannelImageInput, Channel>()("agent:channels:set-image"),
+    /** "New conversation": the members of the channel forget its earlier messages. */
+    clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
+    /** Compacts the channel session of each member now. */
+    compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     // The user's own pinned chats. A joined server answers through `sidebar-pins-v1`.
@@ -1624,6 +1672,8 @@ export const IPC_ENDPOINTS = {
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
+    // A joined server takes this through `agent-thread-pages-v1`.
+    readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.
@@ -1994,7 +2044,7 @@ export const IPC_ENDPOINTS = {
     mcpSignInPage: scopedRequest<CancelMcpSignInInput, string | null, "required">()("servers:mcp:sign-in-page"),
     // A host with `sign-in-relay-v1` opens no tab: the page opens in this computer's browser, and the
     // callback comes back here. `mcpSignInRelay` names the page while it waits, `openMcpSignInRelay`
-    // opens it when the user asks, and `completeMcpSignInRelay` takes the address the user pastes when
+    // opens it again, and `completeMcpSignInRelay` takes the address the user pastes when
     // no listener took the callback.
     mcpSignInRelay: scopedRequest<CancelMcpSignInInput, McpSignInRelayPage | null, "required">()(
       "servers:mcp:sign-in-relay",
@@ -2150,6 +2200,7 @@ export const IPC_GROUP_PATHS = {
   voice: "voice",
   dynamicIsland: "dynamicIsland",
   browserDock: "browserDock",
+  agentDock: "agentDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
   backgroundProcesses: "backgroundProcesses",

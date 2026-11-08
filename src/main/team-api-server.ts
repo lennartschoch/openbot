@@ -45,6 +45,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -70,6 +71,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
@@ -89,6 +91,7 @@ import {
   LOCAL_SERVERS_CAPABILITY,
   legacyTeamCapabilities,
   MCP_ACCOUNTS_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
@@ -114,6 +117,7 @@ import {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -143,6 +147,7 @@ import {
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import {
   HOST_RESTART_EVENT,
   type HostRestartEvent,
@@ -256,6 +261,7 @@ import { routeAgentTasks } from "./team-api/route-agent-tasks";
 import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
+  routeAgentThreadPages,
   routeAgentThreadReads,
   routeAgentThreadReplies,
   routeAgentThreads,
@@ -281,6 +287,7 @@ import { routeFiles } from "./team-api/route-files";
 import { routeFocusUse } from "./team-api/route-focus-use";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
+import { routeHostPersonality } from "./team-api/route-host-personality";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
@@ -307,6 +314,7 @@ import { routePushNotifications } from "./team-api/route-push-notifications";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
+import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
 import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSideQuestion } from "./team-api/route-side-question";
@@ -1013,15 +1021,26 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
+      const { mcpServers, mcpServerOwners } = this.#options;
       if (
-        (await routeMcpServers(context, this.#options.mcpServers, this.#options.mcpToolRuntimePreparation)) ===
+        (await routeMcpServers(context, mcpServers, this.#options.mcpToolRuntimePreparation, mcpServerOwners)) ===
         "handled"
       )
         return;
-      if ((await routeMcpSignIn(context, this.#options.mcpServers && this.#options.mcpSignIns)) === "handled") return;
-      if ((await routeMcpSignInApp(context, this.#options.mcpServers && this.#options.mcpSignIns)) === "handled")
+      if (
+        (await routeMcpSignIn(context, mcpServers && this.#options.mcpSignIns, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
         return;
-      if ((await routeSignInRelay(context, this.#options.mcpServers && this.#options.signInRelay)) === "handled")
+      if (
+        (await routeMcpSignInApp(context, mcpServers && this.#options.mcpSignIns, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
+        return;
+      if (
+        (await routeSignInRelay(context, mcpServers && this.#options.signInRelay, mcpServers, mcpServerOwners)) ===
+        "handled"
+      )
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
@@ -1052,6 +1071,11 @@ export class TeamApiServer {
         return;
       if ((await routeBrowserProxies(context, this.#options.browserProfiles)) === "handled") return;
       if ((await routeRoutineResults(context, this.#options.admin, hidden)) === "handled") return;
+      if (
+        (await routeRoutineRunPlace(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
+        "handled"
+      )
+        return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFolders(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentInstructions(context, this.#options.admin, hidden)) === "handled") return;
@@ -1080,6 +1104,7 @@ export class TeamApiServer {
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReplies(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if ((await routeAgentThreadPages(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
@@ -1090,6 +1115,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
@@ -2074,6 +2100,7 @@ export class TeamApiServer {
       preserveSemanticTags: supportsTeamSemanticTags(route.capabilities),
       historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
       channelAttention: route.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
+      channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -2243,7 +2270,8 @@ export class TeamApiServer {
           if (
             capability === "channel-chats-v1" ||
             capability === CHANNEL_DELETE_CAPABILITY ||
-            capability === CHANNEL_TASK_CANCEL_CAPABILITY
+            capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
+            capability === CHANNEL_ISOLATION_CAPABILITY
           )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
@@ -2258,6 +2286,9 @@ export class TeamApiServer {
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === MCP_SIGN_IN_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
+          // A member changes only the servers that they added, so the host must know who added each.
+          if (capability === MCP_MEMBER_ACCESS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpServerOwners !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === SIGN_IN_RELAY_CAPABILITY)
@@ -2305,6 +2336,7 @@ export class TeamApiServer {
           if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_REPLIES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_BRANCHES_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_PAGES_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
@@ -2344,6 +2376,7 @@ export class TeamApiServer {
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+          if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
           if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
@@ -2358,6 +2391,7 @@ export class TeamApiServer {
           if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
           if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
+          if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;

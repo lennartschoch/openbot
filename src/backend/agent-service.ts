@@ -20,6 +20,7 @@ import type {
   AgentSummary,
   AgentTask,
   AgentTaskInput,
+  AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentWaitsSnapshot,
@@ -73,6 +74,7 @@ import type {
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  ReadAgentTaskPageInput,
   RemoveMcpServerInput,
   ReorderQueueInput,
   ResetAgentSessionSettingInput,
@@ -124,11 +126,13 @@ import {
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  DEFAULT_RESPONSE_STYLE,
   isContextResetMarker,
   isCustomProviderHarness,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
+  type ResponseStyle,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOWS_USAGE_ID,
@@ -360,6 +364,11 @@ export interface AgentServiceOptions {
    * Omitted, such a message waits in the queue, as every one did before the setting existed.
    */
   busyMessageMode?: () => BusyMessageMode;
+  /**
+   * How the agents talk while they work (the server personality), read at each start and resume of
+   * a session. The main process owns the preference. Omitted, the default style.
+   */
+  responseStyle?: () => ResponseStyle;
   /**
    * How many memories one agent can hold. The main process owns the preference. Omitted, the
    * default cap, which was the only cap before the setting existed.
@@ -1124,6 +1133,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }),
       // Only a server has a memory reading.
       serverHost: hostMemory !== null,
+      ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
@@ -1350,6 +1360,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (!agent || !this.#reportsCompactions(agentId)) return null;
         return this.#store.database.activeProviderSession(threadId, agent.provider)?.externalSessionId ?? null;
       },
+      progressUpdates: (agentId) =>
+        (options.responseStyle?.() ?? DEFAULT_RESPONSE_STYLE) === "natural"
+          ? (this.#store.list().find((item) => item.id === agentId)?.provider ?? null)
+          : null,
     });
     this.#memoryHold = new MemoryHold({
       memory: hostMemory,
@@ -1798,6 +1812,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The server personality changed. Each agent's next turn opens its session again, with the
+   * instructions of the new style. A running turn keeps its instructions.
+   */
+  responseStyleChanged(): void {
+    for (const agent of this.#store.list()) this.#conversation.unloadAgentThreads(agent.id);
+  }
+
+  /**
    * The other agents in the agent's sidebar section, in sidebar order, for its instructions. Null when
    * the agent has no section of the user's, or is in the Integrations section: the orchestrators there
    * serve unrelated integrations and choose teammates by fit.
@@ -1878,6 +1900,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The next scheduled routine run of any agent or channel, or null when none is scheduled. */
   nextRoutineDueAt(): string | null {
     return this.#routineTimer.nextDueAt();
+  }
+
+  /**
+   * The agents that run a turn now, in any thread (their chat, a channel, a routine or a task), and
+   * the agents with a delivery whose turn has not started. A quit stops this work, so `Cmd + Q` asks
+   * for a hold or a second press only while this is not empty.
+   */
+  workingAgents(): AgentSummary[] {
+    const working = new Set<string>();
+    for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
+      if (snapshot.activeTurnId) working.add(agentId);
+    }
+    return this.listAgents().filter((agent) => working.has(agent.id) || this.#mailbox.hasUnfinishedDelivery(agent.id));
   }
 
   hasActiveWork(): string[] {
@@ -3661,6 +3696,72 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }, Effect.uninterruptible).bind(this);
 
   /**
+   * "New conversation" in a channel: the members forget the earlier messages. The channel writes a
+   * marker, and the provider session of each member's channel thread ends, so the next turn starts
+   * a new session that reads only the messages after the marker. The members, the messages, and
+   * the agents' own chats do not change.
+   */
+  readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
+    this: AgentService,
+    channelId: string,
+    person: { id: string; name: string },
+  ) {
+    yield* this.channels.clearContext(channelId, person, {
+      busy: (contexts) => {
+        const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+        return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
+      },
+      end: (threadIds) =>
+        Effect.forEach(threadIds, (threadId) => this.#threads.endThreadContext(threadId), { discard: true }),
+    });
+  }, Effect.uninterruptible).bind(this);
+
+  /** Whether a member's channel session runs a turn, or a compaction or a refused start holds it. */
+  #channelSessionBusy(agent: AgentSummary | undefined, threadId: string): boolean {
+    if (!agent) return false;
+    if (
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agent.id, threadId)
+    )
+      return true;
+    const session = this.#store.database.activeProviderSession(threadId, agent.provider);
+    return session !== null && this.#compaction.heldThreads(agent.id).includes(session.externalSessionId);
+  }
+
+  /**
+   * Compacts the channel session of each member now, as `compactAgentContext` does for an agent's
+   * own chat. A member with no session, or with a provider that OpenBot cannot ask to compact, is
+   * skipped; when no member can compact, the request fails.
+   */
+  readonly compactChannelContext = Effect.fn("AgentService.compactChannelContext")(function* (
+    this: AgentService,
+    channelId: string,
+  ) {
+    const contexts = yield* this.channels.compactTargets(channelId);
+    const sessions = yield* lifecycleStep("compact channel context", () => {
+      const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+      const candidates = contexts.flatMap(({ agentId, threadId }) => {
+        const agent = agents.get(agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
+      });
+      if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+        throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+      const reserved = candidates.filter(({ agentId, externalSessionId }) =>
+        this.#compaction.reserve(agentId, externalSessionId, true),
+      );
+      if (!reserved.length) throw new ContextCompactRefusedError(sourceText("error.backend.channelCompactUnavailable"));
+      return reserved;
+    });
+    yield* Effect.forEach(
+      sessions,
+      ({ agentId, externalSessionId }) => this.#compaction.request(agentId, externalSessionId),
+      // Each session compacts on its own; one at a time, a large channel would wait minutes.
+      { discard: true, concurrency: "unbounded" },
+    );
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's
    * own chat has nothing to start. A turn of a task or a compaction can still run; the request then
    * waits for the next drain, unless a turn in the agent's own chat starts first. The user can turn
@@ -3798,11 +3899,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  /** `heldRoutines`: routines due while a restart waited run once. */
-
+  /**
+   * `heldRoutines`: routines due while a restart waited run once.
+   * `rosterLoaded` runs when the agents are restored. The steps after it do not change the roster.
+   * `beforeProviderStart` runs just before the providers start, which read the MCP entries when they spawn.
+   */
   readonly initialize = Effect.fn("AgentService.initialize")(function* (
     this: AgentService,
-    options: { heldRoutines?: RoutineHoldWindow | undefined } = {},
+    options: {
+      heldRoutines?: RoutineHoldWindow | undefined;
+      rosterLoaded?: Effect.Effect<void> | undefined;
+      beforeProviderStart?: Effect.Effect<void> | undefined;
+    } = {},
   ) {
     this.#stopping = false;
     yield* this.#store
@@ -3839,6 +3947,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#initialized = true;
       this.#memoryHold.start();
     });
+    if (options.rosterLoaded) yield* options.rosterLoaded;
+    if (options.beforeProviderStart) yield* options.beforeProviderStart;
     yield* this.#providers
       .start()
       .pipe(Effect.mapError((error) => new AgentLifecycleFailed({ operation: "start providers", cause: error.cause })));
@@ -4669,6 +4779,41 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
     return structuredClone(this.#tasks.read(agentId, taskId));
+  }
+
+  /**
+   * The older messages of a task: the page before a message that its panel holds. A limit of 0 reads
+   * only whether there are any. A message that the thread does not hold has none. `exclusions` leave out
+   * the markers that a remote reader cannot show, so they do not count either.
+   */
+  readTaskPage(input: ReadAgentTaskPageInput, exclusions: ConversationMarkerExclusions = {}): AgentTaskPage {
+    const { threadId } = this.#tasks.require(input.agentId, input.taskId);
+    const database = this.#store.database;
+    const none = (hasOlder: boolean): AgentTaskPage => ({
+      conversation: { agentId: input.agentId, threadId, activeTurnId: null, revision: 0, messages: [] },
+      hasOlder,
+    });
+    if (input.limit === 0)
+      return none(database.conversationCountBefore(threadId, input.beforeMessageId, exclusions) > 0);
+    const cursor = database.conversationCursorAt(threadId, input.beforeMessageId);
+    if (!cursor) return none(false);
+    const page = database.readConversationPage(
+      input.agentId,
+      threadId,
+      { type: "before", cursor },
+      input.limit,
+      exclusions,
+    );
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId,
+        activeTurnId: page.activeTurnId,
+        revision: page.revision,
+        messages: page.messages,
+      },
+      hasOlder: page.pageInfo.hasOlder,
+    };
   }
 
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */

@@ -25,7 +25,8 @@ A Grok Bot export that a member imports into a joined server, from the desktop a
 to the computer that runs that server through the same encrypted host connection, not through the
 account Worker. The host keeps the file only until the import ends, is cancelled, or expires.
 When an owner or admin signs in to an MCP server, a provider or a connector of a joined server, or
-opens a sign-in link that an agent of that server showed, the sign-in page can open in the browser
+opens a sign-in link that an agent of that server showed, and when a member signs in to an MCP
+server of a joined server that lets members manage MCP servers, the sign-in page can open in the browser
 of their own computer. That computer then sends the address the page returns to, which holds the
 sign-in code, to the host through the same encrypted host connection, not through the account
 Worker. A Slack or Discord install sends its sealed grant to the host on the same path; the user's
@@ -246,7 +247,9 @@ It saves no referrer, IP address or identifier. A later visit does not change it
 after 90 days. When you sign in on the web, or open the page after a desktop checkout in the same
 browser, the browser sends it to the account service. The account service keeps the first one that
 it gets on your account and sends it to OpenPanel with your account ID. To remove it from a
-browser, clear the site data of openbot.run. OpenPanel can also derive
+browser, clear the site data of openbot.run. When you choose a language on the website, it saves
+the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
+pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
 request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
 through `analytics.openbot.run`.
@@ -328,7 +331,7 @@ The local host also records how the agents are used:
 when there is no install ID.
 - **Startup time.** Once per start, the host sends how long the start took, rounded: until the
   window could show, until the services were ready, and until the workspace loaded; the name of the
-  slowest startup step from a fixed list; and whether it was the first start since the computer
+  slowest startup step from a fixed list, and how long each step of that list took; and whether it was the first start since the computer
   booted, a later one, or the first start of a new version. To know this, the app keeps the time and
   version of its last start in a local file that is not sent. Paths and names are not sent.
 - **Connection time.** When this computer connects to a remote server, the host sends how long the
@@ -1243,11 +1246,13 @@ message. The answers go from the computer to the Slack Web API directly.
   which runs on its provider like any other agent and passes the work to a teammate with the facts
   it needs.
 - **Sent to Slack.** The agents' answers and the files they attach, short status posts ("Working on
-  it…"), reactions, and approval requests with the command, folder and
-  reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
+  it…", or with the Natural response style the agent's latest progress line, redacted, never its
+  thinking), reactions, and approval requests with the command, folder and reason the provider gave,
+  redacted. A failed request posts a fixed sentence, never the provider's
   error. Any agent, also in the user's own chat or a routine run, can post text, redacted, and
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
-  and list those channels' names.
+  and list those channels' names. A new post can ping a user that it mentions, never a channel,
+  `@here`, `@everyone` or a user group.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1348,10 +1353,10 @@ short-lived signed addresses, in transit only.
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
 - **Sent to Telegram.** The agents' answers and the files they attach, short status posts ("Working on
-  it…"), reactions, and approval requests with the command, folder and reason the provider gave,
+  it…", or the redacted progress line, as for Slack), reactions, and approval requests with the command, folder and reason the provider gave,
   redacted. A failed request posts a fixed sentence, never the provider's error. As for Slack, any
   agent can post redacted text and files from its workspace or the OpenBot shared directory to a
-  linked chat.
+  linked chat. An answer or a post can ping a person that it mentions.
 
 Anyone who can post in a linked chat can give the agents work. The agents run on the host with the
 access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -1408,6 +1413,7 @@ restrict or block a number that it sees as automated.
   used only by OpenBot, a person whom the owner did not allow gets one message with a pairing code.
   On the owner's personal number, OpenBot never writes to anyone else first. Any agent can post
   redacted text and files from its workspace or the OpenBot shared directory to the allowed chats.
+  An answer or a post can ping a person that it mentions.
 
 Anyone whom the owner allowed can give the agents work. The agents run on the host with the access
 the user gave them. A hosted server that sleeps does not start for a WhatsApp message; WhatsApp keeps

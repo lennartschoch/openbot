@@ -12,6 +12,7 @@ import { Effect } from "effect";
 
 import { join } from "node:path";
 import {
+  type AgentSummary,
   type AppVariant,
   type CentralAuthState,
   type ChatWindowTarget,
@@ -163,6 +164,8 @@ export interface MainWindowContext {
   reportError: (message: string, error: unknown) => void;
   /** Quits after `Cmd + Q` was held or pressed twice in a window. See `createQuitShortcut`. */
   quitFromShortcut: () => void;
+  /** The agents that a quit stops, here and on the servers on this computer. See `createQuitShortcut`. */
+  workingAgents: () => AgentSummary[];
 }
 
 export interface MainWindowController {
@@ -201,13 +204,15 @@ export function createMainWindowController({
   onMainWindowCreated,
   reportError,
   quitFromShortcut,
+  workingAgents,
 }: MainWindowContext): MainWindowController {
   const quitShortcut =
     process.platform === "darwin"
       ? createQuitShortcut({
           quit: quitFromShortcut,
           isQuitting,
-          showHint: (window, visible) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, visible),
+          workingAgents,
+          showHint: (window, agents) => sendToRenderer(window, IPC_ENDPOINTS.app.quitShortcutHint, agents),
         })
       : null;
   const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
@@ -652,6 +657,45 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   return window;
 }
 
+/** The agent dock at the right edge of the screen: a transparent panel above the other apps. */
+export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
+  const window = new BrowserWindow({
+    ...bounds,
+    show: false,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    focusable: false,
+    hiddenInMissionControl: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    type: "panel",
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      devTools: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  // The chat composer makes the panel key. It must not activate the app and bring the main window up.
+  preventPanelActivation(window);
+  // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
+  window.webContents.setZoomMode("isolated");
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  return window;
+}
+
 /**
  * The overlay that carries the Computer Use rim over the window an agent works in.
  *
@@ -897,6 +941,12 @@ export function showMainWindow(window: BrowserWindow): void {
   presentMainWindow(window, process.platform, () => app.show());
 }
 
+export function loadAgentDockRenderer(window: BrowserWindow): Promise<void> {
+  const url = helperRendererUrl(process.env.ELECTRON_RENDERER_URL);
+  url.searchParams.set("surface", "agent-dock");
+  return window.loadURL(url.toString());
+}
+
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
   const displayMode = display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
@@ -948,12 +998,18 @@ let quitConfirmationOpen = false;
  * asks. A click on
  * the item, the Dock, a system logout and an update still quit at once.
  */
-function macQuitItem(translate: AppTranslate, quit: (source: MenuQuitSource) => void): MenuItemConstructorOptions {
+function macQuitItem(
+  translate: AppTranslate,
+  agentsWork: () => boolean,
+  quit: (source: MenuQuitSource) => void,
+): MenuItemConstructorOptions {
   return {
     label: translate("menu.quit"),
     accelerator: "Command+Q",
     click: (_item, _window, event) => {
       if (!event.triggeredByAccelerator) return quit("menu");
+      // With no agent at work, a quit stops nothing, so the keys quit at once.
+      if (!agentsWork()) return quit("shortcut");
       // A second press while the question is open does not open another one, and a quit that has
       // started hid every window and needs no question.
       if (quitConfirmationOpen || windowsKeptHidden) return;
@@ -997,6 +1053,7 @@ export function configureApplicationMenu(
   interfaceSize: InterfaceSizeService,
   translate: AppTranslate,
   getMainWindow: () => BrowserWindow | null,
+  workingAgents: () => AgentSummary[],
   quit: (source: MenuQuitSource) => void,
 ): void {
   Menu.setApplicationMenu(
@@ -1041,7 +1098,9 @@ export function configureApplicationMenu(
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          process.platform === "darwin" ? macQuitItem(translate, quit) : { role: "quit" },
+          process.platform === "darwin"
+            ? macQuitItem(translate, () => workingAgents().length > 0, quit)
+            : { role: "quit" },
         ],
       },
       { role: "editMenu" },

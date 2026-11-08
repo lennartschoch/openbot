@@ -27,6 +27,7 @@ import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
 import type { ServerAuditStore } from "../server-audit-store";
+import type { ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import type { ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
@@ -78,6 +79,7 @@ import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { LiveActivityPushService } from "../live-activity-push";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
+import type { McpServerOwnersStore } from "../mcp-server-owners-store";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
 import type { PasswordManagersService } from "../password-managers/password-managers-service";
 import type { ProviderAccountsHost } from "../provider-accounts-host";
@@ -185,6 +187,12 @@ export type TeamApiMcpServers = Pick<
   "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
 
+/**
+ * Who added each MCP server. Its presence, beside `mcpServers`, is what `#protocolSupport` advertises
+ * `mcp-member-access-v1` on.
+ */
+export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove">;
+
 /** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
 export type TeamApiMcpSignIns = Pick<
   McpHostSignIns,
@@ -271,6 +279,9 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
+/** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
+export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
+
 /**
  * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
  * The host keeps the levels of the owner under one key, so its desktop app and its phones read the
@@ -313,6 +324,7 @@ export type TeamApiAgentTasks = Pick<
   | "listAgents"
   | "listTasks"
   | "readTask"
+  | "readTaskPage"
   | "startTask"
   | "sendMessage"
   | "stopTask"
@@ -460,6 +472,8 @@ export interface TeamApiAdmin {
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  /** `host-personality-v1`: how the server's agents talk while they work. Any member reads it. */
+  personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
   /**
@@ -607,6 +621,7 @@ export interface TeamApiOptions {
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;
+  mcpServerOwners?: TeamApiMcpServerOwners | undefined;
   mcpSignIns?: TeamApiMcpSignIns | undefined;
   signInRelay?: TeamApiSignInRelay | undefined;
   connectors?: TeamApiConnectors | undefined;
@@ -628,6 +643,7 @@ export interface TeamApiOptions {
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
+  routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;
   sidebarPins?: TeamApiSidebarPins;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */

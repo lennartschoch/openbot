@@ -32,12 +32,14 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeClaudeUserSetupSetting,
   decodeCompanySignInScimToken,
   decodeCompanySignInSettings,
   decodeHermesImportPreview,
   decodeHermesImportResult,
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
+  decodeHostPersonality,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeInstanceExportResult,
@@ -129,6 +131,12 @@ import {
   decodeSideQuestionAnswer,
   decodeTables,
 } from "./agent-decoding";
+import {
+  decodeAgentDockAction,
+  decodeAgentDockDisplays,
+  decodeAgentDockOffset,
+  decodeAgentDockPresentation,
+} from "./agent-dock-decoding";
 import { decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
@@ -183,7 +191,6 @@ import {
   decodePendingListing,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
-  decodeQuitShortcutHint,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
   decodeRemoteNetworkRouteState,
@@ -249,6 +256,7 @@ import {
   decodeReadStates,
   decodeReceipt,
   decodeTaskConversation,
+  decodeTaskPage,
   decodeWaits,
 } from "./conversation-decoding";
 import {
@@ -601,6 +609,8 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   deleteChannel: decodeVoid,
   deleteChannelMessage: decodeVoid,
   setChannelImage: decodeChannel,
+  clearChannelContext: decodeVoid,
+  compactChannelContext: decodeVoid,
   getSidebarLayout: decodeSidebarLayout,
   mutateSidebarLayout: decodeSidebarLayout,
   getSidebarPins: decodeSidebarPinsFromMain,
@@ -632,6 +642,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   cancelWait: decodeVoid,
   listTasks: decodeAgentTasks,
   readTask: decodeTaskConversation,
+  readTaskPage: decodeTaskPage,
   startTask: decodeAgentTask,
   runQueuedMessageAsTask: decodeAgentTask,
   branchTask: decodeAgentTask,
@@ -763,7 +774,7 @@ const openbotApi: OpenBotDesktopApi = {
     openChatWindow: decodeVoid,
     getChatWindows: decodeChatWindowTargets,
     chatWindows: decodeChatWindowTargets,
-    quitShortcutHint: decodeQuitShortcutHint,
+    quitShortcutHint: decodeAgents,
   }),
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,
@@ -786,6 +797,8 @@ const openbotApi: OpenBotDesktopApi = {
     signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
+    getClaudeUserSetup: decodeClaudeUserSetupSetting,
+    setClaudeUserSetup: decodeClaudeUserSetupSetting,
   }),
   browserDock: bridgeGroup(IPC_ENDPOINTS.browserDock, {
     publishPresentation: decodeVoid,
@@ -795,6 +808,18 @@ const openbotApi: OpenBotDesktopApi = {
     action: decodeBrowserDockAction,
     setFrame: decodeVoid,
     shown: decodeBrowserDockShown,
+  }),
+  agentDock: bridgeGroup(IPC_ENDPOINTS.agentDock, {
+    publishPresentation: decodeVoid,
+    getPresentation: decodeAgentDockPresentation,
+    presentation: decodeAgentDockPresentation,
+    performAction: decodeVoid,
+    action: decodeAgentDockAction,
+    setInteractive: decodeVoid,
+    closeChat: decodeVoid,
+    listDisplays: decodeAgentDockDisplays,
+    drag: decodeVoid,
+    moved: decodeAgentDockOffset,
   }),
   dynamicIsland: bridgeGroup(IPC_ENDPOINTS.dynamicIsland, {
     getPreference: decodeDynamicIslandPreference,
@@ -1204,6 +1229,8 @@ const openbotApi: OpenBotDesktopApi = {
     setUpdateSettings: decodeHostUpdateStatus,
     getTimezone: decodeHostTimezoneSettings,
     setTimezone: decodeHostTimezoneSettings,
+    getPersonality: decodeHostPersonality,
+    setPersonality: decodeHostPersonality,
     getAgentMemoryLimit: decodeHostAgentMemoryLimit,
     setAgentMemoryLimit: decodeHostAgentMemoryLimit,
     getMemoryReview: decodeHostMemoryReview,

@@ -59,6 +59,7 @@ export const messages = {
   "error.team.providersUnsupported": "Esta conexão não oferece suporte às configurações de provedores.",
   "error.team.providerNotManaged": "O OpenBot não gerencia a CLI deste provedor.",
   "error.team.channelsUnsupported": "Esta conexão não oferece suporte a chats em canais.",
+  "error.team.channelContextUnsupported": "Esta conexão não suporta uma nova conversa nem compactação em um canal.",
   "error.team.channelPictureUnsupported": "Esta conexão não oferece suporte a imagens de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexão não oferece suporte à exclusão de canais.",
   "error.team.channelTaskCancelUnsupported": "Esta conexão não oferece suporte ao cancelamento de tarefas de canais.",
@@ -70,6 +71,7 @@ export const messages = {
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
   "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
+  "error.team.routineRunPlaceUnsupported": "Esta conexão não pode alterar onde uma rotina é executada.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
@@ -143,6 +145,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente não oferece suporte à autenticação segura.",
   "error.team.agentSettingsUnsupported": "Esta conexão não oferece suporte às configurações de agentes.",
   "error.team.adminRequired": "É necessário acesso de administrador.",
+  "error.team.mcpServerNotYours": "Só a pessoa que adicionou este servidor MCP, ou um administrador, pode alterá-lo.",
   "error.team.ownerRequired": "Só o proprietário deste servidor pode fazer isso.",
   "error.team.requestTooLarge": "O corpo da solicitação é muito grande.",
   "error.team.signInRelayUnsupported":
@@ -156,4 +159,5 @@ export const messages = {
   "error.team.signInRelayUsed": "Este login já foi enviado.",
   "error.team.signInRelayMismatch": "Este endereço não é deste login.",
   "error.team.signInRelayLinkUnknown": "Nenhum agente deste servidor mostrou este link de login.",
+  "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
 } as const satisfies PartialTranslation<typeof source>;

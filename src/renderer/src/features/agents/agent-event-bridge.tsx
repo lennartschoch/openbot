@@ -24,6 +24,8 @@ import { agentConversationKey, composerDraftKey, promptRequestKey } from "../con
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import { noteSocialFollowReplyCompleted } from "../conversation/social-follow-prompt";
 import { appendTurnStepLine } from "../conversation/turn-step-lines";
+import { serverCanManageMcp } from "../servers/server-capabilities";
+import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
@@ -58,6 +60,7 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
+  const { openServerSettings } = useServerSettings();
   const { applyAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
@@ -187,7 +190,12 @@ export function AgentEventBridge() {
       case "turn-progress":
         setTurnProgress((current) => ({
           ...current,
-          [event.agentId]: { turnId: event.turnId, detail: cleanAgentMessageText(event.detail) },
+          [event.agentId]: {
+            turnId: event.turnId,
+            detail: cleanAgentMessageText(event.detail),
+            ...(event.running ? { running: true } : {}),
+            ...(event.activity ? { activity: event.activity } : {}),
+          },
         }));
         setTurnStepLines((current) => appendTurnStepLine(current, event.turnId, cleanAgentMessageText(event.detail)));
         return;
@@ -390,13 +398,22 @@ export function AgentEventBridge() {
         // one stays global. The message is already redacted in the main process.
         const toastKey = readableAgentError(event.message);
         if (claimErrorToast(toastKey)) {
-          // An MCP server left out at hand-off is not the provider failing, and calling it a
-          // provider error sends the user to the wrong settings page.
+          // An MCP server that a provider was not given or could not use is not the provider failing,
+          // and calling it a provider error sends the user to the wrong settings page. The button
+          // shows only to a user who can see the server's MCP settings.
           const { t } = currentText();
-          const title =
-            event.code === "mcp_server_not_started" ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code);
-          toast.error(title, {
+          const mcp = event.code === "mcp_server_not_started";
+          const serverId = activeServerId();
+          toast.error(mcp ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code), {
             ...{ description: toastKey },
+            ...(mcp && serverCanManageMcp(activeServer())
+              ? {
+                  action: {
+                    label: t("agent.error.openMcpSettings"),
+                    onClick: () => openServerSettings(serverId, null, "mcp"),
+                  },
+                }
+              : {}),
             report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
           });
         }

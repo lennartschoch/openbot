@@ -26,6 +26,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "./agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CAPABILITY } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "./agent-thread-files-v1";
+import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
@@ -49,6 +50,7 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
+import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
@@ -68,6 +70,7 @@ import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
@@ -108,6 +111,7 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -150,11 +154,25 @@ export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
 export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
 /**
+ * A host that accepts a file with any name. A file with no known type is stored as an opaque `file`
+ * attachment, and the agent gets its path. An older host refuses a name outside the known types.
+ */
+export const TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY = "any-file-attachments";
+/**
  * A host that keeps a separate MCP sign-in for each row whose URL ends in an `#account-…` fragment.
  * An older host files every row on one URL under one sign-in, so the client offers "Add account"
  * for a listing only when the host advertises this.
  */
 export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
+/**
+ * A host that lets a member, and not only an owner or admin, use the routes of `mcp-servers-v1`,
+ * `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`. A member can read
+ * the list, test, and add a server. A member can change, sign in, sign out, or remove only a server
+ * that the member added; the host refuses any other row with 403. The host lets a member in only
+ * when the client also sends this capability, so a released client sees no change. Each server
+ * still has one sign-in, which every agent of the host uses.
+ */
+export const MCP_MEMBER_ACCESS_CAPABILITY = "mcp-member-access-v1";
 /**
  * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
  * caller, a member or an admin, removes their own membership with the same effects as an admin's
@@ -199,6 +217,7 @@ export {
   AGENT_TASKS_CAPABILITY,
   AGENT_THREAD_BRANCHES_CAPABILITY,
   AGENT_THREAD_FILES_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
@@ -214,6 +233,7 @@ export {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -265,6 +285,7 @@ export {
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -456,6 +477,12 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
   CODEX_API_KEY_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -625,7 +652,13 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PASSWORD_MANAGERS_CAPABILITY &&
     capability !== BROWSER_PROXIES_CAPABILITY &&
     capability !== BROWSER_EGRESS_CAPABILITY &&
-    capability !== CODEX_API_KEY_CAPABILITY,
+    capability !== CODEX_API_KEY_CAPABILITY &&
+    capability !== CHANNEL_ISOLATION_CAPABILITY &&
+    capability !== AGENT_THREAD_PAGES_CAPABILITY &&
+    capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+    capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+    capability !== HOST_PERSONALITY_CAPABILITY &&
+    capability !== MCP_MEMBER_ACCESS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -671,6 +704,12 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_EGRESS_CAPABILITY,
   CODEX_API_KEY_CAPABILITY,
   ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  AGENT_THREAD_PAGES_CAPABILITY,
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
+  ROUTINE_RUN_PLACE_CAPABILITY,
+  HOST_PERSONALITY_CAPABILITY,
+  MCP_MEMBER_ACCESS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -799,6 +838,12 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PASSWORD_MANAGERS_CAPABILITY &&
       capability !== BROWSER_PROXIES_CAPABILITY &&
       capability !== BROWSER_EGRESS_CAPABILITY &&
-      capability !== CODEX_API_KEY_CAPABILITY,
+      capability !== CODEX_API_KEY_CAPABILITY &&
+      capability !== CHANNEL_ISOLATION_CAPABILITY &&
+      capability !== AGENT_THREAD_PAGES_CAPABILITY &&
+      capability !== TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY &&
+      capability !== ROUTINE_RUN_PLACE_CAPABILITY &&
+      capability !== HOST_PERSONALITY_CAPABILITY &&
+      capability !== MCP_MEMBER_ACCESS_CAPABILITY,
   );
 }

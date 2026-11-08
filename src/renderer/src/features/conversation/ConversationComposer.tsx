@@ -8,6 +8,7 @@ import {
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import {
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
@@ -29,7 +30,7 @@ import {
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
-import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerSendControl, type ComposerSendVoice } from "@openbot/ui/features/conversation/ComposerSendControl";
 import {
   ComposerCompactionNotice,
   ComposerNewChatButton,
@@ -123,7 +124,10 @@ export function ConversationComposer() {
     openSideQuestion,
     voiceConversationAvailable,
     openSidePanelPane,
+    closeSidePanelPane,
     activeRightPanel,
+    sidePanel,
+    sendStarting,
     channel,
     providerSilentMinutes,
     providerOffline,
@@ -155,6 +159,25 @@ export function ConversationComposer() {
     };
   };
   const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
+  /** The voice conversation runs while its tab is in the side panel, also when another tab shows. */
+  const voiceTabOpen = () => sidePanel().panes.includes("voice");
+  /**
+   * With nothing to send, Send starts a voice conversation, as on mobile. While the conversation runs,
+   * the same button ends it. When Send cannot send to the agent, Send stays and is disabled.
+   */
+  const sendVoice = (): ComposerSendVoice | undefined => {
+    if (!props.agent || !voiceConversationAvailable()) return undefined;
+    if (composerHasContent() || editingDeliveryId() || voicePhase() !== "idle") return undefined;
+    if (attachmentBusy() || uploadFailed() || submitting() || !agentReady() || providerUpdateRequired())
+      return undefined;
+    if (voiceTabOpen()) return "end";
+    // Between a send and its turn, Send stays, so the voice icon does not show for a moment before Stop.
+    return sendStarting() ? undefined : "start";
+  };
+  const toggleVoiceConversation = () => {
+    if (voiceTabOpen()) closeSidePanelPane("voice");
+    else openSidePanelPane("voice");
+  };
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // One chip for each file of each import. Only a single-file import knows the bytes of its file.
@@ -338,12 +361,14 @@ export function ConversationComposer() {
     const server = props.server;
     const local = server?.kind !== "remote";
     const capabilities = server?.compatibility?.capabilities ?? [];
+    // A host that takes any file gets no filter, so the picker shows every file.
+    if (local || capabilities.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY)) return undefined;
     return supportedAttachmentExtensions({
-      eml: local || capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
-      media: local || capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
-      zip: local || capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
-      mp4: local || capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
-      svg: local || capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
+      eml: capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+      media: capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+      zip: capabilities.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
+      mp4: capabilities.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
+      svg: capabilities.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
     })
       .map((extension) => `.${extension}`)
       .join(",");
@@ -366,6 +391,8 @@ export function ConversationComposer() {
         props.activeTurnId && !editingDeliveryId() && !composerHasContent() && voicePhase() !== "recording",
       )}
       onStop={props.onStop}
+      voice={sendVoice()}
+      onVoice={toggleVoiceConversation}
       label={sendLabel()}
       keyShortcuts={sendKeyShortcuts()}
       title={sendTitle()}
