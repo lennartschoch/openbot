@@ -6,6 +6,18 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.64.0-fork.13] - 2026-11-08
+
+### Fixed
+
+- Phone: the app starts again. `expo-notifications` requires three native modules as its JavaScript
+  bundle loads, and the Google strip had deleted them, so the app died at launch with
+  `Cannot find native module 'ExpoPushTokenManager'`. They are registered again as Firebase-free
+  stubs that report the transport as unavailable when something calls them.
+- Phone: the release APK no longer carries ML Kit or Firebase code. The build passes the scanner
+  switches to Gradle directly, and the release job inspects the finished APK, so a config plugin
+  that skips them fails the build instead of shipping Google code to a phone.
+
 ## [0.64.0-fork.12] - 2026-11-08
 
 ### Fixed
