@@ -1,11 +1,31 @@
 # OpenBot
 
+**DeGoogled OpenBot with push notifications over UnifiedPush.**
+
 > Unofficial fork of [nightly-labs/openbot](https://github.com/nightly-labs/openbot).
 > Not affiliated with Synthetify Labs. Releases are built from this repository; see
 > [`FORK.md`](FORK.md).
 
-[![CI](https://github.com/nightly-labs/openbot/actions/workflows/ci.yml/badge.svg)](https://github.com/nightly-labs/openbot/actions/workflows/ci.yml)
+[![Fork release](https://github.com/lennartschoch/openbot/actions/workflows/fork-release.yml/badge.svg)](https://github.com/lennartschoch/openbot/actions/workflows/fork-release.yml)
 [![License](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-blue.svg)](LICENSE)
+
+This fork changes three things about OpenBot, and keeps everything else in step with upstream:
+
+- **A de-Googled Android app.** The APK carries no Google dependencies: no Firebase Cloud
+  Messaging, no ML Kit, no Play Services libraries. QR codes decode in the app with a pure
+  JavaScript decoder instead of ML Kit.
+- **Push notifications over UnifiedPush.** The phone registers with a UnifiedPush distributor app
+  that you pick in Settings → Notifications, such as ntfy. The desktop app then posts each
+  notification to the topic URL that the distributor hands out, so any ntfy server works,
+  self-hosted included. iPhone notifications keep using Apple Push Notifications.
+- **No analytics and no failure reports.** Four switches disable the product events and crash
+  reports of the desktop app, the host, and the phone.
+
+Releases are built from this repository: a Linux AppImage (x64 and arm64), a macOS disk image
+(arm64), and an Android APK (arm64-v8a). Versions look like `0.64.0-fork.11`: the upstream
+version, plus the fork build. The desktop apps update themselves from
+[GitHub Releases](https://github.com/lennartschoch/openbot/releases); on the iPhone the app is
+the upstream App Store build.
 
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
@@ -43,24 +63,48 @@ Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Clin
 Kimi connects to Moonshot AI, Devin connects to Cognition, GitHub Copilot connects to GitHub, Hermes connects to Nous Portal and to the providers you set up in Hermes,
 visited pages use the network, and installed plugins may connect to their own services.
 
+## Push notifications
+
+The desktop app that runs your agents sends every push. An iPhone receives them through Apple
+Push Notifications. On Android the fork replaces the Firebase Cloud Messaging transport of
+upstream with UnifiedPush:
+
+1. Install a UnifiedPush distributor app, such as [ntfy](https://ntfy.sh) or UniPushed (from F-Droid, so it needs no Google Play).
+2. In the OpenBot app, open Settings → Notifications and pick the distributor. The app lists the
+   distributor apps that answer and registers with the one you choose.
+3. The distributor assigns a topic URL, for example `https://ntfy.sh/<topic>`, and the app passes
+   it to the desktop host. The host then posts each notification to that URL, and the distributor
+   shows it. Any ntfy server works, self-hosted included.
+
+The phone keeps its normal notification channels, permissions, and tap handling; only the
+transport changes.
+
 ## Install
 
 OpenBot supports macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64 systems, and x64
 or arm64 Linux as an AppImage.
 
+### Android
+
+1. Download the latest `openbot-fork-*-android.apk` from [GitHub Releases](https://github.com/lennartschoch/openbot/releases).
+2. Install it, open the app, and pick a UnifiedPush distributor under Settings → Notifications
+   (see [Push notifications](#push-notifications)).
+
 ### macOS
 
-1. Download the latest `OpenBot-*-arm64.dmg` (or `OpenBot-*-x64.dmg` on an Intel Mac) from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
-2. Drag OpenBot to Applications and open it.
+1. Download the latest `OpenBot-*-arm64.dmg` from [GitHub Releases](https://github.com/lennartschoch/openbot/releases).
+2. Drag OpenBot to Applications and open it. The fork builds arm64 only, and an unsigned build
+   needs one right-click → Open; see [FORK.md](FORK.md#macos-signing).
 
 ### Windows
 
 1. Download the latest `OpenBot-*-x64.exe` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
-2. Run the installer and open OpenBot.
+2. Run the installer and open OpenBot. The fork builds no Windows installer; it uses the upstream
+   one.
 
 ### Linux
 
-1. Download the latest `OpenBot-*-x86_64.AppImage` (or `OpenBot-*-arm64.AppImage` on arm64) from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
+1. Download the latest `OpenBot-*-x86_64.AppImage` (or `OpenBot-*-arm64.AppImage` on arm64) from [GitHub Releases](https://github.com/lennartschoch/openbot/releases).
 2. Make it executable with `chmod +x OpenBot-*.AppImage`, then run it.
 
 The AppImage does not need libfuse2, so it also runs on Arch Linux and Omarchy. It mounts itself
@@ -692,14 +736,24 @@ described above.
 
 ## Releases
 
-Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
-version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 and x64 release, a signed Windows x64 release, and unsigned Linux x64
-and arm64 AppImages in GitHub Actions. After the release is published, the workflow pushes the Docker
-image to `ghcr.io/nightly-labs/openbot`.
-Installed builds check GitHub Releases for updates and expose download/restart controls in the account
-popover. Release signing secrets and the complete procedure are documented in
-[docs/RELEASING.md](docs/RELEASING.md).
+This fork tracks upstream releases and adds fork builds on top. After an upstream release, one
+command merges the newest upstream tag, bumps the version to `<base>-fork.<n>` (for example
+`0.64.0-fork.11`), tags `fork-v<version>`, and pushes:
+
+```sh
+node scripts/fork/sync-upstream.mjs --push
+```
+
+The tag starts `.github/workflows/fork-release.yml`, which builds and publishes to
+[GitHub Releases](https://github.com/lennartschoch/openbot/releases):
+
+- Linux AppImage (x64 and arm64) plus the update manifest.
+- macOS disk image (arm64), signed with the fork certificate when one is configured.
+- Android APK (arm64-v8a), signed with the fork key.
+
+Installed desktop builds check GitHub Releases for updates and expose download/restart controls in
+the account popover. iOS uses the upstream App Store app; Windows uses the upstream installer. The
+version scheme, signing material, and repository secrets are documented in [FORK.md](FORK.md).
 
 ## Contributing
 
