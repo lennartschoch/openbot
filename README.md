@@ -20,6 +20,9 @@ This fork changes three things about OpenBot, and keeps everything else in step 
   self-hosted included. iPhone notifications keep using Apple Push Notifications.
 - **No analytics and no failure reports.** Four switches disable the product events and crash
   reports of the desktop app, the host, and the phone.
+- **A self-hosted account service.** `account/` is a small Bun re-implementation of the account
+  API: one process, one SQLite file, no Cloudflare Workers, D1, or SMTP. The unmodified desktop
+  app, host, Signal, and mobile app accept it.
 
 Releases are built from this repository: a Linux AppImage (x64 and arm64), a macOS disk image
 (arm64), and an Android APK (arm64-v8a). Versions look like `0.64.0-fork.11`: the upstream
@@ -56,7 +59,7 @@ OpenBot is ready for production use. A new release ships almost every day.
 - Optional Computer Use on macOS, Windows and Linux through the `cua-driver` binary in the release, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
-- Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
+- Optional OpenBot accounts, served by the fork's own [account service](#account-service).
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
 Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
@@ -78,6 +81,21 @@ upstream with UnifiedPush:
 
 The phone keeps its normal notification channels, permissions, and tap handling; only the
 transport changes.
+
+## Account service
+
+OpenBot accounts, the host registry, remote sessions, and Mobile Connect need an account API.
+Upstream runs it on Cloudflare Workers and D1. This fork re-implements the parts the clients
+call as a small Bun service in [`account/`](account/README.md):
+
+- One Bun process and one SQLite file. No Cloudflare Workers, D1, R2, SMTP, or Stripe.
+- Single-tenant by design: one owner, a few hosts and phones.
+- Sign-in through host server claims and company OIDC, with ES256 remote tickets that Signal
+  verifies from `/.well-known/jwks.json`.
+- The unmodified desktop app, host, Signal, and mobile app accept it; the wire contract is
+  [`account/PROTOCOL.md`](account/PROTOCOL.md). Upstream's `apps/auth-api` stays in the tree
+  only to keep merges simple.
+- Runs in a container: `docker compose up -d --build`, or pull `ghcr.io/lennartschoch/openbot-account`.
 
 ## Install
 
