@@ -6,6 +6,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.64.0-fork.9] - 2026-11-08
+
+### Fixed
+
+- Phone: the release APK builds again. The camera module kept its ML Kit barcode classes as
+  `compileOnly`, so R8 failed on them as missing classes.
+
 ## [0.64.0-fork.8] - 2026-11-08
 
 ### Changed
