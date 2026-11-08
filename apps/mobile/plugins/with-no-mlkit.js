@@ -36,7 +36,13 @@ const REMOVED_METADATA = new Set([
  * dependencies as `compileOnly`, so R8 names these packages. Nothing loads them at runtime: the
  * scanner code is unreachable while `barcode-scanner-enabled` is `false`.
  */
-const MLKIT_DONTWARN_RULES = ["-dontwarn com.google.mlkit.**", "-dontwarn com.google.android.gms.vision.**"].join("\n");
+const MLKIT_DONTWARN_RULES = [
+  "-dontwarn com.google.mlkit.**",
+  "-dontwarn com.google.android.gms.vision.**",
+  // The code scanner's `Task`/`On*Listener` types are `compileOnly` with the scanner off, like the
+  // ML Kit classes, so R8 names them too.
+  "-dontwarn com.google.android.gms.tasks.**",
+].join("\n");
 const RULES_MARKER = "# with-no-mlkit";
 
 /** @type {import('expo/config-plugins').ConfigPlugin<null>} */
