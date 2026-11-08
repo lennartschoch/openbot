@@ -278,11 +278,12 @@ its windows on, at 1280x800. Main gives that display to Computer Use, to remote 
 processes, so an agent's screenshot and remote desktop do not show the OpenBot window. See
 [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server).
 
-Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a
-new release, and it starts at the next boot, or when an owner, an admin or a permitted member
-installs it in Server Settings > Updates. `sudo openbot update` stages, stops the service, applies
-and starts the service again. When a step fails or a signal stops it, the command completes an
-interrupted copy, starts the service, and exits with an error.
+Updates are manual in this fork (see [Updates](hosted-servers.md#updates)): the timer stages a new
+release from `github.com/lennartschoch/openbot/releases`, and it starts at the next boot.
+`sudo openbot update` stages, stops the service, applies and starts the service again. Server
+Settings > Updates shows the version and a newer release, but nothing installs from a client. When a
+step fails or a signal stops it, the command completes an interrupted copy, starts the service, and
+exits with an error.
 
 ## Control socket
 

@@ -1565,7 +1565,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.update.path.container":
     "On the Docker host, pull the new OpenBot image and create the container again with the same data volumes. Wait for active work to finish first. Keep the existing volumes to preserve your data.",
   "mobile.server.update.path.manual":
-    "This installation cannot replace itself. Ask the host administrator to install the compatible release from github.com/nightly-labs/openbot/releases. Keep the existing OpenBot data.",
+    "This installation cannot replace itself. Ask the host administrator to install the compatible release from github.com/lennartschoch/openbot/releases. Keep the existing OpenBot data.",
   "mobile.server.update.path.unavailable":
     "This is a development build. Use an installed OpenBot release to check for updates.",
   "mobile.server.update.check": "Check for updates",

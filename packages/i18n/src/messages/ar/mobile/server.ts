@@ -1599,7 +1599,7 @@ export const messages = {
   "mobile.server.update.path.container":
     "على مضيف Docker، اسحب صورة OpenBot الجديدة وأنشئ الحاوية مجددًا بوحدات تخزين البيانات نفسها. انتظر انتهاء العمل النشط أولًا. أبقِ وحدات التخزين الحالية للحفاظ على بياناتك.",
   "mobile.server.update.path.manual":
-    "لا يستطيع هذا التثبيت استبدال نفسه. اطلب من مسؤول المضيف تثبيت الإصدار المتوافق من github.com/nightly-labs/openbot/releases. أبقِ بيانات OpenBot الحالية.",
+    "لا يستطيع هذا التثبيت استبدال نفسه. اطلب من مسؤول المضيف تثبيت الإصدار المتوافق من github.com/lennartschoch/openbot/releases. أبقِ بيانات OpenBot الحالية.",
   "mobile.server.update.path.unavailable": "هذا إصدار تطوير. استخدم إصدار OpenBot مثبّتًا للتحقق من وجود تحديثات.",
   "mobile.server.update.check": "التحقق من وجود تحديثات",
   "mobile.server.update.start": "التحديث عند الخمول",

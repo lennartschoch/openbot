@@ -1164,7 +1164,7 @@ export const messages = {
   "mobile.server.update.path.container":
     "Docker ana makinesinde yeni OpenBot görüntüsünü çekin ve kapsayıcıyı aynı veri birimleriyle yeniden oluşturun. Önce etkin çalışmanın bitmesini bekleyin. Verilerinizi korumak için mevcut birimleri saklayın.",
   "mobile.server.update.path.manual":
-    "Bu kurulum kendini değiştiremez. Ana makine yöneticisinden uyumlu sürümü github.com/nightly-labs/openbot/releases adresinden yüklemesini isteyin. Mevcut OpenBot verilerini saklayın.",
+    "Bu kurulum kendini değiştiremez. Ana makine yöneticisinden uyumlu sürümü github.com/lennartschoch/openbot/releases adresinden yüklemesini isteyin. Mevcut OpenBot verilerini saklayın.",
   "mobile.server.update.path.unavailable":
     "Bu bir geliştirme derlemesidir. Güncellemeleri denetlemek için yüklü bir OpenBot sürümü kullanın.",
   "mobile.server.update.check": "Güncellemeleri denetle",

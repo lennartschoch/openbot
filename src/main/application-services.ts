@@ -36,12 +36,6 @@ import {
   createBrowserProfileService,
 } from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
-import {
-  CONTAINER_UPDATE_PATHS,
-  CONTAINER_UPDATE_TRIGGER,
-  HOSTED_UPDATE_TRIGGER,
-  HostedUpdateAdapter,
-} from "./hosted-update-adapter";
 import { LicenseDesktopService } from "./license-service";
 import { LocalSignInWindows } from "./local-sign-in-window";
 import { LocalSkillLibrary } from "./local-skill-library";
@@ -3567,26 +3561,17 @@ export async function createApplicationServices({
   const currentVersion = app.getVersion();
   // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
-  // A hosted or self-installed server runs a release that root owns. Root installs updates for it
-  // when openbot-hosted-update has installed its request units. A container of openbot-instance asks
-  // the host instead, which pulls the image. Other containers have neither.
-  const containerInstaller =
-    app.isPackaged &&
-    process.platform === "linux" &&
-    installationMode === "container" &&
-    existsSync(CONTAINER_UPDATE_TRIGGER);
-  const hostedInstaller =
-    containerInstaller ||
-    (app.isPackaged &&
-      process.platform === "linux" &&
-      (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
-      existsSync(HOSTED_UPDATE_TRIGGER));
-  // A local server is the same application as its parent, which installs the update for both.
+  // A server never installs its own update in this fork. A container cannot replace its image, and a
+  // hosted or self-installed server runs a release that root owns; both would fetch whatever release
+  // their host is told to read. Servers update by hand instead: `sudo openbot update` on the server,
+  // or a newer image tag on the container host. `HostReleaseService` still reports a newer release,
+  // as a read-only notice. The desktop app updates itself, as before.
   const updatesEnabled =
     !localServerChild &&
     app.isPackaged &&
     !isNixStoreInstall() &&
-    (hostedInstaller || (supportsInstalledUpdates(process.platform) && updateMetadataAvailable)) &&
+    supportsInstalledUpdates(process.platform) &&
+    updateMetadataAvailable &&
     isValidSemver(currentVersion);
   if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
     logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
@@ -3594,13 +3579,7 @@ export async function createApplicationServices({
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
   let updaterEnabled = updatesEnabled;
   let updaterCacheDirectory: string | undefined;
-  if (updatesEnabled && hostedInstaller) {
-    updateAdapter = new HostedUpdateAdapter({
-      currentVersion,
-      arch: process.arch,
-      ...(containerInstaller ? { paths: CONTAINER_UPDATE_PATHS } : {}),
-    });
-  } else if (updatesEnabled) {
+  if (updatesEnabled) {
     const realAdapter = await loadElectronUpdater();
     if (realAdapter) {
       updateAdapter = realAdapter;

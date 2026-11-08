@@ -528,10 +528,25 @@ from a removed snapshot keep running.
 
 ### Updates
 
-Server Settings > Updates has the same controls as on a computer that updates itself: download,
-**Update when idle**, **Restart now**, automatic updates, and the switch that lets members update.
-OpenBot runs as the service user from a release that root owns, so it asks root to do the work
-(`src/main/hosted-update-adapter.ts`). It makes an empty file in its runtime directory:
+This fork has no in-app server update. A client cannot update a server, because the request would
+make root fetch a release that the fork does not control, and a container cannot replace its own
+image. Server Settings > Updates shows the installed version and, as a read-only notice, whether
+this fork has a newer release. A server installs a release by hand:
+
+- Self-installed or hosted server: `sudo openbot update`, or the timer below, which stages the
+  release and installs it at the next boot.
+- Container: pull the newer image tag and create the container again with the same data volumes.
+
+The timer and `sudo openbot update` read this fork's releases
+(`github.com/lennartschoch/openbot/releases`), never upstream's.
+
+The paragraphs below describe the mechanism that upstream activates. It is off in this fork:
+there is no `HostedUpdateAdapter`, so `openbot-hosted-update request` never runs from the app.
+
+Upstream: Server Settings > Updates has the same controls as on a computer that updates itself:
+download, **Update when idle**, **Restart now**, automatic updates, and the switch that lets members
+update. OpenBot runs as the service user from a release that root owns, so it asks root to do the
+work. It makes an empty file in its runtime directory:
 `/run/openbot/update-stage` to download, and `/run/openbot/update-install` to install.
 `openbot-update-request.path` then starts `openbot-update-request.service`, which runs
 `openbot-hosted-update request` as root. That removes the file without reading it and runs `stage`.
@@ -543,12 +558,9 @@ takes or that stops.
 
 The release that an older script moves into place has these units, but that script installs only
 the units it knows. So `openbot.service` runs `openbot-hosted-update trigger` as root before OpenBot
-starts; it installs and starts the request units when they are missing. OpenBot offers the controls
-only when `/etc/systemd/system/openbot-update-request.path` is there at its start. Otherwise, and on
-hosts older than this release, the panel checks the release (`host-release-v1`) and shows the
-host-managed update path. A container has no request units. A container of `docker/instances` uses
-the same `HostedUpdateAdapter` with folders that the host mounts in `/var/lib/openbot-update`; see
-[Updates from the app](docker.md#updates-from-the-app).
+starts; it installs and starts the request units when they are missing. A container has no request
+units, and in this fork nothing writes a request: see [Updates from the app](docker.md#updates-from-the-app)
+for the container path.
 
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:
@@ -568,11 +580,10 @@ On a server, root runs `openbot-hosted-update`:
    a complete disk, or when `.applying` shows an interrupted copy. `openbot.service` does not
    require it, so it starts after a failure too: with the old release, or with a partial copy after
    a failed copy, until the next start. On a self-installed server, the new release starts at the
-   next boot. A hosted server installs it itself: when the release is staged, OpenBot asks root to
-   install it when idle, and when no connected client changed data or typed for 5 minutes and the
-   start was 5 minutes ago. Reading is not use. Server Settings shows this wait as "other work",
-   because `host-update-v1` has no reason for it. The automatic update switch of a hosted server
-   is always on.
+   next boot, or when someone runs `sudo openbot update`. Upstream's hosted server also installs it
+   itself: when the release is staged, OpenBot asks root to install it when idle, and when no
+   connected client changed data or typed for 5 minutes and the start was 5 minutes ago. Reading is
+   not use.
 
 boat saves `/opt` by the paths that change, and it does not look into a directory that a rename
 moves. After the next stop, such a directory is empty or has its old files. So a release gets to

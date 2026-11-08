@@ -1195,7 +1195,7 @@ export const messages = {
   "mobile.server.update.path.container":
     "Lade auf dem Docker-Host das neue OpenBot-Image herunter und erstelle den Container mit denselben Datenvolumes neu. Warte zuerst, bis aktive Aufgaben beendet sind. Behalte die vorhandenen Volumes, um deine Daten zu erhalten.",
   "mobile.server.update.path.manual":
-    "Diese Installation kann sich nicht selbst ersetzen. Bitte den Host-Administrator, die kompatible Version von github.com/nightly-labs/openbot/releases zu installieren. Behalte die vorhandenen OpenBot-Daten.",
+    "Diese Installation kann sich nicht selbst ersetzen. Bitte den Host-Administrator, die kompatible Version von github.com/lennartschoch/openbot/releases zu installieren. Behalte die vorhandenen OpenBot-Daten.",
   "mobile.server.update.path.unavailable":
     "Dies ist eine Entwicklungsversion. Verwende eine installierte OpenBot-Version, um nach Updates zu suchen.",
   "mobile.server.update.check": "Nach Updates suchen",

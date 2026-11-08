@@ -247,6 +247,15 @@ release can report where it came from. Resolve conflicts by hand, then run
 - `docker/compose.yaml`, `docker/instances/compose.yaml` and `docs/docker.md` name
   `ghcr.io/lennartschoch/openbot`, the fork image (amd64 only). The container asks its host to
   pull that image, so a merge must keep the name here too.
+- **A server does not update itself from a client.** `src/main/application-services.ts` builds no
+  `HostedUpdateAdapter` (the file is deleted), so `host-update-v1` cannot ask root to install a
+  release, and a container never asks its host. `HostReleaseService` still reads this fork's feed,
+  as a read-only notice. A server updates by hand: `sudo openbot update`, the timer that stages a
+  release and installs it at the next boot, or a newer image tag on the container host. Keep it off
+  at each merge unless the fork controls the release that root would fetch.
+- The provider runtime block list (`BLOCKED_VERSIONS_URL` in
+  `src/main/provider-runtime-releases.ts`) reads this fork's `main`, not upstream's, so upstream
+  cannot hold a provider runtime back in a fork install.
 - Upstream publishes a Linux arm64 AppImage. The fork builds Linux x64 only (`dist:linux`), so
   `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
   there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.

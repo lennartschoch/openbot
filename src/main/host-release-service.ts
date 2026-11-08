@@ -163,13 +163,6 @@ async function fetchLatestRelease(target: ReleaseTarget, request: typeof fetch, 
   return manifest.version;
 }
 
-/** The latest Linux release for `arch`, for the hosted installer. */
-export function fetchLatestLinuxRelease(arch: string, request: typeof fetch, signal: AbortSignal): Promise<string> {
-  const target = releaseTarget("linux", arch);
-  if (!target) return Promise.reject(new Error("No release for this machine"));
-  return fetchLatestRelease(target, request, signal);
-}
-
 /** The three numbers of a version, and the fork build number when the fork made it. */
 function readVersion(version: string): { numbers: readonly number[]; forkBuild: number | null } {
   const numbers = (version.split(/[-+]/u, 1)[0] ?? "").split(".").map(Number);
@@ -185,7 +178,7 @@ function readVersion(version: string): { numbers: readonly number[]; forkBuild: 
  * that base is not newer than a fork build of it, because the fork fixes that base and installing
  * the plain release would remove the fixes.
  */
-export function newerRelease(candidate: string, current: string): boolean {
+function newerRelease(candidate: string, current: string): boolean {
   const left = readVersion(candidate);
   const right = readVersion(current);
   for (let index = 0; index < 3; index += 1) {

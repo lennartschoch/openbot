@@ -247,7 +247,7 @@ Agents have full access in their container, so the host limits what a container 
 | Show the instances | `openbot-instance list` |
 | Stop, start, restart | `openbot-instance down <name>`, `up <name>`, `restart <name>` |
 | Read the log | `openbot-instance logs <name> -f` (recent lines), or `/var/log/openbot/openbot-<name>.log*` (30 days) |
-| Upgrade | In the app (see [Updates from the app](#updates-from-the-app)), or `openbot-instance upgrade <name>` or `upgrade --all` |
+| Upgrade | `openbot-instance upgrade <name>` or `upgrade --all` (see [Updates from the app](#updates-from-the-app)) |
 | `openbot` commands | `openbot-instance run <name> status`, `login`, `mobile-connect`, `name <name>` |
 | Make the disk larger | `down <name>`, `umount /srv/openbot/<name>/data`, `fallocate --length <new size> data.img`, `e2fsck -f data.img`, `resize2fs data.img`, `mount /srv/openbot/<name>/data`, `up <name>` |
 
@@ -258,8 +258,13 @@ There is no command to remove an instance. To remove one and delete its data: `r
 
 ### Updates from the app
 
-The owner or an admin updates an instance in Server settings › Updates, or in the update dialog, as on a
-hosted server. The container never gets the Docker socket. OpenBot writes an empty request file to
+This fork updates a container from the host only: `openbot-instance upgrade <name>`, or the next
+`up` with a newer image tag. The app cannot ask the host for an update, so Server settings › Updates
+shows the version and a newer release without an install button.
+
+Upstream also updates an instance from the app. The owner or an admin updates it in Server settings
+› Updates, or in the update dialog, as on a hosted server. The container never gets the Docker
+socket. OpenBot writes an empty request file to
 `/srv/openbot/<name>/update-requests`. `openbot-instance-update@<name>.path` sees it and runs
 `openbot-instance update-request <name>` as root. Root only tests and removes the request; it never
 reads or follows it. It pulls the image of the instance and writes its version to `update-status` only
@@ -373,8 +378,8 @@ the backup. When it has less, copy the old data to another disk, delete it from
 
 ## Upgrades
 
-OpenBot does not update itself in a container. A new image replaces it. An instance of
-`docker/instances` can ask the host for that from the app, see
+OpenBot does not update itself in a container. A new image replaces it. Run
+`openbot-instance upgrade <name>` on the host, or `up` with a newer tag, see
 [Updates from the app](#updates-from-the-app). Do not go back to an older tag: an older OpenBot cannot
 open a database that a newer one migrated, so it does not start.
 
