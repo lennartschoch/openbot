@@ -10,7 +10,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.lennartschoch.openbot",
-      "buildNumber": "640000013",
+      "buildNumber": "640000014",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.lennartschoch.openbot",
-      "versionCode": 640000013,
+      "versionCode": 640000014,
       "icon": "./assets/icons/app-icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/android-adaptive-eyes.png",
