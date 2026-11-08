@@ -229,6 +229,13 @@ release can report where it came from. Resolve conflicts by hand, then run
   missing from the generated file. The job then inspects the finished APK: it fails when
   `MlKitInitProvider`, `FirebaseInitProvider`, the document-scanner activity, or a `firebase-`/
   `play-services-mlkit-` resource is inside, and when one of the three notification modules is not.
+- **The macOS host checks a pinned certificate, not an Apple team.** A self-signed certificate has
+  no Apple anchor and no team identifier, so `scripts/host-installation.ts` and
+  `scripts/host-manager-macos.ts` verify `certificate leaf = H"<SHA-1>"` instead. The SHA-1 is in
+  `HOST_CERTIFICATE_SHA1`, the name in `HOST_CERTIFICATE_NAME`, and
+  `scripts/host-signing-keychain.sh` finds the identity by the same hash. A new certificate must
+  change all three, and the SHA-256 table above. Nothing in this repository builds
+  `OpenBot-Host-*.pkg` yet, so these three files are unexecuted by CI.
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.

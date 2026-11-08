@@ -1,7 +1,16 @@
 import { z } from "zod";
 import { HOST_MANAGER_DIRECTORY } from "../src/main/host-update-files";
 
-export const HOST_TEAM_ID = "ZTRDTUL87R";
+/**
+ * SHA-1 of the DER of the code-signing certificate that signs this fork, from
+ * `.fork/openbot-fork-code-signing.crt`. It replaces upstream's Apple team ID in every signature
+ * check: the certificate is self-signed, so it has no Apple anchor and no team identifier, and the
+ * pinned leaf hash is the check that only this fork's builds pass. A new certificate changes this
+ * value, and `FORK.md` lists its SHA-256.
+ */
+export const HOST_CERTIFICATE_SHA1 = "5bb823022153892b63908d9c054a9c61319d872c";
+/** The common name of that certificate, as `codesign` and `pkgutil` print it. */
+export const HOST_CERTIFICATE_NAME = "OpenBot Fork";
 export const HOST_PACKAGE_ID = "app.openbot.host";
 export const HOST_DAEMON_PLIST = "/Library/LaunchDaemons/app.openbot.host-manager.plist";
 export const HOST_AGENT_PLIST = "/Library/LaunchAgents/app.openbot.desktop.relaunch.plist";
@@ -24,7 +33,7 @@ export const hostReleaseSchema = z
 
 export function hostExecutableRequirement(name: string): string {
   if (!HOST_EXECUTABLES.some((entry) => entry === name)) throw new Error("Unknown host executable.");
-  return `=anchor apple generic and identifier "app.openbot.host.${name}" and certificate leaf[subject.OU] = "${HOST_TEAM_ID}" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists`;
+  return `=identifier "app.openbot.host.${name}" and certificate leaf = H"${HOST_CERTIFICATE_SHA1}"`;
 }
 
 export function hostFileMode(path: string) {

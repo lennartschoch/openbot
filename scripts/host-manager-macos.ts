@@ -6,13 +6,14 @@ import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { HostManagerOperations } from "../src/main/host-manager";
 import { HOST_MANAGER_DIRECTORY, verifyHostDirectory } from "../src/main/host-update-files";
+import { HOST_CERTIFICATE_SHA1 } from "./host-installation";
 
 const exec = promisify(execFile);
 export const SHARED_APP = "/Applications/OpenBot.app";
 const STAGING = "/Applications/.openbot-host-stage";
 const PRIVATE = join(HOST_MANAGER_DIRECTORY, "private");
-const SIGNING_REQUIREMENT =
-  '=anchor apple generic and identifier "app.openbot.desktop" and certificate leaf[subject.OU] = "ZTRDTUL87R"';
+/** The shared app of this fork, by its identifier and its pinned self-signed certificate. */
+const SIGNING_REQUIREMENT = `=identifier "app.openbot.desktop" and certificate leaf = H"${HOST_CERTIFICATE_SHA1}"`;
 const releaseSchema = z.object({
   tag_name: z.string().regex(/^v?\d+\.\d+\.\d+$/),
   draft: z.literal(false),

@@ -5,12 +5,17 @@
 #
 #   source scripts/host-signing-keychain.sh
 #
-# Requires CSC_LINK, CSC_KEY_PASSWORD, CSC_INSTALLER_LINK, CSC_INSTALLER_KEY_PASSWORD and
-# APPLE_TEAM_ID. Exports HOST_SIGNING_KEYCHAIN, HOST_APPLICATION_IDENTITY,
-# HOST_INSTALLER_IDENTITY and host_signing_dir.
+# Requires CSC_LINK, CSC_KEY_PASSWORD, CSC_INSTALLER_LINK and CSC_INSTALLER_KEY_PASSWORD. Exports
+# HOST_SIGNING_KEYCHAIN, HOST_APPLICATION_IDENTITY, HOST_INSTALLER_IDENTITY and host_signing_dir.
+#
+# This fork signs with its own self-signed certificate, so the identity is found by the pinned leaf
+# hash in `scripts/host-installation.ts` and not by an Apple team. The keychain is new and holds
+# exactly the two imports below, so the installer identity is the other one.
 
 umask 077
-test "$APPLE_TEAM_ID" = ZTRDTUL87R
+# The SHA-1 of the DER of `.fork/openbot-fork-code-signing.crt`. Keep it equal to
+# HOST_CERTIFICATE_SHA1 in scripts/host-installation.ts.
+: "${HOST_APPLICATION_CERTIFICATE_SHA1:=5bb823022153892b63908d9c054a9c61319d872c}"
 host_signing_dir="$(mktemp -d "$RUNNER_TEMP/openbot-host-signing.XXXXXX")"
 export HOST_SIGNING_KEYCHAIN="$host_signing_dir/host.keychain-db"
 # `codesign --keychain` restricts which keychain is searched, it does not open one outside the
@@ -41,10 +46,14 @@ security import "$host_signing_dir/application.p12" -k "$HOST_SIGNING_KEYCHAIN" 
 security import "$host_signing_dir/installer.p12" -k "$HOST_SIGNING_KEYCHAIN" -P "$CSC_INSTALLER_KEY_PASSWORD" -T /usr/bin/productsign -T /usr/bin/pkgbuild >/dev/null
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$host_keychain_password" "$HOST_SIGNING_KEYCHAIN" >/dev/null
 security list-keychains -d user -s "$HOST_SIGNING_KEYCHAIN" ${host_previous_keychains[@]+"${host_previous_keychains[@]}"} >/dev/null
-export HOST_APPLICATION_IDENTITY="$(security find-identity -v -p codesigning "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Application:.*(ZTRDTUL87R)\)".*/\1/p')"
-export HOST_INSTALLER_IDENTITY="$(security find-identity -v -p basic "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Installer:.*(ZTRDTUL87R)\)".*/\1/p')"
-test -n "$HOST_APPLICATION_IDENTITY" || { echo 'Developer ID Application identity missing.' >&2; exit 1; }
-test -n "$HOST_INSTALLER_IDENTITY" || { echo 'Developer ID Installer identity missing.' >&2; exit 1; }
+# The quoted name of the identity that holds the pinned certificate, from `security find-identity`,
+# whose lines are `<number>) <SHA-1> "<name>"`.
+export HOST_APPLICATION_IDENTITY="$(security find-identity -v -p codesigning "$HOST_SIGNING_KEYCHAIN" |
+  awk -v h="$HOST_APPLICATION_CERTIFICATE_SHA1" 'index($0, h) && match($0, /"[^"]*"/) { print substr($0, RSTART + 1, RLENGTH - 2); exit }')"
+export HOST_INSTALLER_IDENTITY="$(security find-identity -v -p basic "$HOST_SIGNING_KEYCHAIN" |
+  awk -v h="$HOST_APPLICATION_CERTIFICATE_SHA1" '!index($0, h) && match($0, /"[^"]*"/) { print substr($0, RSTART + 1, RLENGTH - 2); exit }')"
+test -n "$HOST_APPLICATION_IDENTITY" || { echo "No identity with the pinned certificate $HOST_APPLICATION_CERTIFICATE_SHA1." >&2; exit 1; }
+test -n "$HOST_INSTALLER_IDENTITY" || { echo 'Installer identity missing.' >&2; exit 1; }
 # Prove codesign can reach the identity before a caller spends minutes building binaries it cannot
 # sign, and say what the keychain state was when it cannot.
 cp /usr/bin/true "$host_signing_dir/probe"

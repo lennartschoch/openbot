@@ -72,9 +72,15 @@ jobs:
 
       - name: Build the image
         shell: bash
+        env:
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           set -euo pipefail
+          # The source label names the repository that built the image. Set it here rather than in
+          # the Dockerfile: a build from an old tag gets that tag's Dockerfile, and before this fork
+          # changed it the label named the upstream repository.
           docker build --file docker/Dockerfile \
+            --label "org.opencontainers.image.source=$SOURCE_URL" \
             --build-arg "VERSION=$FORK_VERSION" \
             --build-arg "REVISION=$(git rev-parse HEAD)" \
             --tag openbot:release image

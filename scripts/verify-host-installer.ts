@@ -5,10 +5,10 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { HOST_MANAGER_DIRECTORY } from "../src/main/host-update-files";
 import {
+  HOST_CERTIFICATE_NAME,
   HOST_EXECUTABLES,
   HOST_FILES,
   HOST_PACKAGE_ID,
-  HOST_TEAM_ID,
   hostExecutableRequirement,
   hostFileMode,
   hostReleaseSchema,
@@ -104,21 +104,12 @@ export async function verifyHostPayload(expanded: string, version: string): Prom
   }
 }
 
-// `pkgutil` describes a Developer ID Installer package as issued "for distribution". A Mac
-// Installer Distribution certificate reports "signed by a certificate trusted by" instead: that is
-// the App Store type, it cannot install this package outside the Mac App Store, and it was issued
-// by mistake once already. So the whole status line is the check, not the word "signed".
-const HOST_SIGNATURE_STATUS = "signed by a developer certificate issued by Apple for distribution";
-
-// Takes the text so the accepted and rejected wordings are provable without a signing identity:
-// the release path is the only place this runs, and a status no real package produces would fail
-// there for the first time with the package already built.
+// The fork signs the package with its self-signed certificate, so it has neither the "issued by
+// Apple for distribution" status that upstream checks nor a trusted timestamp. What is left is the
+// package's certificate name, which must be the pinned one; each executable inside is verified
+// against the pinned leaf hash.
 export function verifyHostSignature(signature: string): void {
-  if (
-    !new RegExp(`^\\s*1[.:] Developer ID Installer:.*\\(${HOST_TEAM_ID}\\)\\s*$`, "m").test(signature) ||
-    !new RegExp(`^\\s*Status: ${HOST_SIGNATURE_STATUS}\\s*$`, "m").test(signature) ||
-    !/^\s*Signed with a trusted timestamp on: /m.test(signature)
-  )
+  if (!/^\s*Status: signed\b/m.test(signature) || !signature.includes(HOST_CERTIFICATE_NAME))
     throw new Error(`Unexpected installer signing identity:\n${signature}`);
 }
 
@@ -147,8 +138,11 @@ export async function verifyHostInstaller(pkg: string, version: string, requireN
         binary,
       ]);
       const details = await command("/usr/bin/codesign", ["-d", "--verbose=4", binary]);
-      if (!/^CodeDirectory .*flags=.*\bruntime\b/m.test(details) || !details.includes(`TeamIdentifier=${HOST_TEAM_ID}`))
-        throw new Error("Host executable lacks hardened runtime or team identity.");
+      if (
+        !/^CodeDirectory .*flags=.*\bruntime\b/m.test(details) ||
+        !details.includes(`Authority=${HOST_CERTIFICATE_NAME}`)
+      )
+        throw new Error("Host executable lacks hardened runtime or the pinned signing certificate.");
       const libraries = await command("/usr/bin/otool", ["-L", binary]);
       for (const line of libraries
         .split("\n")

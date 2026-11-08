@@ -6,10 +6,10 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { HOST_MANAGER_DIRECTORY } from "../src/main/host-update-files";
 import {
+  HOST_CERTIFICATE_SHA1,
   HOST_EXECUTABLES,
   HOST_FILES,
   HOST_PACKAGE_ID,
-  HOST_TEAM_ID,
   hostExecutableRequirement,
   hostFileMode,
 } from "./host-installation";
@@ -38,12 +38,12 @@ async function build(): Promise<void> {
   const identity = required("HOST_APPLICATION_IDENTITY");
   const installer = required("HOST_INSTALLER_IDENTITY");
   const keychain = required("HOST_SIGNING_KEYCHAIN");
-  if (
-    !identity.startsWith("Developer ID Application:") ||
-    !installer.startsWith("Developer ID Installer:") ||
-    ![identity, installer].every((name) => name.endsWith(`(${HOST_TEAM_ID})`))
-  )
-    throw new Error("Wrong host signing identities.");
+  // The fork signs with one self-signed certificate, so the identities carry no Apple team. The
+  // keychain must hold that certificate: every check below, and every launch of the host, compares
+  // against its pinned leaf hash.
+  const identities = await command("/usr/bin/security", ["find-identity", "-p", "basic", keychain]);
+  if (!identities.includes(HOST_CERTIFICATE_SHA1))
+    throw new Error("HOST_SIGNING_KEYCHAIN does not hold the pinned host signing certificate.");
   const appVersion = (
     await command("/usr/libexec/PlistBuddy", [
       "-c",
