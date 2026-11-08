@@ -1,4 +1,7 @@
-const { AndroidConfig, withAndroidManifest, withGradleProperties } = require("expo/config-plugins");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const { AndroidConfig, withAndroidManifest, withAppBuildGradle, withGradleProperties } = require("expo/config-plugins");
 
 /**
  * Keeps Google's ML Kit out of the APK.
@@ -27,6 +30,14 @@ const REMOVED_METADATA = new Set([
   "com.google.firebase.messaging.default_notification_color",
   "com.google.firebase.messaging.default_notification_icon",
 ]);
+/**
+ * R8 shrinks the app with `proguard-android-optimize.txt`, which reports every class that the app
+ * code references but the APK does not contain. `expo-camera` keeps its Kotlin scanner code with the
+ * dependencies as `compileOnly`, so R8 names these packages. Nothing loads them at runtime: the
+ * scanner code is unreachable while `barcode-scanner-enabled` is `false`.
+ */
+const MLKIT_DONTWARN_RULES = ["-dontwarn com.google.mlkit.**", "-dontwarn com.google.android.gms.vision.**"].join("\n");
+const RULES_MARKER = "# with-no-mlkit";
 
 /** @type {import('expo/config-plugins').ConfigPlugin<null>} */
 module.exports = (config) => {
@@ -36,6 +47,20 @@ module.exports = (config) => {
         config.modResults,
         property,
         "false",
+      );
+    }
+    return config;
+  });
+
+  config = withAppBuildGradle(config, (config) => {
+    // Prebuild writes `app/proguard-rules.pro` before the plugin mods run, and `build.gradle`
+    // includes it, so the rules need no change to the Gradle files.
+    const rulesFile = path.join(config.modRequest.platformProjectRoot, "app", "proguard-rules.pro");
+    const current = fs.existsSync(rulesFile) ? fs.readFileSync(rulesFile, "utf8") : "";
+    if (!current.includes(RULES_MARKER)) {
+      fs.appendFileSync(
+        rulesFile,
+        `\n${RULES_MARKER}: the ML Kit scanner of expo-camera is compileOnly.\n${MLKIT_DONTWARN_RULES}\n`,
       );
     }
     return config;
