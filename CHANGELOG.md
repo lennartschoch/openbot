@@ -6,6 +6,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.64.0-fork.10] - 2026-11-08
+
+### Fixed
+
+- macOS: the build downloads the remote desktop runtime with a token, so the release lookup no
+  longer fails when the anonymous GitHub API limit of the build machine is used up.
+
 ## [0.64.0-fork.9] - 2026-11-08
 
 ### Fixed
