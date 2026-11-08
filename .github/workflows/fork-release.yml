@@ -104,6 +104,9 @@ jobs:
       - name: Build the AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The runtime installer reads GITHUB_TOKEN for its release lookup; without it the lookup
+          # is anonymous and the 60 requests per hour of the runner IP can be exhausted.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_GH_IGNORE_TIME: true
         run: bun run dist:linux -- --config.publish.owner="${{ github.repository_owner }}" --config.publish.repo="${{ github.event.repository.name }}"
 
@@ -187,6 +190,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
