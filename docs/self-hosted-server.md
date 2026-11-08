@@ -12,7 +12,7 @@ To run it in a container, see [Docker](docker.md).
 On Ubuntu 24.04 or 26.04 (x86_64 or arm64) with systemd:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/lennartschoch/openbot/main/scripts/install-server.sh | sudo bash
 sudo openbot login
 ```
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs OpenBot as a self-hosted server on a Linux computer with no screen:
 #
-#   curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/lennartschoch/openbot/main/scripts/install-server.sh | sudo bash
 #
 # Options (after `sudo bash -s --`):
 #   --user <name>             The user that runs OpenBot and its agents. Default: the user of the
@@ -19,7 +19,9 @@
 set -euo pipefail
 export LC_ALL=C DEBIAN_FRONTEND=noninteractive
 
-RELEASES=https://github.com/nightly-labs/openbot/releases
+RELEASES=https://github.com/lennartschoch/openbot/releases
+# The fork publishes its own releases in its own repository, tagged `fork-v<version>`.
+RELEASE_TAG_PREFIX=fork-v
 service_user=""
 auth_api_url=""
 display_size=""
@@ -58,7 +60,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-[ "$(uname -s)" = Linux ] || fail "This install is for Linux. Download the desktop app at https://openbot.run."
+[ "$(uname -s)" = Linux ] || fail "This install is for Linux. Download the desktop app at $RELEASES/latest."
 [ "$(id -u)" -eq 0 ] || fail "Run this with sudo."
 [ -d /run/systemd/system ] || fail "OpenBot needs systemd."
 command -v apt-get >/dev/null || fail "OpenBot needs Ubuntu 24.04 or a newer Ubuntu or Debian."
@@ -86,12 +88,12 @@ manifest=$(fetch "$RELEASES/latest/download/$manifest")
 version=$(sed -n 's/^version: *//p' <<<"$manifest" | head -n 1)
 path=$(sed -n 's/^path: *//p' <<<"$manifest" | head -n 1)
 sha512=$(sed -n 's/^sha512: *//p' <<<"$manifest" | head -n 1)
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "The release manifest has no valid version."
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || fail "The release manifest has no valid version."
 [ "$path" = "OpenBot-$version-$architecture.AppImage" ] || fail "The release manifest names another file."
 [[ $sha512 =~ ^[A-Za-z0-9+/]{86}==$ ]] || fail "The release manifest has no valid SHA-512."
 
 echo "Downloading OpenBot $version..."
-fetch --output "$work/OpenBot.AppImage" "$RELEASES/download/v$version/$path"
+fetch --output "$work/OpenBot.AppImage" "$RELEASES/download/$RELEASE_TAG_PREFIX$version/$path"
 [ "$(openssl dgst -sha512 -binary "$work/OpenBot.AppImage" | openssl base64 -A)" = "$sha512" ] ||
   fail "The download does not match the release manifest."
 chmod 0700 "$work/OpenBot.AppImage"

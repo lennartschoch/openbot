@@ -231,6 +231,22 @@ release can report where it came from. Resolve conflicts by hand, then run
 - `apps/mobile/src/features/app-update/model/app-update.ts`: store links point at this repository.
 - `electron-builder.yml` keeps upstream's `publish.owner`/`repo`. The release workflow overrides
   them on the command line, so the file needs no edit.
+- **Every release lookup reads `lennartschoch/openbot`, never `nightly-labs/openbot`.** Upstream
+  released 0.65.0 while the fork was on 0.64.0-fork.13, and the desktop app offered that upstream
+  version as a server update. A merge must keep these release lookups:
+  - `RELEASE_REPOSITORY` in `src/main/host-release-service.ts`. The desktop's Server Settings panel
+    and the server's own update check read this one feed.
+  - `RELEASES` and `RELEASE_TAG_PREFIX` in `scripts/hosting/openbot-hosted-update` and in
+    `scripts/install-server.sh`. The fork tags are `fork-v<version>`, not `v<version>`, and the
+    version in the manifest is `-fork.<n>`, so neither script accepts only `x.y.z`.
+  - `DOWNLOAD_URL` in `src/main/app-archive-watch.ts`, which the newer-database recovery opens.
+  `newerRelease` in `src/main/host-release-service.ts` compares the fork build number on one base
+  version: `-fork.14` is newer than `-fork.13`, and a plain release of that base is not newer than
+  a fork build of it. Keep that too: with the upstream comparison the app offered the same version
+  forever.
+- Upstream publishes a Linux arm64 AppImage. The fork builds Linux x64 only (`dist:linux`), so
+  `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
+  there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.
 - The account service lives in `account/`. Upstream's `apps/auth-api` stays only for merges.
 
 ## Licence

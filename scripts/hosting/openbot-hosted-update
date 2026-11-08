@@ -27,7 +27,9 @@ export LC_ALL=C DEBIAN_FRONTEND=noninteractive
 umask 022
 
 INSTALL=/opt/OpenBot
-RELEASES=https://github.com/nightly-labs/openbot/releases
+# The fork publishes its own releases in its own repository, tagged `fork-v<version>`.
+RELEASES=https://github.com/lennartschoch/openbot/releases
+RELEASE_TAG_PREFIX=fork-v
 LOCK=/run/openbot-update.lock
 # Not in a directory that boat saves, so a download that a stop interrupts does not stay.
 SCRATCH=/var/tmp
@@ -336,7 +338,7 @@ stage() {
   sha512=$(sed -n 's/^sha512: *//p' <<<"$manifest" | head -n 1)
   # Only for the percent. A Linux manifest has one file, the AppImage.
   size=$(sed -n 's/^ *size: *//p' <<<"$manifest" | head -n 1)
-  [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "The release manifest has no valid version."
+  [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || fail "The release manifest has no valid version."
   [ "$path" = "OpenBot-$version-$architecture.AppImage" ] || fail "The release manifest names another file."
   [[ $sha512 =~ ^[A-Za-z0-9+/]{86}==$ ]] || fail "The release manifest has no valid SHA-512."
   # A release that is no longer the latest one, for example because it was withdrawn, is removed. A
@@ -351,7 +353,7 @@ stage() {
   # Global: the trap runs after this function returns.
   work=$(mktemp -d "$SCRATCH/openbot-update.XXXXXX")
   trap 'rm -rf "$work"; rm -f "$STATE"' EXIT
-  download "$RELEASES/download/v$version/$path" "$work/OpenBot.AppImage" "$size"
+  download "$RELEASES/download/$RELEASE_TAG_PREFIX$version/$path" "$work/OpenBot.AppImage" "$size"
   set_state preparing
   [ "$(openssl dgst -sha512 -binary "$work/OpenBot.AppImage" | openssl base64 -A)" = "$sha512" ] ||
     fail "The AppImage does not match the release manifest."

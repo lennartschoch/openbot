@@ -6,8 +6,15 @@ import { isValidSemver } from "./update-service";
 
 class ReleaseCheckFailed extends Schema.TaggedError<ReleaseCheckFailed>()("ReleaseCheckFailed", {}) {}
 
+/**
+ * The repository that publishes this build. The fork publishes its own releases, under
+ * `fork-v<version>` tags, so neither the desktop nor a server reads the upstream repository.
+ */
+const RELEASE_REPOSITORY = "lennartschoch/openbot";
+
 const ReleaseManifest = Schema.Struct({
-  version: Schema.String.check(Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+$/u)),
+  // A fork release adds `-fork.<n>`, or `-<base prerelease>-fork.<n>`, to the upstream base.
+  version: Schema.String.check(Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u)),
   files: Schema.Array(Schema.Struct({ url: Schema.String })),
 });
 
@@ -128,7 +135,7 @@ export class HostReleaseService {
 
 /** The version of the latest published release for `target`. Rejects on any fault of the feed. */
 async function fetchLatestRelease(target: ReleaseTarget, request: typeof fetch, signal: AbortSignal): Promise<string> {
-  const response = await request(`https://github.com/nightly-labs/openbot/releases/latest/download/${target.feed}`, {
+  const response = await request(`https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/${target.feed}`, {
     signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
   });
   if (!response.ok || !response.body) {
@@ -163,12 +170,33 @@ export function fetchLatestLinuxRelease(arch: string, request: typeof fetch, sig
   return fetchLatestRelease(target, request, signal);
 }
 
+/** The three numbers of a version, and the fork build number when the fork made it. */
+function readVersion(version: string): { numbers: readonly number[]; forkBuild: number | null } {
+  const numbers = (version.split(/[-+]/u, 1)[0] ?? "").split(".").map(Number);
+  const forkBuild = /-fork\.(\d+)$/u.exec(version)?.[1];
+  return { numbers, forkBuild: forkBuild === undefined ? null : Number(forkBuild) };
+}
+
+/**
+ * Whether `candidate` is a newer release than `current`.
+ *
+ * The three numbers decide first. On one base version the fork makes several builds: `-fork.14` is
+ * newer than `-fork.13`, and a build of the base is newer than the base itself. A plain release of
+ * that base is not newer than a fork build of it, because the fork fixes that base and installing
+ * the plain release would remove the fixes.
+ */
 export function newerRelease(candidate: string, current: string): boolean {
-  const left = candidate.split(".").map(Number);
-  const right = current.split(/[.+-]/u).slice(0, 3).map(Number);
+  const left = readVersion(candidate);
+  const right = readVersion(current);
   for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    const difference = (left.numbers[index] ?? 0) - (right.numbers[index] ?? 0);
     if (difference !== 0) return difference > 0;
   }
+  if (left.forkBuild !== null || right.forkBuild !== null) {
+    if (right.forkBuild === null) return true;
+    if (left.forkBuild === null) return false;
+    return left.forkBuild > right.forkBuild;
+  }
+  // A release of a base version replaces a prerelease of that base, as semver orders them.
   return current.split("+", 1)[0]?.includes("-") ?? false;
 }
