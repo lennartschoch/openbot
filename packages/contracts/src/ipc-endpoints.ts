@@ -499,6 +499,7 @@ import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-l
 import type { SetSidebarPinsInput, SidebarPinsSnapshot } from "./ipc-sidebar-pins";
 import type {
   CreateLocalSkillInput,
+  HostSkillLearning,
   InstalledSkill,
   InstallLocalSkillInput,
   InstallSkillInput,
@@ -507,6 +508,8 @@ import type {
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
   ReviseLocalSkillInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
@@ -561,7 +564,7 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
-import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
+import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
   SpeechApiKeyInput,
   SpeechAudio,
@@ -1195,6 +1198,9 @@ export const IPC_ENDPOINTS = {
     saveCustomProvider: scopedRequest<SaveCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:save-custom-provider",
     ),
+    updateCustomProvider: scopedRequest<UpdateCustomProviderInput, CustomProviderResult, "required">()(
+      "provider-admin:update-custom-provider",
+    ),
     deleteCustomProvider: scopedRequest<DeleteCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:delete-custom-provider",
     ),
@@ -1337,6 +1343,10 @@ export const IPC_ENDPOINTS = {
     // server's agents (`0` is off), and the values its host permits.
     getMemoryReview: scopedQuery<HostMemoryReview, "required">()("host-admin:get-memory-review"),
     setMemoryReview: scopedRequest<number, HostMemoryReview, "required">()("host-admin:set-memory-review"),
+    // What the background memory reviews of the server's agents do when a chat teaches a skill, and
+    // the values its host permits.
+    getSkillLearning: scopedQuery<HostSkillLearning, "required">()("host-admin:get-skill-learning"),
+    setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
@@ -1428,7 +1438,8 @@ export const IPC_ENDPOINTS = {
   // The Vault of this computer. Lists carry no password, card number or security code: `reveal`
   // returns one when the user asks, and `copy` writes one to the clipboard in main. The `host*`
   // endpoints do the same for one server: a joined server answers through `vault-v1`, to an owner
-  // or admin. It has no CSV import, as the file is on this computer.
+  // or admin. It has no CSV import, as the file is on this computer. `codes` returns the current
+  // two-step code of each login that has a key; the key never comes to the renderer.
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -1437,6 +1448,7 @@ export const IPC_ENDPOINTS = {
     copy: request<VaultSecretRequest, void>()("vault:copy"),
     importCsv: request<undefined, VaultImportResult>()("vault:import-csv"),
     reset: request<undefined, VaultState>()("vault:reset"),
+    codes: request<undefined, VaultTwoStepCodes>()("vault:codes"),
     changed: event<VaultState>()("vault:changed"),
     hostList: scopedQuery<VaultState, "required">()("vault:host-list"),
     hostSave: scopedRequest<VaultSaveInput, VaultState, "required">()("vault:host-save"),
@@ -1444,6 +1456,7 @@ export const IPC_ENDPOINTS = {
     hostReveal: scopedRequest<VaultSecretRequest, string, "required">()("vault:host-reveal"),
     hostCopy: scopedRequest<VaultSecretRequest, void, "required">()("vault:host-copy"),
     hostReset: scopedQuery<VaultState, "required">()("vault:host-reset"),
+    hostCodes: scopedQuery<VaultTwoStepCodes, "required">()("vault:host-codes"),
   },
   // The 1Password connection of this computer. The token goes from the renderer to main once, in
   // `connectWithToken`; every answer is the status only. The `host*` endpoints do the same for a
@@ -1650,6 +1663,10 @@ export const IPC_ENDPOINTS = {
     saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
     // Only the computer that runs the agent answers. A joined server has no route for it.
     askSideQuestion: scopedRequest<AskSideQuestionInput, string>()("agent:ask-side-question"),
+    // A joined server answers through `skill-learning-v1`; without it, `saved: false`.
+    saveSkillSuggestion: scopedRequest<SaveSkillSuggestionInput, SaveSkillSuggestionResult>()(
+      "agent:save-skill-suggestion",
+    ),
     createAgent: scopedRequest<CreateAgentInput, ClientAgentSummary>()("agent:create"),
     duplicateAgent: scopedRequest<string, DuplicateAgentResult>()("agent:duplicate"),
     updateAgent: scopedRequest<UpdateAgentInput, ClientAgentSummary>()("agent:update"),

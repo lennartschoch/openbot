@@ -21,7 +21,7 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
 import { causeHelpers } from "../effect-boundary";
-import { type HomeSkill, listHomeSkills, skillFolderNames } from "../home-skills";
+import { type HomeSkill, listHomeSkills, skillFolderNames, userSkillFolderNames } from "../home-skills";
 import type { MailboxStore } from "../mailbox-store";
 import type { McpOperationError } from "../mcp-effects";
 import {
@@ -204,6 +204,10 @@ export interface ThreadLifecycleOptions {
   serverHost?: boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
+  /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
+  memoryReview?: () => boolean;
+  /** Skill learning is automatic, read at each start and resume of a session. Omitted, it is not. */
+  skillRevision?: () => boolean;
   /** The other agents in an agent's sidebar section, read at each start and resume of a session. */
   sectionTeammates?: (agentId: string) => SectionTeammates | null;
   /** Whether a public thread is a channel member's thread. */
@@ -243,6 +247,8 @@ export class ThreadLifecycle {
   readonly #vaultItems: () => VaultContents;
   readonly #serverHost: boolean;
   readonly #responseStyle: () => ResponseStyle;
+  readonly #memoryReview: () => boolean;
+  readonly #skillRevision: () => boolean;
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
   readonly #branchThread: (threadId: string) => boolean;
@@ -293,6 +299,8 @@ export class ThreadLifecycle {
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
     this.#serverHost = options.serverHost ?? false;
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
+    this.#memoryReview = options.memoryReview ?? (() => false);
+    this.#skillRevision = options.skillRevision ?? (() => false);
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
     this.#branchThread = options.branchThread ?? (() => false);
@@ -621,7 +629,7 @@ export class ThreadLifecycle {
     reason?: "configuration-change" | "missing-session",
   ) {
     return yield* Effect.acquireUseRelease(
-      Effect.sync(() => this.holdRuntimeRefresh(agent.id, this.#conversation.isTaskThread(publicThreadId))),
+      Effect.sync(() => this.holdRuntimeRefresh(agent.id, this.#conversation.isSideThread(publicThreadId))),
       () => this.#startProviderThread(agent, client, publicThreadId, reason),
       (release) => Effect.sync(release),
     );
@@ -769,9 +777,10 @@ export class ThreadLifecycle {
         section,
         this.#computerUseInOwnChat(owner, publicThreadId),
         yield* this.#homeSkills(agent, client),
-        this.#conversation.isTaskThread(publicThreadId),
+        this.#runsBesideOwnChat(owner, publicThreadId),
         mcpServers,
         instructionsFile,
+        yield* this.#workspaceSkills(agent, client),
       ),
       serviceName: "openbot",
       dynamicTools: visibleDynamicTools(client.provider),
@@ -1177,9 +1186,21 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#conversation.isTaskThread(publicThreadId) &&
+      this.#runsBesideOwnChat(agent, publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
+    );
+  }
+
+  /**
+   * Whether turns of this thread can run at the same time as the agent's own chat: a task, or a
+   * channel thread on a provider that runs several turns at once.
+   */
+  #runsBesideOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
+    if (this.#conversation.isTaskThread(publicThreadId)) return true;
+    return (
+      this.#conversation.channelForThread(publicThreadId) !== null &&
+      agentProviderDescriptor(agent.provider).concurrentTurns
     );
   }
 
@@ -1292,6 +1313,7 @@ export class ThreadLifecycle {
     sideThread = false,
     mcpServers: readonly McpServerConfig[],
     instructionsFile: InstructionsFileInPrompt,
+    workspaceSkills: readonly string[] = [],
   ): DynamicRecord {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
@@ -1301,6 +1323,8 @@ export class ThreadLifecycle {
       vaultItems: this.#vaultItems(),
       serverHost: this.#serverHost,
       responseStyle: this.#responseStyle(),
+      memoryReview: this.#memoryReview(),
+      skillRevision: this.#skillRevision(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
       memoriesInTurns: client.turnContext === true,
@@ -1308,6 +1332,7 @@ export class ThreadLifecycle {
       savedLoginsInTurns: client.turnContext === true,
       sectionTeammates: section,
       homeSkills,
+      workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
       deferredMcpServers:
         client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
@@ -1345,6 +1370,18 @@ export class ThreadLifecycle {
     for (const folder of descriptor.skillFolders)
       for (const name of yield* skillFolderNames(join(agent.workspacePath, folder))) read.add(name);
     return (yield* listHomeSkills()).filter((skill) => !read.has(skill.slug));
+  });
+
+  /**
+   * The user's skills in a Codex agent's workspace, which Codex lists by short root names (#5810).
+   * The skills that OpenBot writes into each workspace are left out, so a new agent gets no new text.
+   */
+  readonly #workspaceSkills = Effect.fn("ThreadLifecycle.workspaceSkills")(function* (
+    agent: AgentSummary,
+    client: AgentClient,
+  ) {
+    if (client.provider !== "codex") return [];
+    return yield* userSkillFolderNames(join(agent.workspacePath, ".agents", "skills"));
   });
 
   /**
@@ -1402,9 +1439,10 @@ export class ThreadLifecycle {
         this.#sectionTeammates(agent.id),
         computerUseInOwnChat,
         yield* this.#homeSkills(agent, client),
-        this.#conversation.isTaskThread(publicThreadId),
+        this.#runsBesideOwnChat(agent, publicThreadId),
         configs,
         yield* this.#instructionsFile(agent, client),
+        yield* this.#workspaceSkills(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(
@@ -1602,8 +1640,8 @@ export class ThreadLifecycle {
   }
 
   /**
-   * As `providerContextBusy`, for the agent's own chat alone: a side thread that starts a turn or
-   * compacts its own session does not hold a change to the chat's context.
+   * As `providerContextBusy`, for the agent's own chat alone: a task or channel thread that starts a
+   * turn or compacts its own session does not hold a change to the chat's context.
    */
   mainContextBusy(agent: AgentSummary): boolean {
     if (this.#pendingMainStarts.has(agent.id)) return true;
@@ -1611,7 +1649,7 @@ export class ThreadLifecycle {
       .heldThreads(agent.id)
       .some(
         (externalThreadId) =>
-          !this.#conversation.isTaskThread(this.#conversation.publicThreadId(agent.id, externalThreadId)),
+          !this.#conversation.isSideThread(this.#conversation.publicThreadId(agent.id, externalThreadId)),
       );
     if (mainCompacts || this.#mailbox.startingDeliveriesForAgent(agent.id, null).length > 0) return true;
     return agent.threadId !== null && this.#activeTurnOf(agent.id, agent.threadId) !== null;

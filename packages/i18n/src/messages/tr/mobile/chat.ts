@@ -57,6 +57,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "Kod kopyalanamadı",
   "mobile.chat.code.copied": "Kod kopyalandı",
   "mobile.chat.code.copy": "Kodu kopyala",
+  "mobile.chat.table.copyMarkdown": "Markdown kopyala",
+  "mobile.chat.table.copyCsv": "CSV olarak kopyala",
+  "mobile.chat.table.copyFailed": "Tablo kopyalanamadı",
   "mobile.chat.preview.htmlTitle": "HTML önizlemesi",
   "mobile.chat.preview.mermaidTitle": "Mermaid diyagramı",
   "mobile.chat.preview.htmlCode": "HTML kodu",
@@ -195,6 +198,13 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs anahtarında bir izin eksik. Ayarlar > Ses bölümünden kontrol et.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs için ağ bağlantısı gerekir.",
+  "mobile.chat.liveVoice.voiceServerFailed": "Ses sunucunuz yanıtı okuyamadı. Ayarlar > Ses bölümünden kontrol edin.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Bu sunucu GPT Live Voice'u desteklemiyor. Onu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice başlatılamadı. Yeniden denemek için mikrofonun sesini açın.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice durdu. Yeniden başlatmak için mikrofonun sesini açın.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Ayarlar'da OpenBot'un mikrofonu kullanmasına izin verin. Sonra yeniden denemek için mikrofonun sesini açın.",
   "mobile.chat.composer.addAttachment": "Ek ekle",
   "mobile.chat.composer.ask": "{name} ajanına sor",
   "mobile.chat.composer.stopFailed": "Ajan durdurulamadı. Zaten bitmiş olabilir.",

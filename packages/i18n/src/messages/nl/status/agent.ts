@@ -30,6 +30,11 @@ export const messages = {
     "Het schermgebied op {x}, {y}, {width} × {height} punten vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.vaultCardFill":
     "De opgeslagen kaart {card} invullen op {site}. Na je goedkeuring kunnen agents deze kaart op deze site invullen zonder goedkeuring. Verwijder de site in Serverinstellingen > Kluis.",
+  "status.agent.reportProblem":
+    "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
+  "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
+  "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
+  "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
@@ -114,5 +119,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.compactionContinues":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
 } as const satisfies PartialTranslation<typeof source>;
