@@ -78,8 +78,16 @@ release workflow chooses the path from the secrets:
 | Secrets | Result |
 | --- | --- |
 | none | Unsigned. Gatekeeper blocks the first open; no automatic update. |
-| `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. |
+| `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. This path signs with `build/entitlements.fork.mac.plist`. |
 | the two, plus `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` | Signed and notarized with a Developer ID. First open works normally. |
+
+A self-signed certificate has no provisioning profile. `build/entitlements.mac.plist` holds
+`com.apple.developer.associated-domains` and `com.apple.developer.team-identifier`, which macOS
+accepts only with an Apple-issued profile. AMFI kills a self-signed build that carries them at
+launch (`Taskgated Invalid Signature`, `No matching profile found`). The fork path therefore uses
+`build/entitlements.fork.mac.plist`, which has neither key. Offline builds use the same file:
+`bun run package` and `bun run dist:mac` pass `--config.mac.entitlements`. App links to
+`openbot.run` stay an upstream feature.
 
 A self-signed certificate is not trusted by macOS until each Mac trusts it once, and it cannot
 remove the quarantine warning, because only notarization does that:

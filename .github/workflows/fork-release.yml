@@ -223,8 +223,11 @@ jobs:
             # Unsigned: the only path that always works without an Apple account.
             bun run dist:mac -- "${common[@]}"
           elif [[ -z "${APPLE_ID:-}" ]]; then
-            # A self-signed or Developer ID certificate without notarization: sign only.
-            bun run dist:release -- "${common[@]}" --config.mac.notarize=false
+            # A self-signed or Developer ID certificate without notarization: sign only. The fork has
+            # no provisioning profile, so it must not carry the restricted entitlements of
+            # build/entitlements.mac.plist; AMFI kills the app at launch when it does.
+            bun run dist:release -- "${common[@]}" --config.mac.notarize=false \
+              --config.mac.entitlements=build/entitlements.fork.mac.plist
           else
             bun run dist:release -- "${common[@]}" --config.mac.notarize=true
           fi

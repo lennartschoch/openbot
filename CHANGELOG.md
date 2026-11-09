@@ -6,6 +6,22 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.65.0-fork.17] - 2026-11-09
+
+### Fixed
+
+- The signed macOS fork build starts again. It carried `com.apple.developer.associated-domains` and
+  `com.apple.developer.team-identifier`, which macOS accepts only with an Apple-issued provisioning
+  profile. The self-signed certificate has none, so AMFI killed the app at launch with
+  `Taskgated Invalid Signature` and `No matching profile found`. The fork signing path now uses
+  `build/entitlements.fork.mac.plist`, which omits both keys. App links to `openbot.run` stay an
+  upstream feature.
+- Android notifications reach the phone again. The `push-notifications-android-v2` decoder accepted
+  only a single-label host and no query, so every real UnifiedPush endpoint failed, such as
+  `https://ntfy.example.com/openbot-topic?up=1`. The host returned `400`, the phone retried, and no
+  registration was stored. The endpoint pattern now accepts DNS labels and the `?up=1` query that
+  ntfy adds. The v2 registration itself is unchanged.
+
 ## [0.65.0-fork.16] - 2026-11-09
 
 ### Changed

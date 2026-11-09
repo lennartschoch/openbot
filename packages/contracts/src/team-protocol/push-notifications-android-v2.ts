@@ -37,11 +37,14 @@ export const ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES = {
 } as const;
 
 /**
- * The UnifiedPush endpoint of the app: `https://` of an ntfy server, its host, and the path of the
- * topic. Distributors accept other schemes, but the OpenBot hosts pair with ntfy, which is HTTPS.
+ * The UnifiedPush endpoint of the app: the full `https://` URL of one ntfy topic, such as
+ * `https://ntfy.example.com/openbot-topic?up=1`. The host has DNS labels, and ntfy marks a
+ * UnifiedPush endpoint with the `?up=1` query. Both are part of the URL that the distributor gives,
+ * so the decoder accepts them. Without them no real endpoint passed, and no Android phone could
+ * register.
  */
 export const ANDROID_UNIFIED_PUSH_ENDPOINT_PATTERN =
-  /^https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?::\d{1,5})?(?:\/[A-Za-z0-9._~%-]{1,128}){1,8}$/u;
+  /^https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?::\d{1,5})?(?:\/[A-Za-z0-9._~%-]{1,128}){1,8}(?:\?[A-Za-z0-9._~%=&+-]{1,128})?$/u;
 
 export interface AndroidUnifiedPushNotificationRegistration {
   /** The phone's id for this host. The host puts it into the sealed notification for the tap. */

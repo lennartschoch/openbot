@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- A self-signed certificate has no provisioning profile. macOS rejects the app at launch when
+         it carries `com.apple.developer.associated-domains` or `com.apple.developer.team-identifier`
+         without one (AMFI "No matching profile found"). These two keys need the upstream Developer
+         ID profile, so the fork build leaves them out. Universal links to openbot.run stay an
+         upstream feature; the fork does not own that domain. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+  </dict>
+</plist>
