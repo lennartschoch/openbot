@@ -1,5 +1,49 @@
 # Self-hosted stack from start to finish
 
+## Quickstart
+
+The whole stack on one Linux host with Docker and your OIDC identity provider. The sections after
+this one explain each step. Replace `api.example.com`, `signal.example.com`, `turn.example.com` and
+`owner@example.com` with your own values.
+
+```sh
+# 1. The account service. Fill in .env first: the public URL, the three secrets,
+#    the Signal URL, the OIDC values and the owner email. See step 1 below.
+cd account && cp .env.example .env && chmod 0600 .env && "$EDITOR" .env
+docker compose up -d --build
+docker compose exec account bun run src/seed.ts      # prints the server claim
+
+# 2. Signal and TURN. Fill in remote/.env.self-hosted first. See step 2 below.
+cp remote/.env.example remote/.env.self-hosted && "$EDITOR" remote/.env.self-hosted
+docker compose -f remote/compose.yaml --env-file remote/.env.self-hosted up -d --build
+
+# 3. The headless server. Add OPENBOT_AUTH_API_URL to the environment of compose.yaml.
+curl -fsSLO https://raw.githubusercontent.com/lennartschoch/openbot/main/docker/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/lennartschoch/openbot/main/docker/seccomp.json
+docker compose up -d
+docker exec -it openbot openbot login --claim --name my-server   # paste the claim
+
+# 4. The desktop: open the app, Change account service, fill in the two URLs,
+#    Save, Restart OpenBot, sign in. See step 4 below.
+
+# 5. The phone: scan the QR with the OpenBot phone app.
+docker exec -it openbot openbot mobile-connect
+```
+
+| Fill in | In | Value |
+| --- | --- | --- |
+| Account service | `account/.env` | `OPENBOT_ACCOUNT_PUBLIC_URL=https://api.example.com`, `OPENBOT_SIGNAL_URL=wss://signal.example.com/v1/signal`, `OPENBOT_BOOTSTRAP_EMAIL=owner@example.com`, and `openssl rand -base64 48` for `OPENBOT_AUTH_WEBHOOK_SECRET` and `OPENBOT_SERVER_CLAIMS_ADMIN_TOKEN` |
+| Sign-in | `account/.env` | `OPENBOT_OIDC_ISSUER`, `OPENBOT_OIDC_CLIENT_ID`, `OPENBOT_OIDC_CLIENT_SECRET` of your identity provider; `OPENBOT_OIDC_DOMAIN` limits the email domain |
+| Signal and TURN | `remote/.env.self-hosted` | `SIGNAL_DOMAIN`, `TURN_DOMAIN`, `TURN_PUBLIC_IP`, `ACME_EMAIL`, `CLOUDFLARE_DNS_API_TOKEN`, `REMOTE_TICKET_JWKS_URL=https://api.example.com/.well-known/jwks.json`, `REMOTE_CONTROL_PLANE_URL=https://api.example.com`, `REMOTE_AUTH_WEBHOOK_SECRET` (the same value as in the account service), and `openssl rand -base64 48` for `REMOTE_SESSION_SECRET`, `TURN_SHARED_SECRET`, `REMOTE_METRICS_TOKEN` |
+| Headless server | `docker/compose.yaml` | `OPENBOT_AUTH_API_URL=https://api.example.com` in the `environment` of the `openbot` service |
+
+The reverse proxy serves `https://api.example.com` and serves it only over HTTPS; the account
+service publishes on the loopback interface. TURN needs the ports of the
+[production requirements](../remote/README.md#production-requirements). The stack then works with
+nothing on `openbot.run`.
+
+## The pieces
+
 This guide runs the whole OpenBot stack of this fork on one Linux host, with Docker:
 
 | Piece | Runs where | What it does |
