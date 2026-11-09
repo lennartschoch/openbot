@@ -7,6 +7,12 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.66.0-fork.18] - 2026-11-09
+
+### Changed
+
+- The app reports the fork version (`0.66.0-fork.N`), not the upstream store version.
+
 ## [1.4.8] - In review
 
 ### Added

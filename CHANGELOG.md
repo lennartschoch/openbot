@@ -6,6 +6,30 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.66.0-fork.18] - 2026-11-09
+
+### Changed
+
+- Fork builds now ship the upstream OpenBot 0.66.0 release.
+
+### Added
+
+- The sign-in screen has Change account service: an optional account service URL that defaults to
+  `openbot.run`, plus the optional `wss:` Signal address of a self-hosted server, with a restart
+  button. A user of a self-hosted account service sets both before the first email code. To change
+  the service later, sign out first: the fields are on the sign-in screen, and signing out stops
+  the session token from reaching the other service.
+- The phone app reports the fork version (`0.65.0-fork.N`), not the upstream store version.
+
+### Removed
+
+- A headless server (server mode, hosted server, container) installs no provider runtime at all.
+  There is no update check, no download, and a client's `runtimesDownload` and `runtimesCancel` get
+  a refusal - on a desktop host they keep working. A provider on the server runs the CLI that the
+  operator installed on the machine, from `PATH` or `OPENBOT_<PROVIDER>_PATH`; without one, the row
+  shows the install guide. The tool runtimes of the server (Bun, the Computer Use driver, the
+  remote desktop runtime) still download, because remote desktop and MCP servers need them.
+
 ## [0.65.0-fork.17] - 2026-11-09
 
 ### Fixed
