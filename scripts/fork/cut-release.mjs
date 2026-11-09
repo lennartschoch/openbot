@@ -1,4 +1,5 @@
 import {
+  addReleaseNotes,
   applyVersion,
   assertCleanWorktree,
   commitAll,
@@ -60,6 +61,15 @@ const buildNumber = nextForkNumber(root);
 const version = formatForkVersion(baseVersion, buildNumber);
 
 const applied = applyVersion(root, version);
+// The release commit runs the release-notes check of the pre-commit hook. Edit the two sections to
+// describe the fixes of this release; the commit is local until this script pushes.
+addReleaseNotes(root, version, "### Changed\n\n- Fork-only release: the fixes of `main` without a new upstream merge.");
+addReleaseNotes(
+  root,
+  version,
+  "### Changed\n\n- Fork-only release of the phone app: the fixes of `main` without a new upstream merge.",
+  { mobile: true },
+);
 commitAll(root, `chore(fork): release ${version}`);
 const tag = tagRelease(root, version, `OpenBot fork ${version} (upstream ${baseVersion})`);
 
