@@ -1,6 +1,15 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("settings", {
+  // The account server that this app signs in to, General tab. A fork feature: the desktop app can
+  // point at a self-hosted account service without environment variables.
+  "settings.serverUrl.title": "Account service URL",
+  "settings.serverUrl.placeholder": "https://api.example.com",
+  "settings.serverUrl.environmentNote": "OPENBOT_AUTH_API_URL is set, so this run ignores the saved URL.",
+  "settings.serverUrl.signal.title": "Signal URL",
+  "settings.serverUrl.signal.description":
+    "Only for a self-hosted server with team connections: the wss: address of its Signal service.",
+  "settings.serverUrl.signal.placeholder": "wss://signal.example.com/v1/signal",
   // The language setting itself.
   "settings.language.title": "Language",
   "settings.language.description": "OpenBot shows menus, buttons and messages in this language.",

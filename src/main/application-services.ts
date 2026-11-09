@@ -348,6 +348,12 @@ import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
+  createServerUrlService,
+  readSavedServerConfig,
+  SERVER_URL_PREFERENCE_FILE,
+  type ServerUrlService,
+} from "./server-url-store";
+import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
   configureServerLogoProtocols,
@@ -687,6 +693,7 @@ export interface ApplicationServices {
   remoteNetworkRoute: RemoteNetworkRoutePreferenceStore;
   remoteSessionCache: RemoteSessionCache;
   appBehavior: AppBehaviorService;
+  serverUrl: ServerUrlService;
   agentInitialization: AgentInitializationGate<AgentLifecycleFailed>;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -1101,10 +1108,17 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
+  const savedServerConfig = readSavedServerConfig(join(app.getPath("userData"), SERVER_URL_PREFERENCE_FILE));
   const centralAuthApiUrl = readCentralAuthApiUrl(
     process.env.OPENBOT_AUTH_API_URL,
-    app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
+    savedServerConfig.url ?? (app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100"),
   );
+  const serverUrl = createServerUrlService({
+    path: join(app.getPath("userData"), SERVER_URL_PREFERENCE_FILE),
+    initial: savedServerConfig,
+    effectiveUrl: centralAuthApiUrl,
+    environmentUrlSet: process.env.OPENBOT_AUTH_API_URL !== undefined,
+  });
   const centralAuth = new CentralAuthManager({
     apiUrl: centralAuthApiUrl,
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
@@ -3926,6 +3940,7 @@ export async function createApplicationServices({
     remoteNetworkRoute,
     remoteSessionCache,
     appBehavior,
+    serverUrl,
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,

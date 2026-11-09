@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "זהות המארח המרוחק אינה זמינה.",
   "error.app.iceServersMissing": "Remote Signal עדיין לא סיפק שרתי ICE.",
   "error.app.finishLocalTest": "יש לסיים את הבדיקה המקומית לפני החלפת תצוגות.",
+  "error.app.serverUrlInvalid": "כתובת שירות החשבונות חייבת להיות כתובת https:, או כתובת http: במחשב זה.",
+  "error.app.serverUrlSignalInvalid": "כתובת ה-Signal חייבת להיות כתובת wss: ללא שם משתמש וללא סיסמה.",
 } as const satisfies PartialTranslation<typeof source>;

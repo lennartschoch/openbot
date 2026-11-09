@@ -11,4 +11,8 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "De identiteit van de externe host is niet beschikbaar.",
   "error.app.iceServersMissing": "Remote Signal heeft nog geen ICE-servers gegeven.",
   "error.app.finishLocalTest": "Rond de lokale test af voordat je van beeldscherm wisselt.",
+  "error.app.serverUrlInvalid":
+    "De URL van de accountservice moet een https:-adres zijn, of een http:-adres op deze computer.",
+  "error.app.serverUrlSignalInvalid":
+    "De Signal-URL moet een wss:-adres zijn zonder gebruikersnaam en zonder wachtwoord.",
 } as const satisfies PartialTranslation<typeof source>;

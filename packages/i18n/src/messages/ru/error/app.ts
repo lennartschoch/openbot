@@ -11,4 +11,7 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "Идентификатор удалённого хоста недоступен.",
   "error.app.iceServersMissing": "Remote Signal ещё не передал ICE-серверы.",
   "error.app.finishLocalTest": "Завершите локальную проверку, прежде чем переключать экраны.",
+  "error.app.serverUrlInvalid":
+    "URL службы учётных записей должен быть адресом https: или, на этом компьютере, адресом http:.",
+  "error.app.serverUrlSignalInvalid": "URL Signal должен быть адресом wss: без имени пользователя и без пароля.",
 } as const satisfies PartialTranslation<typeof source>;

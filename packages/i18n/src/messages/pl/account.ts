@@ -99,6 +99,15 @@ export const messages = {
   "account.login.changeEmail": "Zmień e-mail",
   "account.login.resend": "Wyślij ponownie",
   "account.login.resendIn": "Wyślij ponownie za {time}",
+  "account.login.serverChange": "Zmień usługę kont",
+  "account.login.serverDescription":
+    "Logujesz się do samodzielnego serwera kont? Wpisz tutaj jego adres. Zostaw puste, aby użyć openbot.run.",
+  "account.login.serverSaved": "Zapisano. Uruchom OpenBot ponownie, a następnie się zaloguj.",
+  "account.login.serverRestart": "Uruchom OpenBot ponownie",
+  "account.login.serverRestarting": "Ponowne uruchamianie…",
+  "account.login.serverSaveFailed": "Nie udało się zapisać serwera. Spróbuj ponownie.",
+  "account.login.serverRestartFailed":
+    "Nie udało się ponownie uruchomić OpenBot. Uruchom go samodzielnie, a następnie się zaloguj.",
   "account.login.loadFailed": "Nie udało się wczytać usługi kont.",
   "account.otp.incorrect": "Ten kod jest nieprawidłowy. Spróbuj ponownie.",
   "account.otp.verifying": "Weryfikowanie…",

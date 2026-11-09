@@ -12,4 +12,8 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "リモートホストの ID を利用できません。",
   "error.app.iceServersMissing": "Remote Signal からまだ ICE サーバーが提供されていません。",
   "error.app.finishLocalTest": "ディスプレイを切り替える前に、ローカルテストを終了してください。",
+  "error.app.serverUrlInvalid":
+    "アカウントサービスの URL は https: アドレスか、このコンピューター上では http: アドレスでなければなりません。",
+  "error.app.serverUrlSignalInvalid":
+    "Signal URL は、ユーザー名とパスワードを含まない wss: アドレスでなければなりません。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -126,8 +126,17 @@ Do these steps on each computer that hosts or connects.
 
 1. If you signed in to `openbot.run` before, sign out in the app. Otherwise the app sends the old
    session token to your service.
-2. Quit the app. Then start it with the two variables. `OPENBOT_REMOTE_SIGNAL_URL` must be equal to
-   the `REMOTE_SIGNAL_URL` of your Worker.
+2. Point the app at your service. On the sign-in screen, open Change account service, fill in
+   `https://api.example.com` as the account service URL and, for team connections, the `wss:`
+   address of your Signal service, then restart the app with the button under the fields. An empty
+   account service URL uses `openbot.run`.
+
+   Already signed in? Sign out in the app first. You land back on the sign-in screen, where the
+   fields are. A restart without a sign-out sends the saved session token to the other service
+   once before the app signs you out, so sign out revokes the token where it belongs.
+
+   You can instead start the app with the two variables, which win over the saved values.
+   `OPENBOT_REMOTE_SIGNAL_URL` must be equal to the `REMOTE_SIGNAL_URL` of your Worker.
 
    macOS:
 
@@ -160,11 +169,14 @@ Do these steps on each computer that hosts or connects.
    service of that desktop. Email sign-in on the phone always uses `openbot.run`, so it cannot
    connect to a self-hosted service.
 
-Set the variables each time that you start the app. Without them, the app uses `openbot.run` and
-sends your session token there. To go back to `openbot.run`, sign out first.
+With the variables, set them each time that you start the app. Without them and without a saved
+account service URL, the app uses `openbot.run` and sends your session token there. To go back to
+`openbot.run`, sign out first, then clear the saved URL under Change account service on the
+sign-in screen, or stop setting the variables.
 
 The app does not start, and shows an error, if `OPENBOT_REMOTE_SIGNAL_URL` is not a `wss:` URL, has
-a user name or password, or is set without `OPENBOT_AUTH_API_URL`.
+a user name or password, or is set without `OPENBOT_AUTH_API_URL`. The saved Signal URL must be a
+`wss:` URL too; the settings page refuses any other.
 
 ## Updates
 

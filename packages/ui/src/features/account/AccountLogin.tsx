@@ -20,6 +20,12 @@ interface AccountLoginProps {
   onReset: () => Promise<void>;
   /** Opens the company sign-in page again: in the browser on desktop, in this tab on the web. */
   onOpenCompanySignIn?: () => Promise<void>;
+  /** The saved server choice, when the host offers one. Absent on the web app, which has one server. */
+  serverUrl?: LoginServerUrl;
+  /** Saves the server choice. The change applies at the next start of the app. */
+  onSaveServerUrl?: (input: SaveServerUrlInput) => Promise<void>;
+  /** Restarts the app, so a saved server choice applies at once. Errors reject. */
+  onRestartApp?: () => Promise<void>;
   /** A choice under the send button, such as the analytics box of the web app. */
   consent?: JSX.Element;
   /** Fine print under the lock line, such as the Terms of Service notice of the web app. */
@@ -33,6 +39,23 @@ interface AccountLoginProps {
 type PendingAction = "retry" | "send" | "check" | "verify" | "resend" | "reset" | "company";
 type LoginStep = "email" | "code" | "company";
 type LoginTransition = "none" | "forward" | "back";
+
+/** The saved server choice of the host, as the Server URL setting holds it. */
+export interface LoginServerUrl {
+  /** The saved account server origin, or null when the app uses its default. */
+  url: string | null;
+  /** The saved `wss:` address of a self-hosted Signal service, or null. */
+  signalUrl: string | null;
+  /** The account server origin that this run signs in with. */
+  effectiveUrl: string;
+  /** True when an environment variable set the server and the saved choice is not in use. */
+  fromEnvironment: boolean;
+}
+
+export interface SaveServerUrlInput {
+  url: string | null;
+  signalUrl: string | null;
+}
 
 const FIELD_ISSUES = new Set([
   "invalid_email",
@@ -52,7 +75,7 @@ const EMAIL_PLACEHOLDER = "you@example.com";
 const EMAIL_MARKER = "\u0000";
 
 export function AccountLogin(props: AccountLoginProps) {
-  const { t, sourceText } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [email, setEmail] = createSignal("");
   const [code, setCode] = createSignal("");
   const [presentedEmailError, setPresentedEmailError] = createSignal<string | null>(null);
@@ -69,6 +92,15 @@ export function AccountLogin(props: AccountLoginProps) {
   let emailShakeTimer: number | undefined;
   let emailRevertTimer: number | undefined;
   let emailMessageTimer: number | undefined;
+
+  // The server choice of a self-hosted account service. The fields start empty: a user who opens
+  // them for the first time types an address, and a user who saved one sees it in the placeholder.
+  const [serverOpen, setServerOpen] = createSignal(false);
+  const [serverUrlDraft, setServerUrlDraft] = createSignal("");
+  const [serverSignalDraft, setServerSignalDraft] = createSignal("");
+  const [serverBusy, setServerBusy] = createSignal(false);
+  const [serverSaved, setServerSaved] = createSignal(false);
+  const [serverError, setServerError] = createSignal<string | null>(null);
 
   onCleanup(clearEmailErrorTimers);
 
@@ -395,6 +427,51 @@ export function AccountLogin(props: AccountLoginProps) {
     }
   }
 
+  function trimServerField(value: string): string | null {
+    const text = value.trim();
+    return text === "" ? null : text;
+  }
+
+  function toggleServer(): void {
+    setServerError(null);
+    if (!serverOpen()) {
+      const saved = props.serverUrl;
+      setServerUrlDraft(saved?.url ?? "");
+      setServerSignalDraft(saved?.signalUrl ?? "");
+      setServerSaved(false);
+    }
+    setServerOpen(!serverOpen());
+  }
+
+  async function saveServer(): Promise<void> {
+    if (!props.onSaveServerUrl || serverBusy()) return;
+    setServerBusy(true);
+    setServerError(null);
+    try {
+      await props.onSaveServerUrl({
+        url: trimServerField(serverUrlDraft()),
+        signalUrl: trimServerField(serverSignalDraft()),
+      });
+      setServerSaved(true);
+    } catch (error) {
+      setServerError(errorMessage(error, t("account.login.serverSaveFailed")));
+    } finally {
+      setServerBusy(false);
+    }
+  }
+
+  async function restartApp(): Promise<void> {
+    if (!props.onRestartApp || serverBusy()) return;
+    setServerBusy(true);
+    setServerError(null);
+    try {
+      await props.onRestartApp();
+    } catch (error) {
+      setServerError(errorMessage(error, t("account.login.serverRestartFailed")));
+      setServerBusy(false);
+    }
+  }
+
   return (
     <main class="account-login-screen">
       <div class="account-login-shell">
@@ -633,6 +710,99 @@ export function AccountLogin(props: AccountLoginProps) {
                         : t("account.login.sendingCode")}
                     </Show>
                   </Button>
+                  <Show when={props.onSaveServerUrl}>
+                    <div class="account-login-server">
+                      <Button
+                        type="button"
+                        class="account-login-code-action account-login-code-action-change"
+                        variant="ghost"
+                        size="sm"
+                        disabled={serverBusy()}
+                        data-cuelume-tap="navigate"
+                        aria-expanded={serverOpen() ? "true" : "false"}
+                        onClick={toggleServer}
+                      >
+                        {t("account.login.serverChange")}
+                      </Button>
+                      <Show when={serverOpen()}>
+                        <fieldset class="account-login-server-panel" aria-label={t("account.login.serverChange")}>
+                          <p class="account-login-server-note">{t("account.login.serverDescription")}</p>
+                          <Show when={props.serverUrl?.fromEnvironment === true}>
+                            <p class="account-login-server-note">{t("settings.serverUrl.environmentNote")}</p>
+                          </Show>
+                          <label class="account-login-server-label">
+                            {t("settings.serverUrl.title")}
+                            <Input
+                              class="t-input"
+                              type="url"
+                              inputmode="url"
+                              autocomplete="off"
+                              spellcheck={false}
+                              placeholder={t("settings.serverUrl.placeholder")}
+                              value={serverUrlDraft()}
+                              onValueChange={(value) => {
+                                setServerUrlDraft(value);
+                                setServerSaved(false);
+                              }}
+                            />
+                          </label>
+                          <label class="account-login-server-label">
+                            {t("settings.serverUrl.signal.title")}
+                            <Input
+                              class="t-input"
+                              type="url"
+                              inputmode="url"
+                              autocomplete="off"
+                              spellcheck={false}
+                              placeholder={t("settings.serverUrl.signal.placeholder")}
+                              value={serverSignalDraft()}
+                              onValueChange={(value) => {
+                                setServerSignalDraft(value);
+                                setServerSaved(false);
+                              }}
+                            />
+                          </label>
+                          <p class="account-login-server-note">{t("settings.serverUrl.signal.description")}</p>
+                          <Show when={serverError()}>
+                            <p class="account-login-error" role="alert">
+                              {serverError()}
+                            </p>
+                          </Show>
+                          <Show
+                            when={serverSaved() && props.onRestartApp}
+                            fallback={
+                              <Button
+                                variant="default"
+                                type="button"
+                                class="account-login-primary"
+                                disabled={serverBusy()}
+                                onClick={() => void saveServer()}
+                              >
+                                <Show when={serverBusy()} fallback={t("common.save")}>
+                                  <span class="account-login-button-spinner" aria-hidden="true" />
+                                  {t("common.saving")}
+                                </Show>
+                              </Button>
+                            }
+                          >
+                            <p class="account-login-server-note">{t("account.login.serverSaved")}</p>
+                            <Button
+                              variant="default"
+                              type="button"
+                              class="account-login-primary"
+                              disabled={serverBusy()}
+                              onClick={() => void restartApp()}
+                            >
+                              <Show when={serverBusy()} fallback={t("account.login.serverRestart")}>
+                                <span class="account-login-button-spinner" aria-hidden="true" />
+                                {t("account.login.serverRestarting")}
+                              </Show>
+                            </Button>
+                          </Show>
+                        </fieldset>
+                      </Show>
+                    </div>
+                  </Show>
                   {props.consent}
                   <div class="account-login-footer">
                     {/* The account is for sign-in only. A new user asks what leaves the computer. */}

@@ -4,6 +4,8 @@ import {
   agentAutoApprovalEnabled,
   type DynamicIslandGeometry,
   type ExternalLinkTarget,
+  type ServerUrlPreference,
+  type SetServerUrlPreferenceInput,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
@@ -160,6 +162,8 @@ const Settings = createSimpleContext({
       defaultAutoApprove: false,
       autoApproveOverrides: {},
     });
+    /** Null until main answers. The Server URL section then draws empty fields. */
+    const [serverUrlPreference, setServerUrlPreference] = createSignal<ServerUrlPreference | null>(null);
     let appSettingsRestoreTarget: HTMLElement | null = null;
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
@@ -445,6 +449,16 @@ const Settings = createSimpleContext({
       }
     }
 
+    /** Saves the server URL fields, or clears a saved one with null. Applies at the next start. */
+    function saveServerUrl(input: SetServerUrlPreferenceInput): Promise<ServerUrlPreference> {
+      return settingsPort()
+        .setServerUrlPreference(input)
+        .then((preference) => {
+          setServerUrlPreference(preference);
+          return preference;
+        });
+    }
+
     /** Whether this agent acts without asking at Full access. */
     function agentAutoApproves(agentId: string): boolean {
       return agentAutoApprovalEnabled(approvalAutomation(), agentId);
@@ -588,6 +602,7 @@ const Settings = createSimpleContext({
             if (agentMemoryLimitChanged) return;
             setGeneralSettings((current) => ({ ...current, agentMemoryLimit: preference.limit }));
           }),
+        settingsPort().getServerUrlPreference().then(setServerUrlPreference),
         settingsPort()
           .getAppBehaviorPreference()
           .then((preference) => {
@@ -670,6 +685,8 @@ const Settings = createSimpleContext({
       preferencesLoadFailed: () => preferencesLoad() === "failed",
       reloadPreferences: loadPreferences,
       generalSettings,
+      serverUrlPreference,
+      saveServerUrl,
       builtInDisplayGeometry,
       updateGeneralSettings,
       sendTestNotification,

@@ -493,6 +493,7 @@ import type {
   TestRoutineInput,
   UpdateRoutineInput,
 } from "./ipc-routines";
+import type { ServerUrlPreference, SetServerUrlPreferenceInput } from "./ipc-server-url";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type { SetSidebarPinsInput, SidebarPinsSnapshot } from "./ipc-sidebar-pins";
@@ -742,6 +743,10 @@ export const IPC_ENDPOINTS = {
     getRemoteNetworkRoute: request<undefined, RemoteNetworkRouteState>()("app:get-remote-network-route"),
     setRemoteNetworkRoute: request<RemoteNetworkRoutePreference, RemoteNetworkRouteState>()(
       "app:set-remote-network-route",
+    ),
+    getServerUrlPreference: request<undefined, ServerUrlPreference>()("app:get-server-url-preference"),
+    setServerUrlPreference: request<SetServerUrlPreferenceInput, ServerUrlPreference>()(
+      "app:set-server-url-preference",
     ),
     getAppBehaviorPreference: request<undefined, AppBehaviorPreference>()("app:get-behavior-preference"),
     setAppBehaviorPreference: request<AppBehaviorPreferenceChange, AppBehaviorPreference>()(

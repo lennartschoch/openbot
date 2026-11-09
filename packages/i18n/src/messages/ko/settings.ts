@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
+  "settings.serverUrl.title": "계정 서비스 URL",
+  "settings.serverUrl.environmentNote": "OPENBOT_AUTH_API_URL이 설정되어 있어서 이번 실행에서는 저장된 URL을 무시해요.",
+  "settings.serverUrl.signal.title": "Signal URL",
+  "settings.serverUrl.signal.description": "팀 연결이 있는 자체 호스팅 서버 전용: 그 Signal 서비스의 wss: 주소.",
+  "settings.serverUrl.signal.placeholder": "wss://signal.example.com/v1/signal",
+  "settings.serverUrl.placeholder": "https://api.example.com",
   "settings.language.title": "언어",
   "settings.language.description": "메뉴, 버튼, 메시지를 이 언어로 표시해요.",
   "settings.language.system": "시스템 기본값",

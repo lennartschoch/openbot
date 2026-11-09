@@ -1205,6 +1205,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       appBehavior = { ...appBehavior, ...change };
       return clone(appBehavior);
     },
+    getServerUrlPreference: async () => ({
+      url: null,
+      signalUrl: null,
+      effectiveUrl: "https://api.openbot.run",
+      fromEnvironment: false,
+    }),
+    setServerUrlPreference: async (input) => ({
+      url: input.url ?? null,
+      signalUrl: input.signalUrl ?? null,
+      effectiveUrl: "https://api.openbot.run",
+      fromEnvironment: false,
+    }),
     getRemoteSessionReusePreference: async () => clone(remoteSessionReuse),
     setRemoteSessionReusePreference: async ({ keepBetweenRuns }) => {
       remoteSessionReuse = { keepBetweenRuns };

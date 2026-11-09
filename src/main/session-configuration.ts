@@ -28,11 +28,15 @@ import { canCheckRendererPermission, canRequestRendererPermission } from "./rend
 import type { TeamStore } from "./team-store";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
-export function configureContentSecurityPolicy(): void {
+export function configureContentSecurityPolicy(savedSignalOrigin?: string | null): void {
   const policy = buildContentSecurityPolicy(
     app.isPackaged,
     process.env.REMOTE_SIGNAL_URL,
-    readSelfHostedSignalOrigin(process.env.OPENBOT_AUTH_API_URL, process.env.OPENBOT_REMOTE_SIGNAL_URL),
+    // The variable pair keeps its released meaning and wins; the saved Signal URL of the Server URL
+    // setting is already a validated `wss:` origin.
+    readSelfHostedSignalOrigin(process.env.OPENBOT_AUTH_API_URL, process.env.OPENBOT_REMOTE_SIGNAL_URL) ??
+      savedSignalOrigin ??
+      null,
   );
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

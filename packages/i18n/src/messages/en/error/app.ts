@@ -11,4 +11,7 @@ export const messages = defineMessages("error.app", {
   "error.app.remoteIdentityUnavailable": "The remote host identity is unavailable.",
   "error.app.iceServersMissing": "Remote Signal has not supplied ICE servers yet.",
   "error.app.finishLocalTest": "Finish the local test before switching displays.",
+  "error.app.serverUrlInvalid":
+    "The account service URL must be an https: address, or an http: address on this computer.",
+  "error.app.serverUrlSignalInvalid": "The Signal URL must be a wss: address without a user name or password.",
 });

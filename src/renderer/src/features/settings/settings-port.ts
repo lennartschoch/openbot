@@ -27,6 +27,8 @@ export interface SettingsPort {
   setAgentDefaults: OpenBotDesktopApi["setAgentDefaults"];
   setAnalyticsPreference: OpenBotDesktopApi["setAnalyticsPreference"];
   setAppBehaviorPreference: OpenBotDesktopApi["setAppBehaviorPreference"];
+  getServerUrlPreference: OpenBotDesktopApi["getServerUrlPreference"];
+  setServerUrlPreference: OpenBotDesktopApi["setServerUrlPreference"];
   setBusyMessageModePreference: OpenBotDesktopApi["setBusyMessageModePreference"];
   setExternalLinkPreference: OpenBotDesktopApi["setExternalLinkPreference"];
   setRemoteNetworkRoute: OpenBotDesktopApi["setRemoteNetworkRoute"];
@@ -41,7 +43,7 @@ export interface SettingsPort {
     "getBuiltInDisplayGeometry" | "getPreference" | "setPreference"
   >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "getPreference" | "openSettings" | "setPreference" | "test">;
-  update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;
+  update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference" | "restartWhenIdle">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
