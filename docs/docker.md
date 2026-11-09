@@ -4,6 +4,9 @@ The OpenBot image is the Linux release, run as a [self-hosted server](self-hoste
 container. It is a normal Remote host of your account. You use it from the desktop app, the iPhone
 app or `openbot.run/app`. The image is `ghcr.io/lennartschoch/openbot`, for `linux/amd64`.
 
+For the whole self-hosted stack - this container, the account service and Signal - see
+[Self-hosted stack](self-hosted-stack.md).
+
 ## Run
 
 With Docker Compose:

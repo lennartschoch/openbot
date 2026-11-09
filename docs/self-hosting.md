@@ -4,6 +4,10 @@ This guide tells you how to run your own account service (the Account API Worker
 for remote access. Use it when you do not want `api.openbot.run` and `signal.openbot.run` to carry
 your account and connection set-up.
 
+For the stack of this fork - the Bun account service in `account/`, Signal and the headless server,
+all in Docker - see [Self-hosted stack](self-hosted-stack.md). This page is the upstream path: the
+Cloudflare Worker account service of `apps/auth-api`.
+
 Our Worker does not issue a ticket for another Signal. A ticket gives access to a host, and our key
 signs it, so a ticket for your Signal would also open our Signal. Thus a self-hosted Signal needs a
 self-hosted account service with its own keys. See

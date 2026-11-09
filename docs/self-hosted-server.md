@@ -5,6 +5,9 @@ server or a cloud VM. It is a normal Remote host of your account. You use it fro
 the iPhone app or `openbot.run/app`, as you use a [hosted server](hosted-servers.md). You install
 and control it from a terminal.
 
+For the whole self-hosted stack - this server, the account service and Signal, all in Docker - see
+[Self-hosted stack](self-hosted-stack.md).
+
 To run it in a container, see [Docker](docker.md).
 
 ## Install
