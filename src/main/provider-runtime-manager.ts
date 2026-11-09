@@ -84,6 +84,14 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  * need, so those paths walk this list; only the parts that mean "a provider" walk `PROVIDERS`.
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
+
+/**
+ * Fork: a provider runtime updates to the version this release pins, never past it. Chasing the
+ * newest upstream release kept every install one update behind a version this fork has not shipped,
+ * so the provider row always showed an update. Each fork release ships its own pin instead.
+ * `OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM=1` restores the upstream behavior.
+ */
+const PROVIDER_RUNTIMES_FOLLOW_UPSTREAM = process.env.OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM === "1";
 const FREE_SPACE_HEADROOM = 100_000_000;
 /**
  * How long a leftover staging or replaced directory is left alone.
@@ -549,6 +557,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
   #runCheck(target: RuntimeTarget): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      if (!PROVIDER_RUNTIMES_FOLLOW_UPSTREAM) {
+        // Fork: no upstream lookup. The rest of the check still runs, so the first start after an
+        // app upgrade downloads the versions this release pins, with no offer to the user.
+        yield* this.#finishCheck(target);
+        return;
+      }
       const [blocked, releases] = yield* Effect.all(
         [
           Effect.result(fetchBlockedVersions(this.#fetch)),
@@ -570,6 +584,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         { concurrency: "unbounded" },
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
+      yield* this.#finishCheck(target);
+      if (releases.every(Result.isFailure))
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(sourceText("error.provider.releaseSourcesUnreachable")),
+        });
+    });
+  }
+
+  /** The part of a check that does not look upstream: post-upgrade downloads, stamps and retention. */
+  #finishCheck(target: RuntimeTarget) {
+    return Effect.gen({ self: this }, function* () {
       if (this.#updateInstalled) {
         // Before offers show again, so the renderer sees these updates already downloading and
         // announces no offer for them. A download reports its own failure in its status.
@@ -593,10 +618,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // Forked: the first collection after a long gap removes gigabytes, and a check the user asked
       // for answers without waiting for it.
       yield* Effect.forkIn(this.#collectVersionsEffect(target, this.#checkRetentionMs), this.#scope);
-      if (releases.every(Result.isFailure))
-        return yield* new ProviderRuntimeFailure({
-          cause: new Error(sourceText("error.provider.releaseSourcesUnreachable")),
-        });
     });
   }
 
@@ -619,11 +640,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * The version an update installs: the latest upstream release, unless it is blocked or older than
-   * the version this build carries. Bun is not a provider and stays on the lock.
+   * The version an update installs. Fork: this release's pin, never past it. Chasing the newest
+   * upstream release kept every install one update behind a version this fork has not shipped, so
+   * the provider row always showed an update. Each fork release ships its own pin instead.
+   * `OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM=1` restores the upstream behavior.
    */
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
     const pinned = runtimeSpec(runtime, target, this.#lock);
+    if (!PROVIDER_RUNTIMES_FOLLOW_UPSTREAM) return pinned;
     if (isManagedToolRuntime(runtime)) return pinned;
     const latest = this.#latest.get(runtime);
     if (!latest || this.#blocked.get(runtime)?.has(latest.version) || !olderVersion(pinned.version, latest.version)) {
@@ -749,7 +773,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
       if (this.#tasks.has(runtime)) return this.getStatus();
-      if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
+      if (
+        PROVIDER_RUNTIMES_FOLLOW_UPSTREAM &&
+        this.#check &&
+        !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))
+      ) {
         yield* this.#awaitReleaseCheck(this.#check);
         if (this.#stopping)
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });

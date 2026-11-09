@@ -83,8 +83,9 @@ export function androidVersionCode(baseVersion, buildNumber) {
 
 /**
  * Writes the fork version into the files that the two release trains read. The desktop app takes
- * the root version. The mobile app keeps its own marketing version, because it follows the store
- * train of upstream, and gets an Android version code that the local Gradle build can use.
+ * the root version. The mobile app shows it too: `expo.version` becomes the fork version, which is
+ * the versionName on Android and the marketing version on iOS. It also gets an Android version
+ * code that the local Gradle build can use.
  *
  * app.json is patched as text: a JSON round trip reflows every short array, and each such line is
  * a conflict at the next merge of upstream.
@@ -120,6 +121,14 @@ export function applyVersion(root, version) {
       `$1      "buildNumber": "${versionCode}",\n`,
     );
     if (patched === before) throw new Error("app.json: the ios block has no bundleIdentifier line.");
+  }
+  const expoVersion = /("expo"\s*:\s*\{[^{}]*?"version"\s*:\s*")[^"]*(")/u;
+  if (expoVersion.test(patched)) {
+    patched = patched.replace(expoVersion, `$1${version}$2`);
+  } else {
+    const before = patched;
+    patched = patched.replace(/("expo"\s*:\s*\{\s*\n\s*"slug"\s*:\s*"[^"]*",\n)/u, `$1    "version": "${version}",\n`);
+    if (patched === before) throw new Error("app.json: the expo block has no slug line.");
   }
   writeFileSync(appPath, patched);
 
