@@ -103,7 +103,7 @@ xattr -dr com.apple.quarantine /Applications/OpenBot.app
 
 The release workflow trusts the certificate on the runner itself, so CI does not need it.
 
-macOS builds are arm64 only (`macos-14`). Intel Macs are not built.
+macOS builds are arm64 only (`macos-26`). Intel Macs are not built.
 
 If you make a new `.p12`, export it with the legacy algorithms. macOS `security import` cannot
 read the OpenSSL 3 defaults (AES/PBES2) and fails with "MAC verification failed":
