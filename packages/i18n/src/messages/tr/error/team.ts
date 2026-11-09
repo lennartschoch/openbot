@@ -102,6 +102,8 @@ export const messages = {
   "error.team.skillsUnsupported": "Beceriler bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.providerRuntimeClientUpdate":
+    "Bu sunucu, sağlayıcı CLI’larını kendisi günceller. Sunucuda OpenBot’u güncelle.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
   "error.team.localServersUnsupported": "Bu bağlantı bu bilgisayardaki sunucuları desteklemiyor.",

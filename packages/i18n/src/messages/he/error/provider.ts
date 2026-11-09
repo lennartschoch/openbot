@@ -38,6 +38,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "יש יותר מדי כתובות או תיקיות.",
   "error.provider.credentialFileUnreadable": "לא ניתן לקרוא את קובץ פרטי ההזדהות של הספק.",
   "error.provider.credentialFileTooLarge": "קובץ פרטי ההזדהות של הספק גדול מדי.",
+  "error.provider.downloadsDisabled":
+    "השרת הזה אינו מוריד CLIs של ספקים. התקינו את ה-CLI בשרת בעצמכם ועדכנו את OpenBot בו.",
   "error.provider.archiveSpecialFile": "ארכיון סביבת ההרצה מכיל קישור או קובץ מיוחד.",
   "error.provider.archiveUnsafePath": "ארכיון סביבת ההרצה מכיל נתיב לא בטוח.",
   "error.provider.runtimeSpecialFile": "סביבת ההרצה מכילה קישור או קובץ מיוחד.",

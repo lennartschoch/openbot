@@ -102,6 +102,8 @@ export const messages = {
   "error.team.skillsUnsupported": "To połączenie nie obsługuje umiejętności.",
   "error.team.hostIdentityUnsupported": "To połączenie nie obsługuje zmian tożsamości serwera.",
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
+  "error.team.providerRuntimeClientUpdate":
+    "Ten serwer sam aktualizuje swoje CLI dostawców. Zaktualizuj OpenBot na serwerze.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
   "error.team.localServersUnsupported": "To połączenie nie obsługuje serwerów na tym komputerze.",

@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Hay demasiadas direcciones o carpetas.",
   "error.provider.credentialFileUnreadable": "El archivo de credenciales del proveedor no se puede leer.",
   "error.provider.credentialFileTooLarge": "El archivo de credenciales del proveedor es demasiado grande.",
+  "error.provider.downloadsDisabled":
+    "Este servidor no descarga CLIs de proveedor. Instala la CLI en el servidor tú mismo y actualiza OpenBot en él.",
   "error.provider.archiveSpecialFile": "El archivo del entorno de ejecución contiene un enlace o un archivo especial.",
   "error.provider.archiveUnsafePath": "El archivo del entorno de ejecución contiene una ruta no segura.",
   "error.provider.runtimeSpecialFile": "El entorno de ejecución contiene un enlace o un archivo especial.",

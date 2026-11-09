@@ -41,6 +41,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Es gibt zu viele Adressen oder Ordner.",
   "error.provider.credentialFileUnreadable": "Die Zugangsdaten-Datei des Anbieters ist nicht lesbar.",
   "error.provider.credentialFileTooLarge": "Die Zugangsdaten-Datei des Anbieters ist zu groß.",
+  "error.provider.downloadsDisabled":
+    "Dieser Server lädt keine Provider-CLIs herunter. Installiere die CLI selbst auf dem Server und aktualisiere OpenBot dort.",
   "error.provider.archiveSpecialFile": "Das Laufzeitarchiv enthält einen Link oder eine spezielle Datei.",
   "error.provider.archiveUnsafePath": "Das Laufzeitarchiv enthält einen unsicheren Pfad.",
   "error.provider.runtimeSpecialFile": "Die Laufzeit enthält einen Link oder eine spezielle Datei.",

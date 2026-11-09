@@ -35,6 +35,7 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "地址或文件夹数量过多。",
   "error.provider.credentialFileUnreadable": "服务商凭据文件无法读取。",
   "error.provider.credentialFileTooLarge": "服务商凭据文件过大。",
+  "error.provider.downloadsDisabled": "此服务器不下载提供方 CLI。请自行在服务器上安装 CLI，并在其上更新 OpenBot。",
   "error.provider.archiveSpecialFile": "运行时压缩包中包含链接或特殊文件。",
   "error.provider.archiveUnsafePath": "运行时压缩包中包含不安全的路径。",
   "error.provider.runtimeSpecialFile": "运行时中包含链接或特殊文件。",

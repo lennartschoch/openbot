@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Ci sono troppi indirizzi o cartelle.",
   "error.provider.credentialFileUnreadable": "Il file delle credenziali del provider non è leggibile.",
   "error.provider.credentialFileTooLarge": "Il file delle credenziali del provider è troppo grande.",
+  "error.provider.downloadsDisabled":
+    "Questo server non scarica le CLI dei provider. Installa la CLI sul server e aggiorna OpenBot su di esso.",
   "error.provider.archiveSpecialFile": "L'archivio del runtime contiene un link o un file speciale.",
   "error.provider.archiveUnsafePath": "L'archivio del runtime contiene un percorso non sicuro.",
   "error.provider.runtimeSpecialFile": "Il runtime contiene un link o un file speciale.",

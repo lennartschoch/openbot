@@ -100,6 +100,7 @@ export const messages = {
   "error.team.skillsUnsupported": "المهارات غير مدعومة في هذا الاتصال.",
   "error.team.hostIdentityUnsupported": "تغييرات هوية الخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
+  "error.team.providerRuntimeClientUpdate": "هذا الخادم يحدّث واجهات CLIs الخاصة بمزوديه بنفسه. حدّث OpenBot على الخادم.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",

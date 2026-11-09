@@ -97,6 +97,16 @@ export async function routeProviders(
   requireAdmin(member);
   const body = await readJson(request);
   const { service, credentials, runtimes, customProviders } = providers;
+  const runtimeDownloads = providers.runtimeDownloads;
+  /**
+   * The runtime download and cancel that a client starts. Fork: a headless server has none, like
+   * its app update - the request would make the server install a harness that the fork did not
+   * ship, and the manager of the server downloads the pin of a new release after the upgrade.
+   */
+  const client = () => {
+    if (!runtimeDownloads) throw new HttpError(403, sourceText("error.team.providerRuntimeClientUpdate"));
+    return runtimeDownloads;
+  };
   try {
     switch (url.pathname) {
       case PROVIDERS_ADMIN_ROUTES.codeLoginStart: {
@@ -140,9 +150,9 @@ export async function routeProviders(
       case PROVIDERS_V8_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV8(runtimes.getStatus()));
       case PROVIDERS_V8_ROUTES.runtimesDownload:
-        return json(200, wireSnapshotV8(await runCauseEffect(runtimes.download(parsed(downloadableProviderV8, body)))));
+        return json(200, wireSnapshotV8(await runCauseEffect(client().download(parsed(downloadableProviderV8, body)))));
       case PROVIDERS_V8_ROUTES.runtimesCancel:
-        return json(200, wireSnapshotV8(await runCauseEffect(runtimes.cancel(parsed(downloadableProviderV8, body)))));
+        return json(200, wireSnapshotV8(await runCauseEffect(client().cancel(parsed(downloadableProviderV8, body)))));
       case PROVIDERS_V8_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV8(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V5_ROUTES.codeLoginStart:
@@ -162,17 +172,17 @@ export async function routeProviders(
       case PROVIDERS_V5_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV5(runtimes.getStatus()));
       case PROVIDERS_V5_ROUTES.runtimesDownload:
-        return json(200, wireSnapshotV5(await runCauseEffect(runtimes.download(parsed(managedProviderV5, body)))));
+        return json(200, wireSnapshotV5(await runCauseEffect(client().download(parsed(managedProviderV5, body)))));
       case PROVIDERS_V5_ROUTES.runtimesCancel:
-        return json(200, wireSnapshotV5(await runCauseEffect(runtimes.cancel(parsed(managedProviderV5, body)))));
+        return json(200, wireSnapshotV5(await runCauseEffect(client().cancel(parsed(managedProviderV5, body)))));
       case PROVIDERS_V5_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV5(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V4_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV4(runtimes.getStatus()));
       case PROVIDERS_V4_ROUTES.runtimesDownload:
-        return json(200, wireSnapshotV4(await runCauseEffect(runtimes.download(parsed(managedProviderV4, body)))));
+        return json(200, wireSnapshotV4(await runCauseEffect(client().download(parsed(managedProviderV4, body)))));
       case PROVIDERS_V4_ROUTES.runtimesCancel:
-        return json(200, wireSnapshotV4(await runCauseEffect(runtimes.cancel(parsed(managedProviderV4, body)))));
+        return json(200, wireSnapshotV4(await runCauseEffect(client().cancel(parsed(managedProviderV4, body)))));
       case PROVIDERS_V4_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V8_ROUTES.apiKeyState:
@@ -243,17 +253,17 @@ export async function routeProviders(
       case PROVIDERS_ADMIN_ROUTES.runtimesStatus:
         return json(200, wireSnapshot(runtimes.getStatus()));
       case PROVIDERS_ADMIN_ROUTES.runtimesDownload:
-        return json(200, wireSnapshot(await runCauseEffect(runtimes.download(parsed(managedProvider, body)))));
+        return json(200, wireSnapshot(await runCauseEffect(client().download(parsed(managedProvider, body)))));
       case PROVIDERS_ADMIN_ROUTES.runtimesCancel:
-        return json(200, wireSnapshot(await runCauseEffect(runtimes.cancel(parsed(managedProvider, body)))));
+        return json(200, wireSnapshot(await runCauseEffect(client().cancel(parsed(managedProvider, body)))));
       case PROVIDERS_ADMIN_ROUTES.runtimesCheck:
         return json(200, wireSnapshot(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV2(runtimes.getStatus()));
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesDownload:
-        return json(200, wireSnapshotV2(await runCauseEffect(runtimes.download(parsed(managedProviderV2, body)))));
+        return json(200, wireSnapshotV2(await runCauseEffect(client().download(parsed(managedProviderV2, body)))));
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCancel:
-        return json(200, wireSnapshotV2(await runCauseEffect(runtimes.cancel(parsed(managedProviderV2, body)))));
+        return json(200, wireSnapshotV2(await runCauseEffect(client().cancel(parsed(managedProviderV2, body)))));
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV2(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_ADMIN_ROUTES.customList:

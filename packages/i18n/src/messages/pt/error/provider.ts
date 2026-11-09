@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Há endereços ou pastas demais.",
   "error.provider.credentialFileUnreadable": "O arquivo de credenciais do provedor não pode ser lido.",
   "error.provider.credentialFileTooLarge": "O arquivo de credenciais do provedor é muito grande.",
+  "error.provider.downloadsDisabled":
+    "Este servidor não baixa CLIs de provedor. Instale a CLI no servidor você mesmo e atualize o OpenBot nele.",
   "error.provider.archiveSpecialFile":
     "O arquivo compactado do ambiente de execução contém um link ou arquivo especial.",
   "error.provider.archiveUnsafePath": "O arquivo compactado do ambiente de execução contém um caminho inseguro.",

@@ -25,13 +25,20 @@ server shows in the server list of that account. Its name is "OpenBot"; give ano
 Then connect a provider from the app, as on a hosted server (see
 [Providers](hosted-servers.md#providers)).
 
+### Provider CLIs
+
+A headless server downloads no provider runtime. A provider runs the CLI that the operator
+installed on the machine: on `PATH` of the service user, or at the path of the
+`OPENBOT_<PROVIDER>_PATH` variable (see [Docker › Environment](docker.md#environment)). Without a
+CLI, the provider row shows the install guide of the provider, and the server installs nothing.
+This keeps the harnesses on the machine yours: the server never fetches or replaces one.
+
 ### Hermes Agent
 
 OpenBot uses the Hermes Agent of the service user, as it uses the user's own Hermes on a desktop
-(see [Hermes](architecture/providers.md#hermes)). Open the server's provider settings and select
-Download on the Hermes row. OpenBot runs the official Hermes installer as the service user, then the
-row shows Connect. To install Hermes from a terminal instead, run the installer as that user, then
-restart OpenBot:
+(see [Hermes](architecture/providers.md#hermes)). A headless server downloads no provider runtime,
+Hermes included, so install it from a terminal. Run the installer as the service user, then restart
+OpenBot:
 
 ```sh
 sudo -u openbot -i bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'

@@ -279,6 +279,12 @@ release can report where it came from. Resolve conflicts by hand, then run
 - The provider runtime block list (`BLOCKED_VERSIONS_URL` in
   `src/main/provider-runtime-releases.ts`) reads this fork's `main`, not upstream's, so upstream
   cannot hold a provider runtime back in a fork install.
+- **A server takes no provider runtime from a client or from itself.** `TeamApiProviders` in
+  `src/main/team-api/dependencies.ts` carries `runtimeDownloads` only on a desktop host, and
+  `route-providers.ts` answers `runtimesDownload` and `runtimesCancel` with 403 without it.
+  `application-services.ts` builds the `ProviderRuntimeManager` of a server mode host or a hosted
+  server with `downloads: false`: no update check, no download, Hermes included. A provider runs
+  the CLI that the operator installed on the machine. Keep both off for servers at each merge.
 - Upstream publishes a Linux arm64 AppImage. The fork builds Linux x64 only (`dist:linux`), so
   `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
   there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.

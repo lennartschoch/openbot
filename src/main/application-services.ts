@@ -1506,6 +1506,9 @@ export async function createApplicationServices({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
     downloadRoot: providerDownloads,
+    // Fork: a headless server installs no provider runtime. Its provider runs the CLI that the
+    // operator installed on the machine. A desktop host, also with a local server child, downloads.
+    downloads: !hostedServer && !serverModeEnvironment,
     hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
@@ -2884,6 +2887,16 @@ export async function createApplicationServices({
         service,
         credentials: providerCredentials,
         runtimes: providerRuntimes,
+        // Fork: only a desktop host takes runtime downloads from a client. A headless server - a
+        // server mode host, a hosted server or a local server child - updates its own runtimes.
+        ...(hostedServer || serverModeEnvironment || localServerChild
+          ? {}
+          : {
+              runtimeDownloads: {
+                download: (runtime) => providerRuntimes.download(runtime),
+                cancel: (runtime) => providerRuntimes.cancel(runtime),
+              },
+            }),
         customProviders: customProviderChanges,
         pasteSignIn: pasteCodeLoginSupported(),
       },

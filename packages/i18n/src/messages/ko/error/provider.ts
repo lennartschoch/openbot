@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "주소나 폴더가 너무 많아요.",
   "error.provider.credentialFileUnreadable": "제공자 자격 증명 파일을 읽을 수 없어요.",
   "error.provider.credentialFileTooLarge": "제공자 자격 증명 파일이 너무 커요.",
+  "error.provider.downloadsDisabled":
+    "이 서버는 프로바이더 CLI를 다운로드하지 않아요. 서버에 직접 CLI를 설치하고 OpenBot을 업데이트해 주세요.",
   "error.provider.archiveSpecialFile": "런타임 아카이브에 링크 또는 특수 파일이 있어요.",
   "error.provider.archiveUnsafePath": "런타임 아카이브에 안전하지 않은 경로가 있어요.",
   "error.provider.runtimeSpecialFile": "런타임에 링크 또는 특수 파일이 있어요.",

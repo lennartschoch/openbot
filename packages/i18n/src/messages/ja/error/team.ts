@@ -102,6 +102,8 @@ export const messages = {
   "error.team.skillsUnsupported": "この接続ではスキルを利用できません。",
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
+  "error.team.providerRuntimeClientUpdate":
+    "このサーバーはプロバイダー CLI を自分で更新します。サーバー上で OpenBot を更新してください。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",

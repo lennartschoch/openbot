@@ -36,6 +36,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "عدد العناوين أو المجلدات كبير جدًا.",
   "error.provider.credentialFileUnreadable": "تتعذّر قراءة ملف بيانات اعتماد المزوّد.",
   "error.provider.credentialFileTooLarge": "ملف بيانات اعتماد المزوّد كبير جدًا.",
+  "error.provider.downloadsDisabled":
+    "هذا الخادم لا ينزّل واجهات CLIs الخاصة بالمزودين. ثبّت CLI على الخادم بنفسك، وحدّث OpenBot عليه.",
   "error.provider.archiveSpecialFile": "يحتوي أرشيف بيئة التشغيل على رابط أو ملف خاص.",
   "error.provider.archiveUnsafePath": "يحتوي أرشيف بيئة التشغيل على مسار غير آمن.",
   "error.provider.runtimeSpecialFile": "تحتوي بيئة التشغيل على رابط أو ملف خاص.",

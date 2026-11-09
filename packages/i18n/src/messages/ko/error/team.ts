@@ -101,6 +101,8 @@ export const messages = {
   "error.team.skillsUnsupported": "이 연결에서는 스킬을 지원하지 않아요.",
   "error.team.hostIdentityUnsupported": "이 연결에서는 서버 ID 변경을 지원하지 않아요.",
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
+  "error.team.providerRuntimeClientUpdate":
+    "이 서버는 프로바이더 CLI를 직접 업데이트해요. 서버에서 OpenBot을 업데이트해 주세요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
   "error.team.localServersUnsupported": "이 연결은 이 컴퓨터의 서버를 지원하지 않습니다.",

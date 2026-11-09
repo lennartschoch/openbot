@@ -105,6 +105,8 @@ export const messages = {
   "error.team.skillsUnsupported": "Esta conexão não oferece suporte a habilidades.",
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
+  "error.team.providerRuntimeClientUpdate":
+    "Este servidor atualiza seus CLIs de provedor sozinho. Atualize o OpenBot no servidor.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
   "error.team.localServersUnsupported": "Esta conexão não oferece suporte a servidores neste computador.",

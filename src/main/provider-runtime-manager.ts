@@ -84,14 +84,6 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  * need, so those paths walk this list; only the parts that mean "a provider" walk `PROVIDERS`.
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
-
-/**
- * Fork: a provider runtime updates to the version this release pins, never past it. Chasing the
- * newest upstream release kept every install one update behind a version this fork has not shipped,
- * so the provider row always showed an update. Each fork release ships its own pin instead.
- * `OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM=1` restores the upstream behavior.
- */
-const PROVIDER_RUNTIMES_FOLLOW_UPSTREAM = process.env.OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM === "1";
 const FREE_SPACE_HEADROOM = 100_000_000;
 /**
  * How long a leftover staging or replaced directory is left alone.
@@ -202,6 +194,12 @@ export interface ProviderRuntimeManagerOptions {
    * snapshot, and `download` and `cancel` of `hermes` go to it. Without it, Hermes has no status.
    */
   hermesInstaller?: HermesInstaller;
+  /**
+   * Fork: false on a headless server. The manager downloads no provider runtime and runs no update
+   * check. A provider runs the CLI that the operator installed on the machine, from `PATH` or the
+   * `OPENBOT_<PROVIDER>_PATH` override, and reads as not downloaded without one.
+   */
+  downloads?: boolean;
   /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
   heldSourceWaitsMs?: readonly number[];
   /**
@@ -277,6 +275,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #check: Deferred.Deferred<void, ProviderRuntimeFailure> | null = null;
   readonly #scope = Scope.makeUnsafe();
   #checkTimer: NodeJS.Timeout | null = null;
+  /** Fork: false on a headless server, which downloads no provider runtime. See the option. */
+  #providerDownloads: boolean;
   #checkIntervalMs = UPDATE_CHECK_INTERVAL_MS;
   #lastCheckAt: number | null = null;
   /** The first check after the start or after a sleep. */
@@ -306,6 +306,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
     this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
     this.#hermesInstaller = options.hermesInstaller ?? null;
+    this.#providerDownloads = options.downloads ?? true;
     this.#hermesInstaller?.on("status", () => {
       this.#revision += 1;
       this.emit("status", this.getStatus());
@@ -370,6 +371,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
       const target = this.#target;
       if (!target) return this.getStatus();
+      // Fork: a headless server has no download target, so a check has nothing to find.
+      if (!this.#providerDownloads) return this.getStatus();
       if (this.#check) yield* Deferred.await(this.#check);
       else {
         const check = Deferred.makeUnsafe<void, ProviderRuntimeFailure>();
@@ -547,7 +550,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * each managed provider CLI that has a newer version, with no offer to the user (#3164).
    */
   startUpdateChecks(options: { intervalMs?: number; updateInstalled?: boolean } = {}): void {
-    if (this.#checkTimer || !this.#target || this.#stopping) return;
+    // Fork: a headless server installs no provider runtime, so there is nothing to check for.
+    if (!this.#providerDownloads || this.#checkTimer || !this.#target || this.#stopping) return;
     this.#checkIntervalMs = options.intervalMs ?? UPDATE_CHECK_INTERVAL_MS;
     this.#updateInstalled = options.updateInstalled ?? false;
     const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
@@ -557,12 +561,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
   #runCheck(target: RuntimeTarget): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
-      if (!PROVIDER_RUNTIMES_FOLLOW_UPSTREAM) {
-        // Fork: no upstream lookup. The rest of the check still runs, so the first start after an
-        // app upgrade downloads the versions this release pins, with no offer to the user.
-        yield* this.#finishCheck(target);
-        return;
-      }
       const [blocked, releases] = yield* Effect.all(
         [
           Effect.result(fetchBlockedVersions(this.#fetch)),
@@ -584,17 +582,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         { concurrency: "unbounded" },
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
-      yield* this.#finishCheck(target);
-      if (releases.every(Result.isFailure))
-        return yield* new ProviderRuntimeFailure({
-          cause: new Error(sourceText("error.provider.releaseSourcesUnreachable")),
-        });
-    });
-  }
-
-  /** The part of a check that does not look upstream: post-upgrade downloads, stamps and retention. */
-  #finishCheck(target: RuntimeTarget) {
-    return Effect.gen({ self: this }, function* () {
       if (this.#updateInstalled) {
         // Before offers show again, so the renderer sees these updates already downloading and
         // announces no offer for them. A download reports its own failure in its status.
@@ -618,6 +605,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // Forked: the first collection after a long gap removes gigabytes, and a check the user asked
       // for answers without waiting for it.
       yield* Effect.forkIn(this.#collectVersionsEffect(target, this.#checkRetentionMs), this.#scope);
+      if (releases.every(Result.isFailure))
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(sourceText("error.provider.releaseSourcesUnreachable")),
+        });
     });
   }
 
@@ -640,14 +631,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * The version an update installs. Fork: this release's pin, never past it. Chasing the newest
-   * upstream release kept every install one update behind a version this fork has not shipped, so
-   * the provider row always showed an update. Each fork release ships its own pin instead.
-   * `OPENBOT_PROVIDER_RUNTIMES_FOLLOW_UPSTREAM=1` restores the upstream behavior.
+   * The version an update installs: the latest upstream release, unless it is blocked or older than
+   * the version this build carries. Bun is not a provider and stays on the lock.
    */
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
     const pinned = runtimeSpec(runtime, target, this.#lock);
-    if (!PROVIDER_RUNTIMES_FOLLOW_UPSTREAM) return pinned;
     if (isManagedToolRuntime(runtime)) return pinned;
     const latest = this.#latest.get(runtime);
     if (!latest || this.#blocked.get(runtime)?.has(latest.version) || !olderVersion(pinned.version, latest.version)) {
@@ -756,9 +744,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
       if (runtime === "hermes") {
-        if (!this.#hermesInstaller)
+        // Fork: a headless server installs no provider runtime, Hermes included. The operator runs
+        // the installer of Hermes by hand.
+        if (!this.#providerDownloads || !this.#hermesInstaller)
           return yield* new ProviderRuntimeFailure({
-            cause: new Error(sourceText("error.provider.runtimesUnsupported")),
+            cause: new Error(sourceText("error.provider.downloadsDisabled")),
           });
         yield* this.#hermesInstaller.install();
         return this.getStatus();
@@ -772,12 +762,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // Only a provider CLI has a path override; nothing points `OPENBOT_BUN_PATH` at a tool runtime.
       if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
+      // Fork: a headless server installs no provider runtime. A tool runtime is not a harness:
+      // remote desktop, Computer Use and the MCP servers still need theirs.
+      if (!this.#providerDownloads && !isManagedToolRuntime(runtime))
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(sourceText("error.provider.downloadsDisabled")),
+        });
       if (this.#tasks.has(runtime)) return this.getStatus();
-      if (
-        PROVIDER_RUNTIMES_FOLLOW_UPSTREAM &&
-        this.#check &&
-        !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))
-      ) {
+      if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
         yield* this.#awaitReleaseCheck(this.#check);
         if (this.#stopping)
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
