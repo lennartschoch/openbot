@@ -26,6 +26,7 @@ import { registerSecretValue } from "@openbot/logging";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
+import type { ClaudeUserMcpPreferenceStore } from "../claude-user-mcp-preference-store";
 import type { ClaudeUserSetupPreferenceStore } from "../claude-user-setup-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -41,6 +42,7 @@ export interface ProviderIpcDependencies {
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
   claudeUserSetup: ClaudeUserSetupPreferenceStore;
+  claudeUserMcp: ClaudeUserMcpPreferenceStore;
   /** Opens a web page in the program that the user chose in Settings. */
   openLink: (url: string) => Promise<void>;
 }
@@ -50,6 +52,7 @@ export function providerIpcHandlers({
   providerRuntimes,
   credentials,
   claudeUserSetup,
+  claudeUserMcp,
   openLink,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
@@ -172,6 +175,14 @@ export function providerIpcHandlers({
         if (changed) service.notifyProviderSettingsChanged();
         return next;
       }),
+      getClaudeUserMcp: handler(() => claudeUserMcp.get()),
+      setClaudeUserMcp: payloadHandler(parseClaudeUserMcp, async (enabled) => {
+        const changed = claudeUserMcp.get().enabled !== enabled;
+        const next = await runCauseEffect(claudeUserMcp.set({ enabled }));
+        // The same status event as the setup switch: each open settings page reads the setting again.
+        if (changed) service.notifyProviderSettingsChanged();
+        return next;
+      }),
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
@@ -233,6 +244,11 @@ function parseRefreshProvidersInput(value: unknown): { automatic: boolean } {
 
 function parseClaudeUserSetup(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
+}
+
+function parseClaudeUserMcp(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid Claude MCP setting.");
   return value;
 }
 

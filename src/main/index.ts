@@ -741,6 +741,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  claudeUserMcp,
   modelVisibility,
   remoteSessionReuse,
   externalLinkPreference,
@@ -862,6 +863,7 @@ function registerIpcHandlers({
       providerRuntimes,
       credentials: providerCredentials,
       claudeUserSetup,
+      claudeUserMcp,
       openLink,
     }),
     ...voiceIpcHandlers({

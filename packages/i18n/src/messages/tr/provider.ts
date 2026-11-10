@@ -236,6 +236,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "Ajanlar CLAUDE.md dosyanızı, becerilerinizi, ajanlarınızı, kancalarınızı ve eklentilerinizi ~/.claude klasöründen yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code ayarı yüklenemedi.",
+  "provider.settings.claudeUserMcp": "Claude Code MCP sunucularımı yükle",
+  "provider.settings.claudeUserMcpDescription":
+    "Ajanlar bu bilgisayardaki Claude Code'un MCP sunucularını da alır; örneğin Gmail ve Slack için claude.ai bağlayıcılarınız. Kapalıyken ajanlar yalnızca MCP panelindeki sunucuları alır.",
+  "provider.settings.claudeUserMcpLoadFailed": "Claude Code MCP ayarı yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {
     one: "{count} modelden {shown} tanesi model seçicide görünür.",

@@ -280,6 +280,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "智能体会从 ~/.claude 加载你的 CLAUDE.md、技能、智能体、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
   "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
+  "provider.settings.claudeUserMcp": "加载我的 Claude Code MCP 服务器",
+  "provider.settings.claudeUserMcpDescription":
+    "智能体还会获得此电脑上 Claude Code 的 MCP 服务器，例如用于 Gmail 和 Slack 的 claude.ai 连接器。关闭时，智能体只获得 MCP 面板中的服务器。",
+  "provider.settings.claudeUserMcpLoadFailed": "无法加载 Claude Code 的 MCP 设置。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",

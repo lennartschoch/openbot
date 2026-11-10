@@ -585,6 +585,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #fallbackApiKey: (() => string | null) | undefined;
   /** Off: the agents load no user settings, CLAUDE.md, skills, agents, hooks or plugins of `~/.claude`, and no `~/.agents/skills`. */
   readonly #userSetup: () => boolean;
+  /** Whether Claude also loads the MCP servers of the user's own Claude Code. See `strictMcpConfig` below. */
+  readonly #userMcp: () => boolean;
   /** Whether the last account read found no claude.ai account and signed in with the key. */
   #onApiKey = false;
   /** Whether this client read the account. A client for one generation without tools does not. */
@@ -630,6 +632,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     historyIndexDirectory?: string,
     fallbackApiKey?: () => string | null,
     userSetup: () => boolean = () => false,
+    userMcp: () => boolean = () => false,
   ) {
     super();
     this.#cli = cli;
@@ -645,6 +648,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#agentEnvironment = agentEnvironment;
     this.#fallbackApiKey = fallbackApiKey;
     this.#userSetup = userSetup;
+    this.#userMcp = userMcp;
     const historyEnvironment = agentEnvironment?.();
     const resolvedHistoryIndexDirectory = historyIndexDirectory ?? stateDirectory;
     const historyOptions: ClaudeHistoryOptions = {
@@ -1163,6 +1167,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const stateDirectory = this.#stateDirectory;
     // Read once, so that the settings and the home skills of one query agree.
     const userSetup = !config.profileGeneration && this.#userSetup();
+    // Profile generation asks one question and must not act, so it never gets the user's servers.
+    const userMcp = !config.profileGeneration && this.#userMcp();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
     const configDirectory =
@@ -1281,7 +1287,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           // my agent have" has no answer. The flag takes away MCP and nothing else, so permissions and
           // hooks still load from those files. Workspace only loads the user settings alone: see
           // `claude-workspace-sandbox.ts`.
-          strictMcpConfig: true,
+          //
+          // Fork: "Load my Claude Code MCP servers" (`userMcp`) opens a second door on purpose. The
+          // CLI then also loads the claude.ai connectors of its signed-in account, the user and
+          // project MCP files, and the servers of the plugins that load. Which server wins when a user
+          // server has the name of one of OpenBot's servers is the CLI's choice and is not checked here,
+          // so the switch is off by default and the user turns it on for one computer.
+          strictMcpConfig: !userMcp,
           permissionMode: "default",
           includePartialMessages: true,
           persistSession: config.persistSession,

@@ -241,6 +241,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "Agenten laden deine CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Die Claude-Code-Einstellung konnte nicht geladen werden.",
+  "provider.settings.claudeUserMcp": "Meine Claude-Code-MCP-Server laden",
+  "provider.settings.claudeUserMcpDescription":
+    "Agenten erhalten auch die MCP-Server von Claude Code auf diesem Computer, etwa deine claude.ai-Connectoren für Gmail und Slack. Aus: Agenten erhalten nur die Server aus dem MCP-Bereich.",
+  "provider.settings.claudeUserMcpLoadFailed": "Die MCP-Einstellung von Claude Code konnte nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {
     one: "{shown} von {count} Modell erscheint in der Modellauswahl.",

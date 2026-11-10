@@ -173,6 +173,8 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
   promptCache?: ProviderPromptCache | undefined;
   /** On the Claude page. This computer only: a joined server has no route for it. */
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
+  /** "Load my Claude Code MCP servers", on the same card. This computer only, like `claudeUserSetup`. */
+  claudeUserMcp?: ProviderClaudeUserSetup | undefined;
   /**
    * The model list of one provider page. Called once when the page opens, so the control lives as
    * long as the page. Only for a host with `model-visibility-v1` that this account administers.
@@ -562,7 +564,7 @@ function ProviderPage(props: PageProps) {
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
         <Show when={props.option.id === "claude" && props.claudeUserSetup}>
-          {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
+          {(setup) => <ClaudeUserSetupSection setup={setup()} mcp={props.claudeUserMcp} disabled={props.disabled} />}
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
@@ -1555,42 +1557,74 @@ function PromptCacheSection(props: {
 
 /**
  * Claude only. Off, the agents load no user settings, CLAUDE.md, skills, agents, hooks or plugins
- * from the user's own Claude Code, so each turn sends a shorter prompt. A change applies to the next
- * Claude process.
+ * from the user's own Claude Code, so each turn sends a shorter prompt. The second switch, when the
+ * page has it, lets the agents also load that Claude Code's MCP servers, such as the claude.ai
+ * connectors. A change applies to the next Claude process.
  */
-function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disabled: boolean | undefined }) {
+function ClaudeUserSetupSection(props: {
+  setup: ProviderClaudeUserSetup;
+  mcp: ProviderClaudeUserSetup | undefined;
+  disabled: boolean | undefined;
+}) {
   const { t } = useText();
   return (
     <SettingsSection title={t("provider.settings.claudeSetup")}>
       <ItemGroup class="settings-modal-card">
-        <Item class="settings-modal-row">
-          <ItemContent>
-            <ItemTitle id="provider-settings-claude-setup-label">{t("provider.settings.claudeUserSetup")}</ItemTitle>
-            <Show
-              when={props.setup.error}
-              fallback={<ItemDescription>{t("provider.settings.claudeUserSetupDescription")}</ItemDescription>}
-            >
-              {(message) => (
-                <ItemDescription class="provider-settings-error" role="alert">
-                  {message()}
-                </ItemDescription>
-              )}
-            </Show>
-          </ItemContent>
-          <Show when={props.setup.value !== null}>
-            <ItemActions>
-              <Switch
-                checked={props.setup.value === true}
-                disabled={Boolean(props.disabled || props.setup.pending)}
-                aria-busy={props.setup.pending ? "true" : "false"}
-                aria-labelledby="provider-settings-claude-setup-label"
-                onChange={(enabled: boolean) => props.setup.onChange(enabled)}
-              />
-            </ItemActions>
-          </Show>
-        </Item>
+        <ClaudeSwitchRow
+          labelId="provider-settings-claude-setup-label"
+          title={t("provider.settings.claudeUserSetup")}
+          description={t("provider.settings.claudeUserSetupDescription")}
+          control={props.setup}
+          disabled={props.disabled}
+        />
+        <Show when={props.mcp}>
+          {(mcp) => (
+            <ClaudeSwitchRow
+              labelId="provider-settings-claude-mcp-label"
+              title={t("provider.settings.claudeUserMcp")}
+              description={t("provider.settings.claudeUserMcpDescription")}
+              control={mcp()}
+              disabled={props.disabled}
+            />
+          )}
+        </Show>
       </ItemGroup>
     </SettingsSection>
+  );
+}
+
+/** One switch row of the Claude Code card. The error of a failed load or save replaces the description. */
+function ClaudeSwitchRow(props: {
+  labelId: string;
+  title: string;
+  description: string;
+  control: ProviderClaudeUserSetup;
+  disabled: boolean | undefined;
+}) {
+  return (
+    <Item class="settings-modal-row">
+      <ItemContent>
+        <ItemTitle id={props.labelId}>{props.title}</ItemTitle>
+        <Show when={props.control.error} fallback={<ItemDescription>{props.description}</ItemDescription>}>
+          {(message) => (
+            <ItemDescription class="provider-settings-error" role="alert">
+              {message()}
+            </ItemDescription>
+          )}
+        </Show>
+      </ItemContent>
+      <Show when={props.control.value !== null}>
+        <ItemActions>
+          <Switch
+            checked={props.control.value === true}
+            disabled={Boolean(props.disabled || props.control.pending)}
+            aria-busy={props.control.pending ? "true" : "false"}
+            aria-labelledby={props.labelId}
+            onChange={(enabled: boolean) => props.control.onChange(enabled)}
+          />
+        </ItemActions>
+      </Show>
+    </Item>
   );
 }
 

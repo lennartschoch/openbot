@@ -257,6 +257,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
   "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
+  "provider.settings.claudeUserMcp": "Загружать мои MCP-серверы Claude Code",
+  "provider.settings.claudeUserMcpDescription":
+    "Агенты также получают MCP-серверы Claude Code на этом компьютере, например ваши коннекторы claude.ai для Gmail и Slack. Если выключено, агенты получают только серверы из панели MCP.",
+  "provider.settings.claudeUserMcpLoadFailed": "Не удалось загрузить настройку MCP для Claude Code.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

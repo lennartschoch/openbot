@@ -273,6 +273,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeUserMcpSetting } from "./ipc-claude-user-mcp";
 import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
@@ -894,6 +895,12 @@ export const IPC_ENDPOINTS = {
      */
     getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
     setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
+    /**
+     * Whether the Claude agents of this computer load the MCP servers of the user's own Claude Code,
+     * such as the claude.ai connectors. This computer only: a joined server has no route for it.
+     */
+    getClaudeUserMcp: request<undefined, ClaudeUserMcpSetting>()("app:get-claude-user-mcp"),
+    setClaudeUserMcp: request<boolean, ClaudeUserMcpSetting>()("app:set-claude-user-mcp"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),

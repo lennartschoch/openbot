@@ -236,6 +236,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "エージェントは ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code の設定を読み込めませんでした。",
+  "provider.settings.claudeUserMcp": "自分の Claude Code の MCP サーバーを読み込む",
+  "provider.settings.claudeUserMcpDescription":
+    "エージェントは、このコンピューターの Claude Code の MCP サーバー（Gmail や Slack の claude.ai コネクタなど）も使えます。オフにすると、MCP パネルのサーバーだけを使います。",
+  "provider.settings.claudeUserMcpLoadFailed": "Claude Code の MCP 設定を読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },
   "provider.settings.modelsSearch": "モデルを検索",

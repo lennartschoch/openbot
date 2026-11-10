@@ -554,6 +554,12 @@ export interface ProviderClientContext {
    * reason as `reportMcpDrops`: without it Claude does not load the setup, as the default is.
    */
   readonly claudeUserSetup?: () => boolean;
+  /**
+   * Whether Claude loads the MCP servers of the user's own Claude Code, such as the claude.ai
+   * connectors, read at each spawn. Without it Claude loads only the MCP panel's servers, as the
+   * default is.
+   */
+  readonly claudeUserMcp?: () => boolean;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -889,6 +895,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
+        context.claudeUserMcp,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,

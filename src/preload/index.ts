@@ -32,6 +32,7 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeClaudeUserMcpSetting,
   decodeClaudeUserSetupSetting,
   decodeCompanySignInScimToken,
   decodeCompanySignInSettings,
@@ -808,6 +809,8 @@ const openbotApi: OpenBotDesktopApi = {
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
     getClaudeUserSetup: decodeClaudeUserSetupSetting,
     setClaudeUserSetup: decodeClaudeUserSetupSetting,
+    getClaudeUserMcp: decodeClaudeUserMcpSetting,
+    setClaudeUserMcp: decodeClaudeUserMcpSetting,
   }),
   browserDock: bridgeGroup(IPC_ENDPOINTS.browserDock, {
     publishPresentation: decodeVoid,

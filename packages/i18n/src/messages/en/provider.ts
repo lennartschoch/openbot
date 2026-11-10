@@ -304,6 +304,10 @@ export const messages = defineMessages("provider", {
   "provider.settings.claudeUserSetupDescription":
     "Agents load your CLAUDE.md, skills, agents, hooks and plugins from ~/.claude. Off, each turn sends a shorter prompt. Workspace files still load.",
   "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
+  "provider.settings.claudeUserMcp": "Load my Claude Code MCP servers",
+  "provider.settings.claudeUserMcpDescription":
+    "Agents also get the MCP servers of this computer's Claude Code, such as your claude.ai connectors for Gmail and Slack. Off, agents get only the servers of the MCP panel.",
+  "provider.settings.claudeUserMcpLoadFailed": "Could not load the Claude Code MCP setting.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",

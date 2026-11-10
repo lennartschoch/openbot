@@ -291,6 +291,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
+  "provider.settings.claudeUserMcp": "טעינת שרתי ה-MCP שלי מ-Claude Code",
+  "provider.settings.claudeUserMcpDescription":
+    "הסוכנים מקבלים גם את שרתי ה-MCP של Claude Code במחשב הזה, למשל מחברי claude.ai שלך ל-Gmail ול-Slack. כשהאפשרות כבויה, הסוכנים מקבלים רק את השרתים מלוח ה-MCP.",
+  "provider.settings.claudeUserMcpLoadFailed": "לא ניתן לטעון את הגדרת ה-MCP של Claude Code.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",

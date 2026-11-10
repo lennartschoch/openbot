@@ -239,6 +239,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "Los agentes cargan tu CLAUDE.md, skills, agentes, hooks y plugins de ~/.claude. Desactivado, cada turno envía un prompt más corto. Los archivos del espacio de trabajo se siguen cargando.",
   "provider.settings.claudeUserSetupLoadFailed": "No se pudo cargar el ajuste de Claude Code.",
+  "provider.settings.claudeUserMcp": "Cargar mis servidores MCP de Claude Code",
+  "provider.settings.claudeUserMcpDescription":
+    "Los agentes también reciben los servidores MCP de Claude Code de este ordenador, como tus conectores de claude.ai para Gmail y Slack. Desactivado, solo reciben los servidores del panel MCP.",
+  "provider.settings.claudeUserMcpLoadFailed": "No se pudo cargar el ajuste MCP de Claude Code.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece en el selector de modelos.",

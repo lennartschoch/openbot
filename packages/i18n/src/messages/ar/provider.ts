@@ -327,6 +327,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
   "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
+  "provider.settings.claudeUserMcp": "تحميل خوادم MCP الخاصة بي من Claude Code",
+  "provider.settings.claudeUserMcpDescription":
+    "يحصل الوكلاء أيضًا على خوادم MCP الخاصة بـ Claude Code على هذا الكمبيوتر، مثل موصلات claude.ai لـ Gmail وSlack. عند الإيقاف، يحصل الوكلاء على خوادم لوحة MCP فقط.",
+  "provider.settings.claudeUserMcpLoadFailed": "تعذّر تحميل إعداد MCP في Claude Code.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

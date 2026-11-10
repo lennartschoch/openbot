@@ -259,6 +259,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "Agenci wczytują Twój CLAUDE.md, umiejętności, agentów, hooki i wtyczki z ~/.claude. Po wyłączeniu każda tura wysyła krótszy prompt. Pliki obszaru roboczego nadal się wczytują.",
   "provider.settings.claudeUserSetupLoadFailed": "Nie udało się wczytać ustawienia Claude Code.",
+  "provider.settings.claudeUserMcp": "Wczytuj moje serwery MCP z Claude Code",
+  "provider.settings.claudeUserMcpDescription":
+    "Agenci dostają też serwery MCP z Claude Code na tym komputerze, na przykład Twoje konektory claude.ai do Gmaila i Slacka. Po wyłączeniu dostają tylko serwery z panelu MCP.",
+  "provider.settings.claudeUserMcpLoadFailed": "Nie udało się wczytać ustawienia MCP Claude Code.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

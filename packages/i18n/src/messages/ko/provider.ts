@@ -274,6 +274,10 @@ export const messages = {
   "provider.settings.claudeUserSetupDescription":
     "에이전트가 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러옵니다. 끄면 각 턴에서 더 짧은 프롬프트를 보냅니다. 작업 공간 파일은 계속 불러옵니다.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code 설정을 불러오지 못했습니다.",
+  "provider.settings.claudeUserMcp": "내 Claude Code MCP 서버 불러오기",
+  "provider.settings.claudeUserMcpDescription":
+    "에이전트가 이 컴퓨터의 Claude Code MCP 서버(예: Gmail, Slack용 claude.ai 커넥터)도 사용합니다. 끄면 MCP 패널의 서버만 사용합니다.",
+  "provider.settings.claudeUserMcpLoadFailed": "Claude Code MCP 설정을 불러오지 못했습니다.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",

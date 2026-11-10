@@ -2,8 +2,29 @@ import type { ProviderClaudeUserSetup } from "@openbot/ui/features/settings/Prov
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, untrack } from "solid-js";
 
+/** The main-process calls and the load-failure text of one Claude switch of this computer. */
+export interface ProviderClaudeSwitchApi {
+  get: () => Promise<{ enabled: boolean }>;
+  set: (enabled: boolean) => Promise<{ enabled: boolean }>;
+  loadFailedKey: "provider.settings.claudeUserSetupLoadFailed" | "provider.settings.claudeUserMcpLoadFailed";
+}
+
+/** "Use my Claude Code setup": the user settings, CLAUDE.md, skills, agents, hooks and plugins. */
+export const CLAUDE_USER_SETUP_SWITCH: ProviderClaudeSwitchApi = {
+  get: () => window.openbot.getClaudeUserSetup(),
+  set: (enabled) => window.openbot.setClaudeUserSetup(enabled),
+  loadFailedKey: "provider.settings.claudeUserSetupLoadFailed",
+};
+
+/** "Load my Claude Code MCP servers": the claude.ai connectors and the user's own MCP servers. */
+export const CLAUDE_USER_MCP_SWITCH: ProviderClaudeSwitchApi = {
+  get: () => window.openbot.getClaudeUserMcp(),
+  set: (enabled) => window.openbot.setClaudeUserMcp(enabled),
+  loadFailedKey: "provider.settings.claudeUserMcpLoadFailed",
+};
+
 /**
- * The Claude page's "Use my Claude Code setup" switch of this computer. A joined server has no route
+ * One switch of the Claude page's Claude Code section on this computer. A joined server has no route
  * for it, so `enabled` is false for one. Undefined while `enabled` is false.
  *
  * Each new value of `status` reads the setting again: main sends a status event after a change.
@@ -11,6 +32,7 @@ import { createEffect, createStore, untrack } from "solid-js";
 export function createProviderClaudeUserSetup(
   enabled: () => boolean,
   status: () => unknown,
+  api: ProviderClaudeSwitchApi = CLAUDE_USER_SETUP_SWITCH,
 ): () => ProviderClaudeUserSetup | undefined {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<{ value: boolean | null; pending: boolean; error: string | null }>({
@@ -23,7 +45,7 @@ export function createProviderClaudeUserSetup(
 
   function load(): void {
     const read = ++reads;
-    window.openbot.getClaudeUserSetup().then(
+    api.get().then(
       (next) => {
         if (read === reads && !untrack(() => state.pending))
           setState((draft) => {
@@ -34,7 +56,7 @@ export function createProviderClaudeUserSetup(
       (error: unknown) => {
         if (read === reads && !untrack(() => state.pending))
           setState((draft) => {
-            draft.error = errorMessage(error, t("provider.settings.claudeUserSetupLoadFailed"));
+            draft.error = errorMessage(error, t(api.loadFailedKey));
           });
       },
     );
@@ -55,7 +77,7 @@ export function createProviderClaudeUserSetup(
       draft.error = null;
     });
     try {
-      const saved = await window.openbot.setClaudeUserSetup(next);
+      const saved = await api.set(next);
       setState((draft) => {
         draft.value = saved.enabled;
       });

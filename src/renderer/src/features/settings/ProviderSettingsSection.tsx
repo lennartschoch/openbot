@@ -63,7 +63,7 @@ import { createEffect, createMemo, createSignal, createStore, Show, untrack } fr
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import type { ProviderConnectionApi } from "../../components/provider-connection-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
-import { createProviderClaudeUserSetup } from "./provider-claude-user-setup";
+import { CLAUDE_USER_MCP_SWITCH, createProviderClaudeUserSetup } from "./provider-claude-user-setup";
 import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
 import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
 import { createProviderPromptCache, type ProviderPromptCacheSource } from "./provider-prompt-cache";
@@ -123,6 +123,7 @@ interface ProviderSettingsSectionProps {
   onDetailChange?: ((detail: ProviderSettingsDetail | null) => void) | undefined;
   promptCache?: ProviderPromptCache | undefined;
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
+  claudeUserMcp?: ProviderClaudeUserSetup | undefined;
   modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
 }
 
@@ -299,6 +300,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onDetailChange={props.onDetailChange}
         promptCache={props.promptCache}
         claudeUserSetup={props.claudeUserSetup}
+        claudeUserMcp={props.claudeUserMcp}
         modelVisibility={props.modelVisibility}
         footer={
           <>
@@ -596,6 +598,12 @@ export function HostProviderSettingsPanel(
     () => props.claudeUserSetup === true,
     () => props.agentStatus,
   );
+  // The same condition: both switches are on this computer's Claude page only.
+  const claudeUserMcp = createProviderClaudeUserSetup(
+    () => props.claudeUserSetup === true,
+    () => props.agentStatus,
+    CLAUDE_USER_MCP_SWITCH,
+  );
   const keys = createProviderKeyState({
     open: true,
     get providerKeys() {
@@ -665,6 +673,7 @@ export function HostProviderSettingsPanel(
         onDetailChange={props.onDetailChange}
         promptCache={promptCache()}
         claudeUserSetup={claudeUserSetup()}
+        claudeUserMcp={claudeUserMcp()}
         modelVisibility={modelVisibility()}
         detectionSettings={
           <Show when={props.detectionSettings}>
