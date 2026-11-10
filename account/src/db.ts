@@ -196,6 +196,19 @@ CREATE TABLE IF NOT EXISTS server_claims (
   redeemed_at INTEGER
 );
 
+-- Generic webhook routes: only ownership of an opaque public route ID. The host keeps the signing
+-- secret and the event data. A revoked route keeps its row (revoked_at set) and a host delete does
+-- not remove it: senders can still post to the old URL, so the ID must never move to another host.
+-- connected_at is in milliseconds, the unit of the route ticket's linkedAt.
+CREATE TABLE IF NOT EXISTS webhook_routes (
+  route_id TEXT PRIMARY KEY,
+  host_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  connected_at INTEGER NOT NULL,
+  revoked_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS webhook_routes_host ON webhook_routes(host_id) WHERE revoked_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS auth_rate_limits (
   key_hash TEXT NOT NULL,
   window_start INTEGER NOT NULL,

@@ -33,6 +33,10 @@ app (`src/main/central-auth-manager.ts`), the host, and Signal
 | `POST /v2/remote/sessions/:id/ticket` (Bearer) `{clientPublicKey}` | `{ticket,expiresAt(ms),signalUrl}` |
 | `POST /v2/remote/sessions/:id/end` (Bearer) | 204 |
 | `POST /v2/remote/resume/validate` (HMAC) | `{valid:boolean}` |
+| `POST /v2/remote/hosts/:id/webhook-routes` `{machineToken,routeId}` | **201** `{routeId}`. 409 `webhook_route_conflict` when the ID belongs to another host or was revoked; 409 `webhook_route_limit` past 64 live routes. |
+| `DELETE /v2/remote/hosts/:id/webhook-routes` `{machineToken,routeId}` | 204. The row stays as a tombstone; the ID is never reused. |
+| `POST /v2/remote/hosts/:id/webhook-route` `{machineToken}` | `{ticket,routes:[routeId]}`. ES256 JWT, `aud=openbot-webhook-route`, claims `hid, routes:[{id,linkedAt(ms)}]`, 5-minute `exp`. |
+| `POST /v2/remote/webhook-route/validate` (HMAC) `{hostId,routes:[{id,linkedAt}]}` | `{routes:[routeId]}`: the IDs still live for that host, owner and `linkedAt`. |
 | `GET /v1/me` (Bearer) | `CentralAuthUser` |
 | `PATCH /v1/me/profile` (Bearer) `{name}` | `CentralAuthUser`. Name 3-20 visible characters. |
 | `PUT /v1/me/analytics` (Bearer) `{enabled, ageMs?}` | `CentralAuthUser` with the new `analyticsEnabled`. |
@@ -53,7 +57,8 @@ app (`src/main/central-auth-manager.ts`), the host, and Signal
 
 ## Service signature (Signal → account)
 
-`POST /v2/remote/resume/validate` carries `OpenBot-Timestamp` and
+`POST /v2/remote/resume/validate` and `POST /v2/remote/webhook-route/validate` carry
+`OpenBot-Timestamp` and
 `OpenBot-Signature = base64url(HMAC-SHA256(secret, "<timestamp>.<raw body>"))`,
 secret = `REMOTE_AUTH_WEBHOOK_SECRET` on both sides.
 

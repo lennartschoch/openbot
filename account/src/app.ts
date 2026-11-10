@@ -5,7 +5,16 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { type Config, PERSISTENT_SESSION_EXPIRES_AT_SECONDS } from "./config";
 import { type Db, hash, newId, newToken, nowSeconds, prune, rateLimit } from "./db";
 import { authorizationUrl, discover, redeemCode } from "./oidc";
-import { jwks, machineTokenHash, mintTicket, type RemoteRole } from "./tickets";
+import {
+  jwks,
+  machineTokenHash,
+  mintTicket,
+  mintWebhookRouteTicket,
+  type RemoteRole,
+  WEBHOOK_ROUTE_ID_PATTERN,
+  WEBHOOK_ROUTES_LIMIT,
+  type WebhookRoute,
+} from "./tickets";
 
 /** A value that a JSON body can hold. Bodies come from `JSON.parse`, so every field is one of these. */
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -94,11 +103,18 @@ export function createApp(config: Config, db: Db) {
         return json({ available: false, servers: [], maxServers: 0, lifecycleAvailable: false });
       if (method === "POST" && path === "/v2/remote/sessions/") return await startSession(config, db, request);
       if (method === "POST" && path === "/v2/remote/resume/validate") return await resumeValidate(config, db, request);
+      if (method === "POST" && path === "/v2/remote/webhook-route/validate")
+        return await validateWebhookRoute(config, db, request);
 
       let m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/ticket$/u);
       if (method === "POST" && m) return await hostTicket(config, db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/key-handover$/u);
       if (method === "POST" && m) return await keyHandover(db, decodeURIComponent(m[1]), request);
+      m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/webhook-routes$/u);
+      if (method === "POST" && m) return await registerWebhookRoute(db, decodeURIComponent(m[1]), request);
+      if (method === "DELETE" && m) return await revokeWebhookRoute(db, decodeURIComponent(m[1]), request);
+      m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/webhook-route$/u);
+      if (method === "POST" && m) return await webhookRouteTicket(db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/members\/$/u);
       if (method === "GET" && m) return listMembers(db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/invites$/u);
@@ -925,6 +941,156 @@ async function resumeValidate(config: Config, db: Db, request: Request): Promise
     sessionExpiresAt > now &&
     host.auth_epoch === authEpoch;
   return json({ valid });
+}
+
+// ── Generic webhook routes ────────────────────────────────────────────────
+//
+// The host makes an opaque route ID for each webhook routine and registers it here; Signal serves
+// `<signal>/v1/webhooks/<routeId>` and forwards each request over the host's ingress socket. This
+// service stores only who owns a route ID. The HMAC secret and the events stay on the host.
+// Revocation reaches Signal when the host reconnects its ingress socket (it does after a delete)
+// or when the 5-minute route ticket expires; this service sends no auth events to Signal.
+
+/** The host proves its machine token, as for a host ticket. */
+async function authenticateHost(
+  db: Db,
+  hostId: string,
+  request: Request,
+): Promise<{ host: HostRow; body: Json } | Response> {
+  const body = await readJson(request);
+  const machineToken = typeof body.machineToken === "string" ? body.machineToken : "";
+  const host = loadHost(db, hostId);
+  if (
+    !host?.machine_token_hash ||
+    !machineToken ||
+    !safeEqual(host.machine_token_hash, machineTokenHash(machineToken))
+  ) {
+    return apiError(401, "host_unauthorized", "The host credential is invalid.");
+  }
+  return { host, body };
+}
+
+function webhookRouteId(body: Json): string | null {
+  const routeId = body.routeId;
+  return typeof routeId === "string" && WEBHOOK_ROUTE_ID_PATTERN.test(routeId) ? routeId : null;
+}
+
+async function registerWebhookRoute(db: Db, hostId: string, request: Request): Promise<Response> {
+  const auth = await authenticateHost(db, hostId, request);
+  if (auth instanceof Response) return auth;
+  const routeId = webhookRouteId(auth.body);
+  if (!routeId) return apiError(400, "invalid_webhook_route", "The webhook route is invalid.");
+  const accountId = auth.host.owner_user_id;
+  const inserted = db.raw
+    .query(
+      `INSERT INTO webhook_routes (route_id, host_id, account_id, connected_at)
+       SELECT ?, ?, ?, ?
+       WHERE (SELECT COUNT(*) FROM webhook_routes WHERE host_id = ? AND revoked_at IS NULL) < ?
+       ON CONFLICT(route_id) DO NOTHING`,
+    )
+    .run(routeId, hostId, accountId, Date.now(), hostId, WEBHOOK_ROUTES_LIMIT);
+  if (inserted.changes) return json({ routeId }, 201);
+  const existing = db.raw
+    .query<{ host_id: string; account_id: string; revoked_at: number | null }, [string]>(
+      "SELECT host_id, account_id, revoked_at FROM webhook_routes WHERE route_id = ?",
+    )
+    .get(routeId);
+  if (existing) {
+    // A route ID is never freed: senders may still post to an old URL. The same live owner may
+    // register it again (the host retries); anyone else gets a conflict.
+    if (existing.revoked_at !== null || existing.host_id !== hostId || existing.account_id !== accountId) {
+      return apiError(409, "webhook_route_conflict", "The webhook route is already registered to another host.");
+    }
+    return json({ routeId }, 201);
+  }
+  return apiError(409, "webhook_route_limit", "This host has reached its webhook route limit.");
+}
+
+async function revokeWebhookRoute(db: Db, hostId: string, request: Request): Promise<Response> {
+  const auth = await authenticateHost(db, hostId, request);
+  if (auth instanceof Response) return auth;
+  const routeId = webhookRouteId(auth.body);
+  if (!routeId) return apiError(400, "invalid_webhook_route", "The webhook route is invalid.");
+  // The row stays as a tombstone so that no other host can take the same public URL.
+  db.raw
+    .query("UPDATE webhook_routes SET revoked_at = ? WHERE route_id = ? AND host_id = ? AND revoked_at IS NULL")
+    .run(Date.now(), routeId, hostId);
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+}
+
+/** The route ticket that the host's Signal ingress socket presents for its webhook routes. */
+async function webhookRouteTicket(db: Db, hostId: string, request: Request): Promise<Response> {
+  const auth = await authenticateHost(db, hostId, request);
+  if (auth instanceof Response) return auth;
+  const rows = db.raw
+    .query<{ route_id: string; connected_at: number }, [string, string, number]>(
+      `SELECT route_id, connected_at FROM webhook_routes
+       WHERE host_id = ? AND account_id = ? AND revoked_at IS NULL
+       ORDER BY connected_at DESC LIMIT ?`,
+    )
+    .all(hostId, auth.host.owner_user_id, WEBHOOK_ROUTES_LIMIT);
+  const routes: WebhookRoute[] = rows.map((row) => ({ id: row.route_id, linkedAt: row.connected_at }));
+  const ticket = await mintWebhookRouteTicket(db, hostId, routes);
+  return json({ ticket, routes: routes.map((route) => route.id) });
+}
+
+/** The service signature that Signal puts on its requests, with a replay window. */
+const SERVICE_SIGNATURE_MAX_SKEW_SECONDS = 5 * 60;
+function verifyServiceSignature(config: Config, request: Request, raw: string): boolean {
+  const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
+  const signature = request.headers.get("OpenBot-Signature") ?? "";
+  if (!/^[0-9]{1,12}$/u.test(timestamp)) return false;
+  if (Math.abs(nowSeconds() - Number(timestamp)) > SERVICE_SIGNATURE_MAX_SKEW_SECONDS) return false;
+  const expected = createHmac("sha256", config.authWebhookSecret).update(`${timestamp}.${raw}`).digest("base64url");
+  return safeEqual(signature, expected);
+}
+
+/**
+ * Signal asks this when an ingress socket presents a route ticket after Signal started: the route
+ * IDs that are still linked, live, to the same host, owner and link time.
+ */
+async function validateWebhookRoute(config: Config, db: Db, request: Request): Promise<Response> {
+  const raw = await readText(request);
+  if (!verifyServiceSignature(config, request, raw)) {
+    return apiError(401, "invalid_signature", "The Remote service signature is invalid.");
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return apiError(400, "invalid_webhook_route", "The webhook route is invalid.");
+  }
+  if (!isJsonObject(body)) return apiError(400, "invalid_webhook_route", "The webhook route is invalid.");
+  const hostId =
+    typeof body.hostId === "string" && body.hostId.length >= 1 && body.hostId.length <= 256 ? body.hostId : "";
+  const routes = parseWebhookRoutes(body.routes);
+  if (!hostId || !routes) return apiError(400, "invalid_webhook_route", "The webhook route is invalid.");
+  if (routes.length === 0) return json({ routes: [] });
+  const rows = db.raw
+    .query<{ route_id: string; connected_at: number }, [string]>(
+      `SELECT route.route_id, route.connected_at FROM webhook_routes route
+       JOIN remote_hosts host ON host.host_id = route.host_id AND host.owner_user_id = route.account_id
+       WHERE route.host_id = ? AND route.revoked_at IS NULL`,
+    )
+    .all(hostId);
+  const linked = new Map(rows.map((row) => [row.route_id, row.connected_at]));
+  return json({
+    routes: routes.filter((route) => linked.get(route.id) === route.linkedAt).map((route) => route.id),
+  });
+}
+
+/** The `routes` of a route ticket as Signal sends them, or null when one entry is malformed. */
+function parseWebhookRoutes(value: JsonValue | undefined): WebhookRoute[] | null {
+  if (!Array.isArray(value) || value.length > WEBHOOK_ROUTES_LIMIT) return null;
+  const routes: WebhookRoute[] = [];
+  for (const entry of value) {
+    if (!isJsonObject(entry)) return null;
+    const { id, linkedAt } = entry;
+    if (typeof id !== "string" || id.length < 1 || id.length > 128) return null;
+    if (typeof linkedAt !== "number" || !Number.isSafeInteger(linkedAt) || linkedAt < 0) return null;
+    routes.push({ id, linkedAt });
+  }
+  return routes;
 }
 
 function redirect(target: string, params: Record<string, string>): Response {

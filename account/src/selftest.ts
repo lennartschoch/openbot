@@ -5,11 +5,11 @@
 //   bun run src/selftest.ts
 
 import { createHmac } from "node:crypto";
-import { createLocalJWKSet, type JWK, jwtVerify } from "jose";
+import { createLocalJWKSet, jwtVerify } from "jose";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
-import { activeKey, REMOTE_TICKET_AUDIENCE } from "./tickets";
+import { activeKey, jwks, REMOTE_TICKET_AUDIENCE, WEBHOOK_ROUTE_AUDIENCE } from "./tickets";
 
 process.env.OPENBOT_ACCOUNT_PUBLIC_URL = "https://api.example.test";
 process.env.OPENBOT_AUTH_WEBHOOK_SECRET = "test-webhook-secret-at-least-32-bytes-long";
@@ -118,8 +118,13 @@ assert(
 );
 
 // 6. Verify the ticket against the published JWKS, exactly as Signal and the app do.
-const jwksResponse = await call<{ keys: JWK[] }>("GET", "/.well-known/jwks.json");
-const keySet = createLocalJWKSet(jwksResponse.json);
+const jwksResponse = await call<JsonObject>("GET", "/.well-known/jwks.json");
+const publishedKeys = jwks(db);
+assert(
+  jwksResponse.status === 200 && JSON.stringify(jwksResponse.json) === JSON.stringify(publishedKeys),
+  "the JWKS route publishes the active keys",
+);
+const keySet = createLocalJWKSet(publishedKeys);
 const verified = await jwtVerify(hostTicket.json.ticket, keySet, {
   audience: REMOTE_TICKET_AUDIENCE,
   algorithms: ["ES256"],
@@ -287,5 +292,128 @@ const ready = await call<{ status: string }>("GET", "/health/ready");
 assert(ready.status === 200 && ready.json.status === "ok", "readiness answers when the database works");
 const oversized = await call<JsonObject>("POST", "/v1/auth/company/start", { returnTo: "a".repeat(70 * 1024) });
 assert(oversized.status === 413, "an oversized request body is refused");
+
+// 14. Generic webhook routes: the host registers an opaque route ID, gets a route ticket for its
+// Signal ingress socket, and Signal re-checks the ticket's routes with a signed request.
+type RouteAnswer = { routeId: string };
+type RouteError = { error: { code: string } };
+const routeId = "route_AbC-123";
+const registered = await call<RouteAnswer>("POST", "/v2/remote/hosts/host-1/webhook-routes", { machineToken, routeId });
+assert(registered.status === 201 && registered.json.routeId === routeId, "host registers a webhook route");
+const again = await call<RouteAnswer>("POST", "/v2/remote/hosts/host-1/webhook-routes", { machineToken, routeId });
+assert(again.status === 201, "registering the same route again is idempotent for its owner");
+const badRouteId = await call<JsonObject>("POST", "/v2/remote/hosts/host-1/webhook-routes", {
+  machineToken,
+  routeId: "a/b",
+});
+assert(badRouteId.status === 400, "a route ID outside the public URL syntax is refused");
+const wrongToken = await call<JsonObject>("POST", "/v2/remote/hosts/host-1/webhook-routes", {
+  machineToken: "wrong",
+  routeId: "other",
+});
+assert(wrongToken.status === 401, "a wrong machine token cannot register a route");
+
+const routeTicket = await call<{ ticket: string; routes: string[] }>("POST", "/v2/remote/hosts/host-1/webhook-route", {
+  machineToken,
+});
+assert(routeTicket.status === 200 && routeTicket.json.routes[0] === routeId, "host gets a webhook route ticket");
+const routeClaims = await jwtVerify(routeTicket.json.ticket, keySet, {
+  audience: WEBHOOK_ROUTE_AUDIENCE,
+  algorithms: ["ES256"],
+  requiredClaims: ["exp"],
+});
+const ticketRoutes: { id: string; linkedAt: number }[] = [];
+for (const entry of Array.isArray(routeClaims.payload.routes) ? routeClaims.payload.routes : []) {
+  if (isJsonObject(entry) && typeof entry.id === "string" && typeof entry.linkedAt === "number") {
+    ticketRoutes.push({ id: entry.id, linkedAt: entry.linkedAt });
+  }
+}
+assert(
+  routeClaims.payload.hid === "host-1" && ticketRoutes.length === 1 && ticketRoutes[0].id === routeId,
+  "the route ticket verifies with JWKS and names the host and route",
+);
+assert(
+  Number.isSafeInteger(ticketRoutes[0].linkedAt) && ticketRoutes[0].linkedAt > 1_000_000_000_000,
+  "linkedAt is in milliseconds",
+);
+const deniedTicket = await call<JsonObject>("POST", "/v2/remote/hosts/host-1/webhook-route", { machineToken: "wrong" });
+assert(deniedTicket.status === 401, "a wrong machine token gets no route ticket");
+
+/** Posts to Signal's validation route, signed as Signal signs it. */
+async function validateRoutes(
+  payload: unknown,
+  at = Math.floor(Date.now() / 1000),
+  sign = true,
+): Promise<{ status: number; routes: string[] }> {
+  requests += 1;
+  const body = JSON.stringify(payload);
+  const stamp = at.toString();
+  const signature = sign
+    ? createHmac("sha256", config.authWebhookSecret).update(`${stamp}.${body}`).digest("base64url")
+    : "nope";
+  const response = await app(
+    new Request("http://local/v2/remote/webhook-route/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "OpenBot-Timestamp": stamp, "OpenBot-Signature": signature },
+      body,
+    }),
+  );
+  const answer = JSON.parse(await response.text());
+  const routes = isJsonObject(answer) && Array.isArray(answer.routes) ? answer.routes : [];
+  return { status: response.status, routes: routes.filter((route) => typeof route === "string") };
+}
+const validated = await validateRoutes({
+  hostId: "host-1",
+  routes: [...ticketRoutes, { id: routeId, linkedAt: 1 }, { id: "unknown", linkedAt: ticketRoutes[0].linkedAt }],
+});
+assert(
+  validated.status === 200 && validated.routes.length === 1 && validated.routes[0] === routeId,
+  "Signal's validation keeps only live routes with the stored link time",
+);
+assert(
+  (await validateRoutes({ hostId: "host-1", routes: ticketRoutes }, undefined, false)).status === 401,
+  "validation refuses a bad signature",
+);
+assert(
+  (await validateRoutes({ hostId: "host-1", routes: ticketRoutes }, Math.floor(Date.now() / 1000) - 3600)).status ===
+    401,
+  "validation refuses a stale timestamp",
+);
+assert((await validateRoutes({ hostId: "host-1", routes: "x" })).status === 400, "validation refuses a malformed body");
+
+// Another host of the same account cannot take the route.
+const register2 = await call<{ machineToken: string }>(
+  "POST",
+  "/v2/remote/hosts/register",
+  { hostId: "host-2", name: "host-2", ownerMembershipId: "owner-2", rotateCredential: true },
+  sessionToken,
+);
+const stolen = await call<RouteError>("POST", "/v2/remote/hosts/host-2/webhook-routes", {
+  machineToken: register2.json.machineToken,
+  routeId,
+});
+assert(
+  stolen.status === 409 && stolen.json.error.code === "webhook_route_conflict",
+  "another host cannot take a live route",
+);
+
+requests += 1;
+const revoked = await app(
+  new Request("http://local/v2/remote/hosts/host-1/webhook-routes", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ machineToken, routeId }),
+  }),
+);
+assert(revoked.status === 204, "host revokes its webhook route");
+const afterRevoke = await validateRoutes({ hostId: "host-1", routes: ticketRoutes });
+assert(afterRevoke.status === 200 && afterRevoke.routes.length === 0, "a revoked route no longer validates");
+const emptyTicket = await call<{ routes: string[] }>("POST", "/v2/remote/hosts/host-1/webhook-route", { machineToken });
+assert(emptyTicket.status === 200 && emptyTicket.json.routes.length === 0, "a revoked route leaves the route ticket");
+const reused = await call<RouteError>("POST", "/v2/remote/hosts/host-1/webhook-routes", { machineToken, routeId });
+assert(
+  reused.status === 409 && reused.json.error.code === "webhook_route_conflict",
+  "a revoked route ID is never reused",
+);
 
 console.log(`\nAll ${requests} requests passed.`);
