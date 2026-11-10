@@ -7,6 +7,12 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Android release build completes again. R8 stopped on `org.webrtc.Dav1dDecoder$Natives`, a class
+  that `org.jitsi:webrtc` 155 refers to but does not contain. The build properties now add
+  `-dontwarn org.webrtc.Dav1dDecoder$Natives`.
+
 ## [0.66.0-fork.18] - 2026-11-09
 
 ### Changed
