@@ -277,7 +277,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - A channel request that names a member as typed text, such as "please check this, @Ana", now goes
   to that member. Before, the lead could end the request with no answer and no message (#5964).
 
-## [0.66.0-fork.17] - 2026-11-10
+## [0.66.0-fork.19] - 2026-11-10
 
 ### Changed
 
