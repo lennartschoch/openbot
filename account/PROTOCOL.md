@@ -26,6 +26,7 @@ app (`src/main/central-auth-manager.ts`), the host, and Signal
 | `POST /v2/server-claims/redeem` `{claim}` | `{sessionToken, user}` |
 | `POST /v2/remote/hosts/register` (Bearer) `{hostId,name,ownerMembershipId,devicePublicKey?,rotateCredential?,machineToken?}` | `{hostId,name,membershipId,authEpoch,machineToken\|null}` |
 | `GET /v2/remote/hosts/` (Bearer) | `{hosts:[{hostId,name,logoKey,devicePublicKey,keyHandovers,authEpoch,membershipId,role}]}` |
+| `GET /v2/remote/hosts/:id/invites` (Bearer) | `{invites:[]}` — always empty; hosts join with a claim, not an invitation |
 | `POST /v2/remote/hosts/:id/ticket` `{machineToken,signalHome?,failedSignalUrl?}` | `{ticket,expiresAt(ms),signalUrl}` |
 | `POST /v2/remote/hosts/:id/key-handover` `{machineToken,handover}` | 204 |
 | `POST /v2/remote/sessions/` (Bearer) `{hostId}` | **201** `{sessionId,hostId,expiresAt(ms)}` |

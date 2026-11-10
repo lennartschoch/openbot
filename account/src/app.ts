@@ -2,12 +2,15 @@
 // server and Signal expect; see ../SPEC.md. Responses are intentionally small.
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { PERSISTENT_SESSION_EXPIRES_AT_SECONDS, type Config } from "./config";
-import { hash, newId, newToken, nowSeconds, prune, rateLimit, type Db } from "./db";
+import { type Config, PERSISTENT_SESSION_EXPIRES_AT_SECONDS } from "./config";
+import { type Db, hash, newId, newToken, nowSeconds, prune, rateLimit } from "./db";
 import { authorizationUrl, discover, redeemCode } from "./oidc";
-import { machineTokenHash, mintTicket, jwks, type RemoteRole } from "./tickets";
+import { jwks, machineTokenHash, mintTicket, type RemoteRole } from "./tickets";
 
-type Json = Record<string, unknown>;
+/** A value that a JSON body can hold. Bodies come from `JSON.parse`, so every field is one of these. */
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+/** A JSON object body. Response and request bodies are small; each route reads its own fields. */
+type Json = { [key: string]: JsonValue };
 
 interface User {
   id: string;
@@ -74,7 +77,8 @@ export function createApp(config: Config, db: Db) {
       if (method === "GET" && path === "/v1/mobile-auth/devices") return listMobileDevices(db, request, url);
       {
         const devicesMatch = path.match(/^\/v1\/mobile-auth\/devices\/([^/]+)$/u);
-        if (method === "DELETE" && devicesMatch) return revokeMobileDevice(db, decodeURIComponent(devicesMatch[1]), request);
+        if (method === "DELETE" && devicesMatch)
+          return revokeMobileDevice(db, decodeURIComponent(devicesMatch[1]), request);
       }
 
       // ── Server claims (host bootstrap without email) ────────────────────
@@ -97,6 +101,8 @@ export function createApp(config: Config, db: Db) {
       if (method === "POST" && m) return await keyHandover(db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/members\/$/u);
       if (method === "GET" && m) return listMembers(db, decodeURIComponent(m[1]), request);
+      m = path.match(/^\/v2\/remote\/hosts\/([^/]+)\/invites$/u);
+      if (method === "GET" && m) return listInvites(db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/sessions\/([^/]+)\/ticket$/u);
       if (method === "POST" && m) return await sessionTicket(config, db, decodeURIComponent(m[1]), request);
       m = path.match(/^\/v2\/remote\/sessions\/([^/]+)\/end$/u);
@@ -162,8 +168,13 @@ async function readJson(request: Request): Promise<Json> {
     if (error instanceof Error && error.message === "body_too_large") throw error;
     throw new Error("invalid_json");
   }
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_json");
-  return value as Json;
+  // The body came from `JSON.parse`, so a plain object already holds only JSON values.
+  if (!isJsonObject(value)) throw new Error("invalid_json");
+  return value;
+}
+
+function isJsonObject(value: unknown): value is Json {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function bearer(request: Request): string | null {
@@ -179,7 +190,10 @@ function bearer(request: Request): string | null {
 function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (!forwarded) return "unknown";
-  const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+  const hops = forwarded
+    .split(",")
+    .map((hop) => hop.trim())
+    .filter(Boolean);
   return hops.at(-1) ?? "unknown";
 }
 
@@ -195,6 +209,13 @@ function loadUser(db: Db, id: string): User | null {
       )
       .get(id) ?? null
   );
+}
+
+/** Reads the user that a statement in the same request has just written. Never null in a working database. */
+function requireUser(db: Db, id: string): User {
+  const user = loadUser(db, id);
+  if (!user) throw new Error("user_missing_after_write");
+  return user;
 }
 
 function findUser(db: Db, token: string | null, now = nowSeconds()): User | null {
@@ -236,7 +257,9 @@ function issueAuthSession(config: Config, db: Db, userId: string, kind = "deskto
 function upsertUserByEmail(db: Db, email: string, name: string | null): User {
   const normalized = email.trim().toLowerCase();
   const existing = db.raw
-    .query<User, [string]>("SELECT id, email, name, avatar_url, analytics_enabled, chat_color FROM users WHERE email = ?")
+    .query<User, [string]>(
+      "SELECT id, email, name, avatar_url, analytics_enabled, chat_color FROM users WHERE email = ?",
+    )
     .get(normalized);
   if (existing) return existing;
   const now = nowSeconds();
@@ -244,7 +267,7 @@ function upsertUserByEmail(db: Db, email: string, name: string | null): User {
   db.raw
     .query("INSERT INTO users (id, email, name, created_at, updated_at, analytics_enabled) VALUES (?, ?, ?, ?, ?, 0)")
     .run(id, normalized, name, now, now);
-  return loadUser(db, id)!;
+  return requireUser(db, id);
 }
 
 // ── human auth ────────────────────────────────────────────────────────────
@@ -265,7 +288,11 @@ async function companyStart(config: Config, db: Db, request: Request): Promise<R
   const returnTo = typeof body.returnTo === "string" ? body.returnTo : "";
   const clientState = typeof body.clientState === "string" ? body.clientState : "";
   const clientChallenge = typeof body.clientChallenge === "string" ? body.clientChallenge : "";
-  if (!COMPANY_SIGN_IN_RETURN.test(returnTo) || !TOKEN_PATTERN.test(clientState) || !TOKEN_PATTERN.test(clientChallenge)) {
+  if (
+    !COMPANY_SIGN_IN_RETURN.test(returnTo) ||
+    !TOKEN_PATTERN.test(clientState) ||
+    !TOKEN_PATTERN.test(clientChallenge)
+  ) {
     return apiError(400, "invalid_company_sign_in", "The sign-in request is invalid.");
   }
   if (!rateLimit(db, `company:start:${clientIp(request)}`, 30, 900)) {
@@ -294,7 +321,20 @@ async function companyStart(config: Config, db: Db, request: Request): Promise<R
       `INSERT INTO company_flows (state_hash, issuer, client_id, client_secret, verifier, nonce, return_to, client_state, client_challenge, login_email, created_at, expires_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(hash(state), connection.issuer, connection.client_id, connection.client_secret, verifier, nonce, returnTo, clientState, clientChallenge, email, now, now + 600);
+    .run(
+      hash(state),
+      connection.issuer,
+      connection.client_id,
+      connection.client_secret,
+      verifier,
+      nonce,
+      returnTo,
+      clientState,
+      clientChallenge,
+      email,
+      now,
+      now + 600,
+    );
 
   return json({
     authorizationUrl: authorizationUrl(metadata, {
@@ -313,7 +353,16 @@ async function companyCallback(config: Config, db: Db, url: URL): Promise<Respon
   if (!TOKEN_PATTERN.test(state)) return apiError(400, "invalid_company_sign_in", "Bad state.");
   const flow = db.raw
     .query<
-      { issuer: string; client_id: string; client_secret: string; verifier: string; nonce: string; return_to: string; client_state: string; client_challenge: string },
+      {
+        issuer: string;
+        client_id: string;
+        client_secret: string;
+        verifier: string;
+        nonce: string;
+        return_to: string;
+        client_state: string;
+        client_challenge: string;
+      },
       [string]
     >(
       "DELETE FROM company_flows WHERE state_hash = ? RETURNING issuer, client_id, client_secret, verifier, nonce, return_to, client_state, client_challenge",
@@ -356,7 +405,9 @@ async function companyCallback(config: Config, db: Db, url: URL): Promise<Respon
     const oneTime = newToken(24);
     const now = nowSeconds();
     db.raw
-      .query("INSERT INTO company_codes (code_hash, user_id, client_challenge, created_at, expires_at) VALUES (?, ?, ?, ?, ?)")
+      .query(
+        "INSERT INTO company_codes (code_hash, user_id, client_challenge, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+      )
       .run(hash(oneTime), user.id, flow.client_challenge, now, now + 120);
     return back({ code: oneTime });
   } catch (error) {
@@ -381,12 +432,13 @@ async function companyExchange(config: Config, db: Db, request: Request): Promis
     .get(now, hash(code), b64urlSha256(codeVerifier), now);
   if (!row) return apiError(400, "invalid_company_sign_in_code", "The sign-in did not finish. Try again.");
   const token = issueAuthSession(config, db, row.user_id);
-  return json({ sessionToken: token, user: toAuthUser(loadUser(db, row.user_id)!) });
+  return json({ sessionToken: token, user: toAuthUser(requireUser(db, row.user_id)) });
 }
 
 function logout(db: Db, request: Request): Response {
   const token = bearer(request);
-  if (token) db.raw.query("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?").run(nowSeconds(), hash(token));
+  if (token)
+    db.raw.query("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?").run(nowSeconds(), hash(token));
   return new Response(null, { status: 204 });
 }
 
@@ -410,7 +462,7 @@ function healthReady(db: Db): Response {
 const PROFILE_NAME_MIN = 3;
 const PROFILE_NAME_MAX = 20;
 const PROFILE_NAME_MAX_UNITS = 120;
-const PROFILE_NAME_UNSAFE = /[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/u;
+const PROFILE_NAME_UNSAFE = /[\p{Cc}\u200b-\u200f\u2028-\u202e\u2060-\u206f]/u;
 const CHAT_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
 
 /**
@@ -443,7 +495,7 @@ async function updateProfile(db: Db, request: Request): Promise<Response> {
     return apiError(429, "rate_limited", "Too many changes. Try again later.");
   }
   db.raw.query("UPDATE users SET name = ?, updated_at = ? WHERE id = ?").run(name, nowSeconds(), user.id);
-  return json(toAuthUser(loadUser(db, user.id)!));
+  return json(toAuthUser(requireUser(db, user.id)));
 }
 
 /**
@@ -457,12 +509,7 @@ async function updateAnalytics(db: Db, request: Request): Promise<Response> {
   if (!user) return apiError(401, "unauthorized", "Sign in is required.");
   const body = await readJson(request);
   const ageMs = body.ageMs === undefined ? 0 : body.ageMs;
-  if (
-    typeof body.enabled !== "boolean" ||
-    typeof ageMs !== "number" ||
-    !Number.isSafeInteger(ageMs) ||
-    ageMs < 0
-  ) {
+  if (typeof body.enabled !== "boolean" || typeof ageMs !== "number" || !Number.isSafeInteger(ageMs) || ageMs < 0) {
     return apiError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
   }
   if (!profileChangeAllowed(db, user.id)) {
@@ -471,7 +518,7 @@ async function updateAnalytics(db: Db, request: Request): Promise<Response> {
   db.raw
     .query("UPDATE users SET analytics_enabled = ?, updated_at = ? WHERE id = ?")
     .run(body.enabled ? 1 : 0, nowSeconds(), user.id);
-  return json(toAuthUser(loadUser(db, user.id)!));
+  return json(toAuthUser(requireUser(db, user.id)));
 }
 
 /** Saves the chat colour that a member's avatar uses. A null colour returns to the automatic hue. */
@@ -480,14 +527,13 @@ async function updateChatColor(db: Db, request: Request): Promise<Response> {
   if (!user) return apiError(401, "unauthorized", "Sign in is required.");
   const body = await readJson(request);
   const value = body.chatColor;
-  const color =
-    value === null ? null : typeof value === "string" && CHAT_COLOR_PATTERN.test(value) ? value : undefined;
+  const color = value === null ? null : typeof value === "string" && CHAT_COLOR_PATTERN.test(value) ? value : undefined;
   if (color === undefined) return apiError(400, "invalid_chat_color", "The chat colour is not valid.");
   if (!profileChangeAllowed(db, user.id)) {
     return apiError(429, "rate_limited", "Too many changes. Try again later.");
   }
   db.raw.query("UPDATE users SET chat_color = ?, updated_at = ? WHERE id = ?").run(color, nowSeconds(), user.id);
-  return json(toAuthUser(loadUser(db, user.id)!));
+  return json(toAuthUser(requireUser(db, user.id)));
 }
 
 /**
@@ -510,7 +556,8 @@ function mobileFeatures(url: URL): Response {
 // ── server claims ─────────────────────────────────────────────────────────
 
 async function createServerClaim(config: Config, db: Db, request: Request): Promise<Response> {
-  if (!safeEqual(bearer(request) ?? "", config.serverClaimsAdminToken)) return apiError(401, "unauthorized", "Bad admin token.");
+  if (!safeEqual(bearer(request) ?? "", config.serverClaimsAdminToken))
+    return apiError(401, "unauthorized", "Bad admin token.");
   const body = await readJson(request);
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email.includes("@")) return apiError(400, "invalid_email", "Enter a valid email address.");
@@ -540,7 +587,7 @@ async function redeemServerClaim(config: Config, db: Db, request: Request): Prom
     .get(now, hash(claim), now);
   if (!row) return apiError(400, "server_claim_invalid", "This claim was used or has expired.");
   const token = issueAuthSession(config, db, row.user_id, "server");
-  return json({ sessionToken: token, user: toAuthUser(loadUser(db, row.user_id)!) });
+  return json({ sessionToken: token, user: toAuthUser(requireUser(db, row.user_id)) });
 }
 
 // ── remote control plane ──────────────────────────────────────────────────
@@ -553,6 +600,13 @@ function loadHost(db: Db, hostId: string): HostRow | null {
       )
       .get(hostId) ?? null
   );
+}
+
+/** Reads the host that a statement in the same request has just written. Never null in a working database. */
+function requireHost(db: Db, hostId: string): HostRow {
+  const host = loadHost(db, hostId);
+  if (!host) throw new Error("host_missing_after_write");
+  return host;
 }
 
 function membershipFor(db: Db, hostId: string, userId: string) {
@@ -588,14 +642,14 @@ async function registerHost(db: Db, request: Request): Promise<Response> {
         "INSERT INTO remote_memberships (membership_id, host_id, user_id, role, status, created_at, updated_at) VALUES (?, ?, ?, 'owner', 'active', ?, ?)",
       )
       .run(ownerMembershipId, hostId, user.id, now, now);
-    host = loadHost(db, hostId)!;
+    host = requireHost(db, hostId);
   } else {
     const membership = membershipFor(db, hostId, user.id);
     if (!membership || membership.role !== "owner") return apiError(403, "forbidden", "Only the owner may register.");
     db.raw
       .query("UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ? WHERE host_id = ?")
       .run(name, devicePublicKey, now, hostId);
-    host = loadHost(db, hostId)!;
+    host = requireHost(db, hostId);
   }
 
   let machineToken: string | null = null;
@@ -607,7 +661,8 @@ async function registerHost(db: Db, request: Request): Promise<Response> {
   } else if (providedToken && host.machine_token_hash !== machineTokenHash(providedToken)) {
     return apiError(401, "unauthorized", "Invalid host credential.");
   }
-  const membership = membershipFor(db, hostId, user.id)!;
+  const membership = membershipFor(db, hostId, user.id);
+  if (!membership) throw new Error("membership_missing_after_write");
   return json({
     hostId,
     name,
@@ -615,6 +670,18 @@ async function registerHost(db: Db, request: Request): Promise<Response> {
     authEpoch: host.auth_epoch,
     machineToken,
   });
+}
+
+/**
+ * This service has no invitations: hosts join with a server claim. The desktop Members screen
+ * reads this route when it opens, so answer the empty list with the same access check.
+ */
+function listInvites(db: Db, hostId: string, request: Request): Response {
+  const user = findUser(db, bearer(request));
+  if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+  const requester = membershipFor(db, hostId, user.id);
+  if (!requester || requester.status !== "active") return apiError(403, "forbidden", "No access to this host.");
+  return json({ invites: [] });
 }
 
 function listMembers(db: Db, hostId: string, request: Request): Response {
@@ -660,7 +727,14 @@ function listHosts(db: Db, request: Request): Response {
   if (!user) return apiError(401, "unauthorized", "Sign in is required.");
   const rows = db.raw
     .query<
-      { host_id: string; name: string; device_public_key: string | null; auth_epoch: number; membership_id: string; role: RemoteRole },
+      {
+        host_id: string;
+        name: string;
+        device_public_key: string | null;
+        auth_epoch: number;
+        membership_id: string;
+        role: RemoteRole;
+      },
       [string]
     >(
       `SELECT h.host_id, h.name, h.device_public_key, h.auth_epoch, m.membership_id, m.role
@@ -725,7 +799,7 @@ async function keyHandover(db: Db, hostId: string, request: Request): Promise<Re
   if (!host || !host.machine_token_hash || host.machine_token_hash !== machineTokenHash(machineToken)) {
     return apiError(401, "unauthorized", "Invalid host credential.");
   }
-  const handover = body.handover as Json | undefined;
+  const handover = isJsonObject(body.handover) ? body.handover : undefined;
   if (!handover || typeof handover.publicKey !== "string") return apiError(400, "invalid_request", "Bad handover.");
   const now = nowSeconds();
   db.raw
@@ -736,13 +810,15 @@ async function keyHandover(db: Db, hostId: string, request: Request): Promise<Re
     .run(
       hostId,
       typeof handover.issuedAt === "number" ? handover.issuedAt : now,
-      typeof handover.previousPublicKey === "string" ? handover.previousPublicKey : host.device_public_key ?? "",
+      typeof handover.previousPublicKey === "string" ? handover.previousPublicKey : (host.device_public_key ?? ""),
       handover.publicKey,
       typeof handover.previousSignature === "string" ? handover.previousSignature : "",
       typeof handover.signature === "string" ? handover.signature : "",
       now,
     );
-  db.raw.query("UPDATE remote_hosts SET device_public_key = ?, updated_at = ? WHERE host_id = ?").run(handover.publicKey, now, hostId);
+  db.raw
+    .query("UPDATE remote_hosts SET device_public_key = ?, updated_at = ? WHERE host_id = ?")
+    .run(handover.publicKey, now, hostId);
   return new Response(null, { status: 204 });
 }
 
@@ -771,9 +847,10 @@ async function sessionTicket(config: Config, db: Db, sessionId: string, request:
   const clientPublicKey = typeof body.clientPublicKey === "string" ? body.clientPublicKey : "";
   if (!clientPublicKey) return apiError(400, "invalid_remote_request", "The client public key is required.");
   const session = db.raw
-    .query<{ host_id: string; user_id: string; membership_id: string; expires_at: number; ended_at: number | null }, [string]>(
-      "SELECT host_id, user_id, membership_id, expires_at, ended_at FROM remote_sessions WHERE session_id = ?",
-    )
+    .query<
+      { host_id: string; user_id: string; membership_id: string; expires_at: number; ended_at: number | null },
+      [string]
+    >("SELECT host_id, user_id, membership_id, expires_at, ended_at FROM remote_sessions WHERE session_id = ?")
     .get(sessionId);
   if (!session || session.user_id !== user.id) return apiError(404, "not_found", "Unknown session.");
   if (session.ended_at !== null || session.expires_at <= nowSeconds()) {
@@ -819,12 +896,13 @@ async function resumeValidate(config: Config, db: Db, request: Request): Promise
   const signature = request.headers.get("OpenBot-Signature") ?? "";
   const expected = createHmac("sha256", config.authWebhookSecret).update(`${timestamp}.${raw}`).digest("base64url");
   if (!safeEqual(signature, expected)) return apiError(401, "invalid_signature", "Bad service signature.");
-  let claims: Json;
+  let claims: unknown;
   try {
-    claims = JSON.parse(raw) as Json;
+    claims = JSON.parse(raw);
   } catch {
     return apiError(400, "invalid_resume_claims", "Bad resume claims.");
   }
+  if (!isJsonObject(claims)) return apiError(400, "invalid_resume_claims", "Bad resume claims.");
   const sessionId = typeof claims.sessionId === "string" ? claims.sessionId : "";
   const hostId = typeof claims.hostId === "string" ? claims.hostId : "";
   const userId = typeof claims.userId === "string" ? claims.userId : "";
@@ -865,14 +943,13 @@ function safeEqual(a: string, b: string): boolean {
 
 /** The signed-in desktop proves it owns the host it shows a QR for. */
 function mobileHostBinding(db: Db, userId: string, value: unknown): { hostId: string; fingerprint: string } | null {
-  if (!value || typeof value !== "object") return null;
-  const host = value as { hostId?: unknown; fingerprint?: unknown };
-  if (typeof host.hostId !== "string") return null;
-  const row = loadHost(db, host.hostId);
+  if (!isJsonObject(value)) return null;
+  if (typeof value.hostId !== "string") return null;
+  const row = loadHost(db, value.hostId);
   if (!row) return null;
-  const membership = membershipFor(db, host.hostId, userId);
+  const membership = membershipFor(db, value.hostId, userId);
   if (!membership || membership.status !== "active") return null;
-  return { hostId: row.host_id, fingerprint: typeof host.fingerprint === "string" ? host.fingerprint : "" };
+  return { hostId: row.host_id, fingerprint: typeof value.fingerprint === "string" ? value.fingerprint : "" };
 }
 
 async function createMobileTicket(db: Db, request: Request): Promise<Response> {
@@ -972,15 +1049,28 @@ async function redeemMobileTicket(config: Config, db: Db, request: Request): Pro
       via = "link";
     }
   }
-  if (!hostId || !userId) return apiError(401, "invalid_mobile_ticket", "The Mobile Connect code is invalid or expired.");
+  if (!hostId || !userId)
+    return apiError(401, "invalid_mobile_ticket", "The Mobile Connect code is invalid or expired.");
   const token = newToken(32);
   db.raw
     .query(
       `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at, created_at, last_used_at, kind, device_id, device_name, platform, via, host_id)
        VALUES (?, ?, ?, ?, ?, ?, 'mobile', ?, ?, ?, ?, ?)`,
     )
-    .run(newId(), userId, hash(token), now + config.authSessionTtlSeconds, now, now, deviceId, deviceName, platform, via, hostId);
-  return json({ sessionToken: token, user: toAuthUser(loadUser(db, userId)!), host: { hostId, fingerprint } });
+    .run(
+      newId(),
+      userId,
+      hash(token),
+      now + config.authSessionTtlSeconds,
+      now,
+      now,
+      deviceId,
+      deviceName,
+      platform,
+      via,
+      hostId,
+    );
+  return json({ sessionToken: token, user: toAuthUser(requireUser(db, userId)), host: { hostId, fingerprint } });
 }
 
 function mobileSession(db: Db, request: Request): Response {
@@ -991,7 +1081,8 @@ function mobileSession(db: Db, request: Request): Response {
 
 function logoutMobile(db: Db, request: Request): Response {
   const token = bearer(request);
-  if (token) db.raw.query("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?").run(nowSeconds(), hash(token));
+  if (token)
+    db.raw.query("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?").run(nowSeconds(), hash(token));
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 

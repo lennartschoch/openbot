@@ -55,7 +55,7 @@ build time.
 cd account
 bun install --frozen-lockfile
 cp .env.example .env        # then fill in the values; chmod 0600
-bun run src/selftest.ts     # 23 requests; no network and no IdP
+bun run src/selftest.ts     # 25 requests; no network and no IdP
 bun run src/index.ts        # listens on OPENBOT_ACCOUNT_PORT
 bun run src/backup.ts       # a dated copy of the database next to it
 ```
