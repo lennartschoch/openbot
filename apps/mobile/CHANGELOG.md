@@ -7,6 +7,12 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.66.0-fork.20] - 2026-11-10
+
+### Changed
+
+- Fork-only release of the phone app: the fixes of `main` without a new upstream merge.
+
 ### Fixed
 
 - The Android release build completes again. R8 stopped on `org.webrtc.Dav1dDecoder$Natives`, a class
