@@ -61,6 +61,9 @@ export const messages = {
   "mobile.chat.code.copyFailed": "No se pudo copiar el código",
   "mobile.chat.code.copied": "Código copiado",
   "mobile.chat.code.copy": "Copiar código",
+  "mobile.chat.table.copyMarkdown": "Copiar como Markdown",
+  "mobile.chat.table.copyCsv": "Copiar como CSV",
+  "mobile.chat.table.copyFailed": "No se pudo copiar la tabla",
   "mobile.chat.preview.htmlTitle": "Vista previa de HTML",
   "mobile.chat.preview.mermaidTitle": "Diagrama Mermaid",
   "mobile.chat.preview.htmlCode": "Código HTML",
@@ -199,6 +202,13 @@ export const messages = {
   "mobile.chat.liveVoice.elevenLabsPermission":
     "A la clave de ElevenLabs le falta un permiso. Revísalo en Ajustes > Voz.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs necesita conexión de red.",
+  "mobile.chat.liveVoice.voiceServerFailed": "Tu servidor de voz no pudo leer la respuesta. Revísalo en Ajustes > Voz.",
+  "mobile.chat.liveVoice.gptUnsupported":
+    "Este servidor no admite GPT Live Voice. Actualiza OpenBot en el ordenador que lo ejecuta.",
+  "mobile.chat.liveVoice.gptFailed": "GPT Live Voice no pudo iniciarse. Activa el micrófono para intentarlo de nuevo.",
+  "mobile.chat.liveVoice.gptEnded": "GPT Live Voice se detuvo. Activa el micrófono para iniciarlo de nuevo.",
+  "mobile.chat.liveVoice.gptMicrophoneOff":
+    "Permite que OpenBot use el micrófono en Ajustes. Después activa el micrófono para intentarlo de nuevo.",
   "mobile.chat.composer.addAttachment": "Añadir archivo adjunto",
   "mobile.chat.composer.ask": "Preguntar a {name}",
   "mobile.chat.composer.stopFailed": "No se pudo detener al agente. Puede que ya haya terminado.",

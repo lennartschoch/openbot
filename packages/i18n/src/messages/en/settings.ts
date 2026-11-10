@@ -201,6 +201,7 @@ export const messages = defineMessages("settings", {
   "settings.soundTheme.play": "Play {name}",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
+  "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
@@ -662,7 +663,11 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.model.multilingual.description":
     "More natural, and slower. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.v3.description":
-    "The most expressive, and the slowest. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+    "Expressive, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4Turbo.description":
+    "Fast, in more than 90 languages. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
+  "settings.voice.speech.model.v4.description":
+    "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.xai.description":
     "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
   "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",

@@ -30,7 +30,9 @@ codec in `team-protocol/storage-v1.ts`. The host advertises it only when its sto
 exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
 renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
 download files travel only as category totals. A host without the capability reads as null, and the
-surface asks for an update; a change is refused before any request.
+surface asks for an update; a change is refused before any request. The desktop Library page and
+the phone Library (the server drawer) read the same `host` scope. The file types, the type filter
+and the order of both are in `@openbot/team-client/stored-files`.
 
 The optional `storage-disk-v1` capability adds `POST /v1/storage/disk` (`team-protocol/storage-disk-v1.ts`).
 It answers the free and total bytes of the disk that holds the host data, from one `statfs` call
@@ -192,7 +194,8 @@ sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` wit
 Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
 the agent, because each spoken request goes to the agent as the member's message. The start needs an
 open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
-timeout or a refused call also answers 409 with a sentence for the member.
+timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
+500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
 
 Each member has at most one session; a new start ends the earlier one of that member, and the local
 user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
@@ -200,7 +203,10 @@ connections of that member. `POST /v1/live-voice/stop` with `{ sessionId }` stop
 caller only. The host also stops it when the last event connection of the logical session that started
 it closes. The capability is advertised only to protocol 9 clients. The desktop on a joined server
 uses live voice only when the host advertises it and the user turned it on in Settings → Voice;
-otherwise the voice transcribes. The web client and the mobile app do not use it yet.
+otherwise the voice transcribes. The mobile app uses it in the voice conversation of an agent chat
+when the host advertises it, the user turned on GPT live voice in Settings → Voice, and the app binary
+has WebRTC (`react-native-webrtc`); otherwise the phone's own voice conversation runs. The phone sends
+a voice name only when it is one of the contract. The web client does not use it yet.
 
 ### Agent import from a joined server
 
@@ -584,6 +590,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
+| `custom-provider-edit-v1` | List, add, edit and remove custom endpoints. A list names each endpoint's harness and header names. An edit changes the name, address, models, key and headers; no key keeps the saved key, and `value: null` keeps a saved header value. The host keeps the harness and the limits of each kept model. Protocol 9 only | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
@@ -597,6 +604,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
@@ -614,10 +622,11 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `vault-v1` | The host's Vault: list, add, change and delete logins, cards and contact info; show one saved password, card number or security code; reset a Vault that the host cannot read. No CSV import. A change sends `vault-changed` with no data, so a client reads the list again | `vault` |
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
+| `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
-the host; no response carries one, except the `vault-v1` and `vault-v2` reveal: it answers the one secret that the
+the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the
 admin asked to show or copy. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
 sign-in and folder import stay on the host.
@@ -690,6 +699,29 @@ background memory reviews of the host's agents (`openbot-memory-review-v1.json`;
 other values. The agent service reads the value at each use, so a change applies from the next turn.
 Server settings → General → Agents → Memory review sets it for this computer
 (`hostAdmin.setMemoryReview`, local handler) and for a joined server.
+
+`skill-learning-v1` reads and sets what the background memory reviews of the host's agents do when a
+chat teaches an agent a skill (`openbot-skill-learning-v1.json`; `automatic`, the default, writes
+and installs the skill for that agent; `ask` asks the user in the chat first; `off` does neither).
+The snapshot gives the mode and the modes that the host permits; the host refuses other values. A
+client shows an unknown mode from a later host as its raw value. The agent service reads the value
+at each review. Server settings → General → Agents → Skill learning sets it for this computer
+(`hostAdmin.setSkillLearning`, local handler) and for a joined server.
+
+The capability also carries the skill question card (see [providers.md](providers.md#skill-suggestions)).
+A skill question message (`itemType` `skill-suggestion:*`) gets `skillSuggestion: { name }` on the
+wire. The frozen protocol 9 projection drops it, so the host adds it after the projection, for a
+connection that advertises the capability only: in HTTP bodies, WebSocket events, and WebRTC bodies
+and event frames (`withSkillSuggestionNames`, `addSkillSuggestionNames`), as `ui-block-vault-v1`
+does for Vault requests. The filtered conversation cache key includes the capability. The team
+client (`remote-peer.ts`, web) and the desktop joined-server transports
+(`team-webrtc-client-transport.ts` for a host on protocol 9, `remote-server-http.ts` and
+`remote-server-event-stream.ts` when they advertise the capability) copy the key back after the
+frozen decode.
+`POST /v1/skill-suggestions/save` (`{ agentId, messageId }` → `{ saved }`) saves the skill of that
+question with the host's background writer. A member needs chat level on the agent: a viewer gets
+403, and a hidden or missing agent 404. `saved: false` means the host saved nothing; the client then
+sends the user's yes. The desktop handler asks a joined host only when it advertises the capability.
 
 `agent-notification-levels-v1` reads and sets the notification levels that the signed-in member chose
 on this server, for all of their devices: the level of the whole server (`server`, `null` until they
@@ -952,6 +984,14 @@ once between the account service and the provider, and once between the app and 
   `__Host-openbot-company` cookie (10 minutes) and opens the provider in the same tab.
   `GET /api/browser/company/return` exchanges the code, sets the `__Host-openbot-web` session cookie,
   and answers 303 to `/app`. The cookie stops a login CSRF.
+- Phone (`signInMobileWithCompany` in `apps/mobile/src/features/auth/api/mobile-auth.ts`): the start
+  names the return `openbot://company-sign-in` (`MOBILE_COMPANY_SIGN_IN_RETURN`), which only a
+  sign-in start accepts, not a test. `openAuthSessionAsync` opens the provider page and takes the
+  return, and `+native-intent.tsx` ignores another copy of the link. The app gives the code, its
+  verifier and its device to `POST /v1/mobile-auth/company/exchange`, which makes a mobile session
+  (`mobile_auth_sessions`, no host) and replaces the earlier session of that device. The stored
+  session has the marker `signIn: "company"`. A custom scheme is not private on Android, so the
+  verifier, not the link, proves the app.
 
 The provider's subject is linked to an account (`company_sign_in_identities`). A first sign-in uses
 the account with the same email, or makes a new one. When the ID token has no `email`, the service
@@ -982,7 +1022,7 @@ Known limits:
 - The local development host reads its members from its team file, not from D1, so the desktop
   Members list in `bun run dev` does not show a company sign-in join. Check D1 or the
   `/v2/remote/hosts` list of the person.
-- The mobile app has no company sign-in.
+- The mobile app signs in with a company account, but has no setup.
 - No full sign-in with a real Entra ID tenant has been made. Discovery, the authorize parameters and
   the token request were checked against the live Microsoft endpoints with a fake application.
 

@@ -37,6 +37,11 @@ export class AgentDockFailed extends Schema.TaggedError<AgentDockFailed>()("Agen
 
 export const { rewrap: toAgentDockFailed } = causeHelpers(AgentDockFailed);
 
+/** The platforms that show the dock window. On Windows it is a tool window above the other apps. */
+function agentDockSupported(platform: NodeJS.Platform): boolean {
+  return platform === "darwin" || platform === "win32";
+}
+
 export interface AgentDockWindowControllerOptions {
   platform: NodeJS.Platform;
   createWindow: (bounds: Rectangle) => BrowserWindow;
@@ -240,16 +245,18 @@ export class AgentDockWindowController {
     return Effect.suspend(() => {
       if (action.type === "send") return this.#send(action);
       if (action.type === "open-chat") {
-        if (action.agentId === null && this.#chatOwner !== rendererId) return Effect.void;
+        if (action.seat === null && this.#chatOwner !== rendererId) return Effect.void;
         const previous = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
         if (previous && previous.rendererId !== rendererId) {
           sendToRenderer(previous.window, IPC_ENDPOINTS.agentDock.closeChat);
         }
-        this.#chatOwner = action.agentId === null ? null : rendererId;
+        this.#chatOwner = action.seat === null ? null : rendererId;
       }
       return Effect.gen({ self: this }, function* () {
         const window = yield* this.#ensureMainWindow();
-        if (action.type === "open-agent" || action.type === "open-settings") this.#options.presentMainWindow(window);
+        if (action.type === "open-agent" || action.type === "open-channel" || action.type === "open-settings") {
+          this.#options.presentMainWindow(window);
+        }
         if (!sendToRenderer(window, IPC_ENDPOINTS.agentDock.action, action)) {
           return yield* new AgentDockFailed({
             cause: new Error(sourceText("error.backend.windowTemporarilyUnavailable")),
@@ -260,7 +267,7 @@ export class AgentDockWindowController {
   }
 
   #send(action: AgentDockSendAction): Effect.Effect<void, AgentDockFailed> {
-    const key = [action.serverId, action.agentId, action.clientMessageId].join("\u0000");
+    const key = [action.serverId, action.seat.kind, action.seat.id, action.clientMessageId].join("\u0000");
     const existing = this.#sends.get(key);
     if (existing) return Deferred.await(existing);
     const done = Deferred.makeUnsafe<void, AgentDockFailed>();
@@ -296,7 +303,7 @@ export class AgentDockWindowController {
     return this.#reconciliation
       .withPermit(
         Effect.suspend(() => {
-          if (this.#destroyed || this.#options.platform !== "darwin") {
+          if (this.#destroyed || !agentDockSupported(this.#options.platform)) {
             this.#destroyWindow();
             return Effect.void;
           }
@@ -344,12 +351,16 @@ export class AgentDockWindowController {
         const entry: DockWindow = { window, rendererId: window.webContents.id, displayId: display.id };
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
-        window.excludedFromShownWindowsMenu = true;
         window.setHasShadow(false);
-        window.setWindowButtonVisibility(false);
         window.setAlwaysOnTop(true, "floating");
-        window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-        window.setHiddenInMissionControl(true);
+        // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
+        // defined on Windows, so a call there throws.
+        if (this.#options.platform === "darwin") {
+          window.excludedFromShownWindowsMenu = true;
+          window.setWindowButtonVisibility(false);
+          window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+          window.setHiddenInMissionControl(true);
+        }
         window.setFocusable(false);
         window.setIgnoreMouseEvents(true, { forward: true });
         window.webContents.on("did-finish-load", () => {
@@ -422,7 +433,7 @@ export class AgentDockWindowController {
     const main = this.#options.getMainWindow();
     const serverId = this.#presentation?.serverId;
     if (main && !main.isDestroyed() && serverId !== undefined) {
-      sendToRenderer(main, IPC_ENDPOINTS.agentDock.action, { type: "open-chat", serverId, agentId: null });
+      sendToRenderer(main, IPC_ENDPOINTS.agentDock.action, { type: "open-chat", serverId, seat: null });
     }
   }
 }
@@ -432,7 +443,7 @@ function agentDockWindowHeight(display: Pick<Display, "workArea">): number {
 }
 
 /**
- * At an edge of the work area, so the macOS Dock at that edge does not cover it. `offset` is the place
+ * At an edge of the work area, so the macOS Dock or the Windows taskbar at that edge does not cover it. `offset` is the place
  * in height: 0 is the top, 1 the bottom.
  */
 function agentDockWindowBounds(display: Pick<Display, "workArea">, edge: AgentDockEdge, offset: number): Rectangle {

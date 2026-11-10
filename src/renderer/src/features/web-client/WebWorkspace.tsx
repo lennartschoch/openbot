@@ -40,7 +40,11 @@ import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/bro
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
-import { AGENT_HIDDEN_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_CAPABILITY,
+  AGENT_WELCOME_CAPABILITY,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -53,8 +57,10 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/ro
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -76,6 +82,7 @@ import {
   getHostPersonality,
   getHostPromptCacheTtl,
   getHostReleaseStatus,
+  getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
   getStorageUsage,
@@ -86,6 +93,7 @@ import {
   setHostModelVisibility,
   setHostPersonality,
   setHostPromptCacheTtl,
+  setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
   startHostUpdate,
@@ -205,6 +213,7 @@ import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import {
@@ -229,7 +238,14 @@ import { isReaderAuthor } from "../team/reader-identity";
 import type { ServerVaultOptions } from "../vault/ServerVaultPanel";
 import { createVaultStore } from "../vault/stores/vault-store";
 import { RailHelpMenu } from "../window/RailHelpMenu";
-import { ServerSettingsPageTitle, SettingsPageFrame } from "../window/SettingsPageFrame";
+import {
+  openFirstSettingsSection,
+  PersonalSettingsLink,
+  ServerSettingsLink,
+  ServerSettingsPageTitle,
+  SettingsPageFrame,
+  SettingsSearchField,
+} from "../window/SettingsPageFrame";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -853,6 +869,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     () => workspace.state.capabilities.includes(BROWSER_PROXIES_CAPABILITY),
     () => workspace.state.capabilities.includes(ROUTINE_RUN_PLACE_CAPABILITY),
+    () => workspace.state.capabilities.includes(SKILL_LEARNING_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -1011,6 +1028,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /** The elements of the settings page that the settings panel shows in. The page sets them. */
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
+  /** The search of the server settings page, which filters its section list. It clears when the page closes. */
+  const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
+  /** Each Enter in that search adds one. The server settings then open the first match. */
+  const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
   /** Where the panel of a settings page shows, or nothing while that page is not on screen. */
   function settingsPlacement(kind: SettingsKind): SettingsPagePlacement | undefined {
     const mounts = settingsMounts();
@@ -1270,6 +1291,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setMemoryReview: async (interval, serverId) =>
       runTeamEffect(setHostMemoryReview(hostRequest(serverId), interval).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostSkillLearningCalls: HostSkillLearningCalls = {
+    getSkillLearning: async (serverId) =>
+      runTeamEffect(getHostSkillLearning(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setSkillLearning: async (mode, serverId) =>
+      runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
+  };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1468,7 +1495,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+      if (event.type === "channels-changed") void channels.changed(event.channelId);
+      else if (event.type === "runtime-snapshot") void channels.resync();
     }),
   );
   // The user changed their levels on another device: the matrix and the notifications follow at once.
@@ -1588,17 +1616,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys.
+  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultV2 = createMemo(() => serverCanAdminister(server(), VAULT_V2_CAPABILITY));
+  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+    const current = server();
+    if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
+    return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
+  });
   const vaultSettings = createMemo((): ServerVaultOptions | undefined => {
     if (vaultHostId() === undefined) return undefined;
-    const v2 = vaultV2();
-    return { store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, v2)), apiKeys: v2 };
+    const version = vaultVersion();
+    return {
+      store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version)),
+      apiKeys: version > 1,
+      twoStep: version === 3,
+    };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
     const current = server();
@@ -1614,7 +1650,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   async function createCanvasAgent(draft: NewAgentDraft): Promise<{ id: string }> {
     const created = await workspace.runtime.createAgent(
-      newAgentInput(draft, workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)),
+      newAgentInput(
+        draft,
+        workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+        workspace.state.capabilities.includes(AGENT_WELCOME_CAPABILITY),
+      ),
     );
     await workspace.refresh();
     return created;
@@ -2140,9 +2180,44 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               <Show when={server()}>{(target) => <ServerSettingsPageTitle server={target()} />}</Show>
                             )
                           }
-                          onMounts={setSettingsMounts}
-                          onEscape={showAgents}
-                        />
+                          footer={
+                            kind === "personal" ? (
+                              <Show when={server()}>
+                                {(target) => (
+                                  <ServerSettingsLink
+                                    server={target()}
+                                    onOpen={() => void openServerSettings(target().id, null)}
+                                  />
+                                )}
+                              </Show>
+                            ) : (
+                              <PersonalSettingsLink account={account()} onOpen={openAccountSettings} />
+                            )
+                          }
+                          onMounts={(mounts) => {
+                            setSettingsMounts(mounts);
+                            if (!mounts) setServerSettingsQuery("");
+                          }}
+                          // Escape clears the search, or else closes the page.
+                          onEscape={() => {
+                            if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
+                            else showAgents();
+                          }}
+                        >
+                          <Show when={kind === "server"}>
+                            <SettingsSearchField
+                              value={serverSettingsQuery()}
+                              onInput={setServerSettingsQuery}
+                              onEnter={() =>
+                                openFirstSettingsSection(
+                                  settingsMounts()?.nav,
+                                  () => setOpenFirstServerSectionRequest((request) => request + 1),
+                                  serverSettingsQuery,
+                                )
+                              }
+                            />
+                          </Show>
+                        </SettingsPageFrame>
                       )}
                     </Show>
                   }
@@ -2406,6 +2481,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       <ServerSettingsOverlay
                         open={serverSettings.state.open && settingsPlacement("server") !== undefined}
                         page={settingsPlacement("server")}
+                        sectionQuery={serverSettingsQuery()}
+                        openFirstSectionRequest={openFirstServerSectionRequest()}
+                        onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         platform="darwin"
@@ -2508,6 +2586,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
+                        skillLearning={{ calls: hostSkillLearningCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
