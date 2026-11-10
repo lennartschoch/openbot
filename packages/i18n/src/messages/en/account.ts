@@ -94,6 +94,15 @@ export const messages = defineMessages("account", {
   "account.login.changeEmail": "Change email",
   "account.login.resend": "Resend code",
   "account.login.resendIn": "Resend in {time}",
+  // The server choice of a self-hosted account service, under the send button of the email step.
+  "account.login.serverChange": "Change account service",
+  "account.login.serverDescription":
+    "Signing in to a self-hosted account service? Set its address here. Leave empty to use openbot.run.",
+  "account.login.serverSaved": "Saved. Restart OpenBot, then sign in.",
+  "account.login.serverRestart": "Restart OpenBot",
+  "account.login.serverRestarting": "Restarting…",
+  "account.login.serverSaveFailed": "Could not save the server. Try again.",
+  "account.login.serverRestartFailed": "OpenBot could not restart. Restart it yourself, then sign in.",
   "account.login.loadFailed": "OpenBot could not load the account service.",
   "account.login.companyTitle": "Continue in your browser",
   "account.login.companyDescription":

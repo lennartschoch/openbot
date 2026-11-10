@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "هوية المضيف البعيد غير متاحة.",
   "error.app.iceServersMissing": "لم يقدّم Remote Signal خوادم ICE بعد.",
   "error.app.finishLocalTest": "أكمل الاختبار المحلي قبل تبديل الشاشات.",
+  "error.app.serverUrlInvalid": "يجب أن يكون عنوان URL لخدمة الحسابات https: أو http: على هذا الحاسوب.",
+  "error.app.serverUrlSignalInvalid": "يجب أن يكون عنوان Signal عنوان wss: بدون اسم مستخدم أو كلمة مرور.",
 } as const satisfies PartialTranslation<typeof source>;

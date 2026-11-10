@@ -46,6 +46,8 @@ import {
   type HiddenAgentsSnapshot,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
+  type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -450,6 +452,35 @@ const NO_STATUS: AgentStatus = {
 };
 
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
+
+// The snapshot that a fake runtime download answers: one ready row per managed provider and tool.
+const NO_RUNTIME_STATUS: ProviderRuntimeStatus = {
+  phase: "ready",
+  progress: null,
+  message: null,
+  version: null,
+};
+const NO_RUNTIME_SNAPSHOT: ProviderRuntimeSnapshot = {
+  revision: 1,
+  providers: {
+    antigravity: NO_RUNTIME_STATUS,
+    claude: NO_RUNTIME_STATUS,
+    cline: NO_RUNTIME_STATUS,
+    codex: NO_RUNTIME_STATUS,
+    copilot: NO_RUNTIME_STATUS,
+    cursor: NO_RUNTIME_STATUS,
+    devin: NO_RUNTIME_STATUS,
+    grok: NO_RUNTIME_STATUS,
+    kimi: NO_RUNTIME_STATUS,
+    mistral: NO_RUNTIME_STATUS,
+    muse: NO_RUNTIME_STATUS,
+    opencode: NO_RUNTIME_STATUS,
+    pi: NO_RUNTIME_STATUS,
+  },
+  toolRuntimes: {
+    bun: NO_RUNTIME_STATUS,
+  },
+};
 
 // The host's agent event listener. Only a chat colour change (`chat-colors-v1`) sends an event in this run.
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
@@ -1506,8 +1537,6 @@ try {
         },
         runtimes: {
           getStatus: unused("providers.runtimes.getStatus"),
-          download: unused("providers.runtimes.download"),
-          cancel: unused("providers.runtimes.cancel"),
           checkForUpdates: unused("providers.runtimes.checkForUpdates"),
           // Pi is ready for DeepSeek. For Inception it is still to come.
           startKeyProviderCli: (provider) =>
@@ -1515,6 +1544,16 @@ try {
               record("startKeyProviderCli", provider);
               return provider === "inception";
             }),
+        },
+        runtimeDownloads: {
+          download: (runtime) => {
+            record("providers.runtimes.download", runtime);
+            return Effect.succeed(NO_RUNTIME_SNAPSHOT);
+          },
+          cancel: (runtime) => {
+            record("providers.runtimes.cancel", runtime);
+            return Effect.succeed(NO_RUNTIME_SNAPSHOT);
+          },
         },
         customProviders: {
           list: () => customEndpoints,

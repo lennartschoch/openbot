@@ -10,6 +10,7 @@ import { useSetupProviderProps } from "./features/onboarding/setup-provider-prop
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useSettings } from "./features/settings/settings-context";
+import { settingsPort } from "./features/settings/settings-port";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
 import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
 import { useI18n } from "./i18n-context";
@@ -125,6 +126,13 @@ export function AppAccessGate() {
                     onOpenCompanySignIn={auth.openCompanySignIn}
                     language={i18n.locale()}
                     onChangeLanguage={languageStep.reopen}
+                    serverUrl={settings.serverUrlPreference() ?? undefined}
+                    onSaveServerUrl={(input) => settings.saveServerUrl(input).then(() => undefined)}
+                    onRestartApp={() =>
+                      settingsPort()
+                        .update.restartWhenIdle("relaunch")
+                        .then(() => undefined)
+                    }
                   />
                 }
               >

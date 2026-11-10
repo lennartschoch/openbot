@@ -103,6 +103,8 @@ export const messages = {
   "error.team.skillsUnsupported": "Это подключение не поддерживает навыки.",
   "error.team.hostIdentityUnsupported": "Это подключение не поддерживает изменение идентификатора сервера.",
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
+  "error.team.providerRuntimeClientUpdate":
+    "Этот сервер обновляет свои CLI провайдеров сам. Обновите OpenBot на сервере.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
   "error.team.localServersUnsupported": "Это подключение не поддерживает серверы на этом компьютере.",

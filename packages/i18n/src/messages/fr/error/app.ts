@@ -12,4 +12,8 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "L’identité de l’hôte distant n’est pas disponible.",
   "error.app.iceServersMissing": "Remote Signal n’a pas encore fourni de serveurs ICE.",
   "error.app.finishLocalTest": "Terminez le test local avant de changer d’écran.",
+  "error.app.serverUrlInvalid":
+    "L’URL du service de comptes doit être une adresse https:, ou une adresse http: sur cet ordinateur.",
+  "error.app.serverUrlSignalInvalid":
+    "L’URL de Signal doit être une adresse wss: sans nom d’utilisateur ni mot de passe.",
 } as const satisfies PartialTranslation<typeof source>;

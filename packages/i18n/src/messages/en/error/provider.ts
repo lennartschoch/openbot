@@ -38,6 +38,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.detectionEntriesTooMany": "There are too many addresses or folders.",
   "error.provider.credentialFileUnreadable": "The provider credential file is unreadable.",
   "error.provider.credentialFileTooLarge": "The provider credential file is too large.",
+  "error.provider.downloadsDisabled":
+    "This server does not download provider CLIs. Install the CLI on the server yourself, and update OpenBot on it.",
   "error.provider.archiveSpecialFile": "The runtime archive contains a link or special file.",
   "error.provider.archiveUnsafePath": "The runtime archive contains an unsafe path.",
   "error.provider.runtimeSpecialFile": "The runtime contains a link or special file.",

@@ -750,6 +750,9 @@ authentication records from D1. The embedded browser uses a separate sandboxed E
 cannot access `window.openbot` or managed local attachments.
 
 To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
+For the whole self-hosted stack on one host - the account service, Signal and the headless server
+in Docker, with the new sign-in and phone flows - see [Self-hosted stack](docs/self-hosted-stack.md)
+(there is a [Quickstart](docs/self-hosted-stack.md#quickstart) at the top).
 This fork uses the Bun service in [`account/`](account/README.md) instead of the Worker in
 `apps/auth-api`.
 

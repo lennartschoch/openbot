@@ -520,7 +520,7 @@ interface TeamApiHostIdentity {
   updateIdentity(input: UpdateHostIdentityInput): Effect.Effect<void, RemoteWorkflowError>;
 }
 
-interface TeamApiProviders {
+export interface TeamApiProviders {
   service: Pick<
     AgentService,
     | "startProviderCodeLogin"
@@ -532,10 +532,13 @@ interface TeamApiProviders {
     | "getStatus"
   >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
-  runtimes: Pick<
-    ProviderRuntimeManager,
-    "getStatus" | "download" | "cancel" | "checkForUpdates" | "startKeyProviderCli"
-  >;
+  runtimes: Pick<ProviderRuntimeManager, "getStatus" | "checkForUpdates" | "startKeyProviderCli">;
+  /**
+   * Fork: the download and cancel that a client starts, on a desktop host only. A headless server
+   * has none - like `host-update-v1`, a client must not install anything on it. The manager of the
+   * server updates its own runtimes after an app upgrade, and the operator updates the server.
+   */
+  runtimeDownloads?: Pick<ProviderRuntimeManager, "download" | "cancel">;
   customProviders: PeerCustomProviderChanges;
   /**
    * Whether this host can run the Claude pasted-code sign-in. `providers-v3` promises it, so a host

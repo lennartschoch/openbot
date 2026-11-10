@@ -110,6 +110,8 @@ export const messages = {
   "error.team.skillsUnsupported": "Le skill non sono supportate da questa connessione.",
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
+  "error.team.providerRuntimeClientUpdate":
+    "Questo server aggiorna le sue CLI dei provider da solo. Aggiorna OpenBot sul server.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",

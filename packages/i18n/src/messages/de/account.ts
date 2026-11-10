@@ -99,6 +99,15 @@ export const messages = {
   "account.login.changeEmail": "E-Mail-Adresse ändern",
   "account.login.resend": "Code erneut senden",
   "account.login.resendIn": "In {time} erneut senden",
+  "account.login.serverChange": "Account-Dienst wechseln",
+  "account.login.serverDescription":
+    "Bei einem selbst gehosteten Account-Dienst angemeldet? Gib seine Adresse hier ein. Leer verwendet OpenBot openbot.run.",
+  "account.login.serverSaved": "Gespeichert. Starte OpenBot neu und melde dich dann an.",
+  "account.login.serverRestart": "OpenBot neu starten",
+  "account.login.serverRestarting": "Neustart läuft…",
+  "account.login.serverSaveFailed": "Der Server ließ sich nicht speichern. Versuch es erneut.",
+  "account.login.serverRestartFailed":
+    "OpenBot ließ sich nicht neu starten. Starte es selbst neu und melde dich dann an.",
   "account.login.loadFailed": "OpenBot konnte den Kontodienst nicht laden.",
   "account.otp.incorrect": "Dieser Code ist falsch. Versuche es erneut.",
   "account.otp.verifying": "Wird geprüft…",

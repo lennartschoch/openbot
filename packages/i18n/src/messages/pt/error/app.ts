@@ -11,4 +11,7 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "A identidade do computador anfitrião remoto está indisponível.",
   "error.app.iceServersMissing": "O Remote Signal ainda não forneceu servidores ICE.",
   "error.app.finishLocalTest": "Conclua o teste local antes de trocar de tela.",
+  "error.app.serverUrlInvalid":
+    "O URL do serviço de contas deve ser um endereço https:, ou um endereço http: neste computador.",
+  "error.app.serverUrlSignalInvalid": "O URL do Signal deve ser um endereço wss: sem nome de usuário e sem senha.",
 } as const satisfies PartialTranslation<typeof source>;

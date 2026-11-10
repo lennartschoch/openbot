@@ -102,6 +102,14 @@ export const messages = {
   "account.login.changeEmail": "تغيير البريد الإلكتروني",
   "account.login.resend": "إعادة إرسال الرمز",
   "account.login.resendIn": "إعادة الإرسال بعد {time}",
+  "account.login.serverChange": "تغيير خدمة الحسابات",
+  "account.login.serverDescription":
+    "تسجّل الدخول إلى خدمة حسابات مستضافة ذاتيًا؟ اكتب عنوانها هنا. اتركه فارغًا لاستخدام openbot.run.",
+  "account.login.serverSaved": "تم الحفظ. أعد تشغيل OpenBot ثم سجّل الدخول.",
+  "account.login.serverRestart": "إعادة تشغيل OpenBot",
+  "account.login.serverRestarting": "جارٍ إعادة التشغيل…",
+  "account.login.serverSaveFailed": "تعذّر حفظ الخادم. حاول مجددًا.",
+  "account.login.serverRestartFailed": "تعذّرت إعادة تشغيل OpenBot. أعد تشغيله بنفسك ثم سجّل الدخول.",
   "account.login.loadFailed": "تعذّر على OpenBot تحميل خدمة الحساب.",
   "account.login.companyTitle": "تابع في متصفحك",
   "account.login.companyDescription":

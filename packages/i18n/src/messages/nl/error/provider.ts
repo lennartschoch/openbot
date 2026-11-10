@@ -40,6 +40,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Er zijn te veel adressen of mappen.",
   "error.provider.credentialFileUnreadable": "Het bestand met inloggegevens van de aanbieder is onleesbaar.",
   "error.provider.credentialFileTooLarge": "Het bestand met inloggegevens van de aanbieder is te groot.",
+  "error.provider.downloadsDisabled":
+    "Deze server downloadt geen provider-CLI's. Installeer de CLI zelf op de server en werk OpenBot er bij.",
   "error.provider.archiveSpecialFile": "Het runtime-archief bevat een link of speciaal bestand.",
   "error.provider.archiveUnsafePath": "Het runtime-archief bevat een onveilig pad.",
   "error.provider.runtimeSpecialFile": "De runtime bevat een link of speciaal bestand.",

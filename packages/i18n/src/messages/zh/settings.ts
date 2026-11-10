@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
+  "settings.serverUrl.title": "账户服务 URL",
+  "settings.serverUrl.environmentNote": "已设置 OPENBOT_AUTH_API_URL，因此本次运行忽略保存的 URL。",
+  "settings.serverUrl.signal.title": "Signal URL",
+  "settings.serverUrl.signal.description": "仅用于带有团队连接的自托管服务器：其 Signal 服务的 wss: 地址。",
+  "settings.serverUrl.signal.placeholder": "wss://signal.example.com/v1/signal",
+  "settings.serverUrl.placeholder": "https://api.example.com",
   // The language setting itself.
   "settings.language.title": "语言",
   "settings.language.description": "OpenBot 的菜单、按钮和消息将使用该语言显示。",

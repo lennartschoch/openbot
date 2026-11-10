@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Il y a trop d’adresses ou de dossiers.",
   "error.provider.credentialFileUnreadable": "Le fichier d’identifiants du fournisseur est illisible.",
   "error.provider.credentialFileTooLarge": "Le fichier d’identifiants du fournisseur est trop volumineux.",
+  "error.provider.downloadsDisabled":
+    "Ce serveur ne télécharge pas de CLI de fournisseur. Installez la CLI sur le serveur vous-même et mettez OpenBot à jour dessus.",
   "error.provider.archiveSpecialFile":
     "L’archive de l’environnement d’exécution contient un lien ou un fichier spécial.",
   "error.provider.archiveUnsafePath": "L’archive de l’environnement d’exécution contient un chemin non sûr.",

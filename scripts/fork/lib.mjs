@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -83,8 +83,9 @@ export function androidVersionCode(baseVersion, buildNumber) {
 
 /**
  * Writes the fork version into the files that the two release trains read. The desktop app takes
- * the root version. The mobile app keeps its own marketing version, because it follows the store
- * train of upstream, and gets an Android version code that the local Gradle build can use.
+ * the root version. The mobile app shows it too: `expo.version` becomes the fork version, which is
+ * the versionName on Android and the marketing version on iOS. It also gets an Android version
+ * code that the local Gradle build can use.
  *
  * app.json is patched as text: a JSON round trip reflows every short array, and each such line is
  * a conflict at the next merge of upstream.
@@ -121,6 +122,14 @@ export function applyVersion(root, version) {
     );
     if (patched === before) throw new Error("app.json: the ios block has no bundleIdentifier line.");
   }
+  const expoVersion = /("expo"\s*:\s*\{[^{}]*?"version"\s*:\s*")[^"]*(")/u;
+  if (expoVersion.test(patched)) {
+    patched = patched.replace(expoVersion, `$1${version}$2`);
+  } else {
+    const before = patched;
+    patched = patched.replace(/("expo"\s*:\s*\{\s*\n\s*"slug"\s*:\s*"[^"]*",\n)/u, `$1    "version": "${version}",\n`);
+    if (patched === before) throw new Error("app.json: the expo block has no slug line.");
+  }
   writeFileSync(appPath, patched);
 
   return { baseVersion, buildNumber, versionCode };
@@ -151,7 +160,22 @@ export function assertCleanWorktree(root) {
 }
 
 export function mergeHeadExists(root) {
-  return git(root, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"]).length > 0;
+  // `rev-parse --verify --quiet` exits 1 when MERGE_HEAD is absent; that is a "no", not a failure.
+  const result = spawnSync("git", ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 && result.stdout.trim().length > 0;
+}
+
+export function tagExists(root, tag) {
+  const result = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/${tag}`], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0;
 }
 
 export function hasUnmergedPaths(root) {
@@ -161,7 +185,29 @@ export function hasUnmergedPaths(root) {
 /** The merge commits that are in progress: one for a merge, none otherwise. */
 export function commitAll(root, message) {
   run("git", ["add", "--all"], { cwd: root });
+  // A resume can find everything already committed: the version bump of the failed run before.
+  if (!git(root, ["status", "--porcelain"])) return false;
   run("git", ["commit", "--message", message], { cwd: root });
+  return true;
+}
+
+/**
+ * Adds the changelog section of a fork release, if it is not there. The pre-commit hook of the
+ * release commit refuses a version with no section, so the sync and the fork-only release write
+ * their own note before they commit the version bump. `body` is the section under the heading,
+ * groups included. A second run with the same version changes nothing: the check also refuses a
+ * duplicate section.
+ */
+export function addReleaseNotes(root, version, body, { mobile = false } = {}) {
+  const file = mobile ? path.join(root, "apps", "mobile", "CHANGELOG.md") : path.join(root, "CHANGELOG.md");
+  const text = readFileSync(file, "utf8");
+  if (text.includes(`## [${version}]`)) return;
+  const anchor = text.indexOf("## [Unreleased]");
+  if (anchor === -1) throw new Error(`${file}: no "## [Unreleased]" heading for the release notes.`);
+  const lineEnd = text.indexOf("\n", anchor);
+  const date = new Date().toISOString().slice(0, 10);
+  const section = `\n## [${version}] - ${date}\n\n${body.trimEnd()}\n`;
+  writeFileSync(file, `${text.slice(0, lineEnd + 1)}${section}${text.slice(lineEnd + 1)}`);
 }
 
 export function tagRelease(root, version, message) {

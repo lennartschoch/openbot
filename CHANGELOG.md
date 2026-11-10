@@ -6,6 +6,58 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.66.0-fork.19] - 2026-11-10
+
+### Changed
+
+- Fork builds now ship the upstream OpenBot 0.66.0 release.
+
+## [0.66.0-fork.18] - 2026-11-09
+
+### Changed
+
+- Fork builds now ship the upstream OpenBot 0.66.0 release.
+
+### Added
+
+- The sign-in screen has Change account service: an optional account service URL that defaults to
+  `openbot.run`, plus the optional `wss:` Signal address of a self-hosted server, with a restart
+  button. A user of a self-hosted account service sets both before the first email code. To change
+  the service later, sign out first: the fields are on the sign-in screen, and signing out stops
+  the session token from reaching the other service.
+- The phone app reports the fork version (`0.65.0-fork.N`), not the upstream store version.
+
+### Removed
+
+- A headless server (server mode, hosted server, container) installs no provider runtime at all.
+  There is no update check, no download, and a client's `runtimesDownload` and `runtimesCancel` get
+  a refusal - on a desktop host they keep working. A provider on the server runs the CLI that the
+  operator installed on the machine, from `PATH` or `OPENBOT_<PROVIDER>_PATH`; without one, the row
+  shows the install guide. The tool runtimes of the server (Bun, the Computer Use driver, the
+  remote desktop runtime) still download, because remote desktop and MCP servers need them.
+
+## [0.65.0-fork.17] - 2026-11-09
+
+### Fixed
+
+- The signed macOS fork build starts again. It carried `com.apple.developer.associated-domains` and
+  `com.apple.developer.team-identifier`, which macOS accepts only with an Apple-issued provisioning
+  profile. The self-signed certificate has none, so AMFI killed the app at launch with
+  `Taskgated Invalid Signature` and `No matching profile found`. The fork signing path now uses
+  `build/entitlements.fork.mac.plist`, which omits both keys. App links to `openbot.run` stay an
+  upstream feature.
+- Android notifications reach the phone again. The `push-notifications-android-v2` decoder accepted
+  only a single-label host and no query, so every real UnifiedPush endpoint failed, such as
+  `https://ntfy.example.com/openbot-topic?up=1`. The host returned `400`, the phone retried, and no
+  registration was stored. The endpoint pattern now accepts DNS labels and the `?up=1` query that
+  ntfy adds. The v2 registration itself is unchanged.
+
+## [0.65.0-fork.16] - 2026-11-09
+
+### Changed
+
+- Fork builds now ship the upstream OpenBot 0.65.0 release.
+
 ## [0.66.0] - 2026-11-09
 
 ### Added
@@ -276,17 +328,6 @@ All notable changes to OpenBot will be documented here. The project follows
   in "…", so the bars stay visible.
 - A channel request that names a member as typed text, such as "please check this, @Ana", now goes
   to that member. Before, the lead could end the request with no answer and no message (#5964).
-
-## [0.66.0-fork.19] - 2026-11-10
-
-### Changed
-
-- Fork builds now ship the upstream OpenBot 0.66.0 release.
-
-## [0.65.0-fork.16] - 2026-11-09
-### Changed
-- Fork builds now ship the upstream OpenBot 0.65.0 release.
-
 
 ## [0.65.0] - 2026-11-08
 

@@ -39,6 +39,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Слишком много адресов или папок.",
   "error.provider.credentialFileUnreadable": "Файл учётных данных провайдера не читается.",
   "error.provider.credentialFileTooLarge": "Файл учётных данных провайдера слишком большой.",
+  "error.provider.downloadsDisabled":
+    "Этот сервер не скачивает CLI провайдеров. Установите CLI на сервере сами и обновите на нём OpenBot.",
   "error.provider.archiveSpecialFile": "Архив среды выполнения содержит ссылку или специальный файл.",
   "error.provider.archiveUnsafePath": "Архив среды выполнения содержит небезопасный путь.",
   "error.provider.runtimeSpecialFile": "Среда выполнения содержит ссылку или специальный файл.",

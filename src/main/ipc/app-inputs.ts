@@ -45,6 +45,7 @@ import type {
   SetAppLogoColorPreferenceInput,
   SetDynamicIslandInteractiveInput,
   SetEnabledSkillInput,
+  SetServerUrlPreferenceInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
@@ -239,6 +240,20 @@ export function parseIdleRestartTarget(input: unknown): IdleRestartTarget {
 }
 
 const APP_BEHAVIOR_SWITCHES = ["launchAtLogin", "keepRunningInBackground", "keepAwake", "keepAwakeOnBattery"] as const;
+/** A saved server URL is null or a string; the service checks that it is a valid origin. */
+export function parseServerUrlPreference(input: unknown): SetServerUrlPreferenceInput {
+  if (!isDynamicRecord(input)) throw new Error("The server URL setting is required.");
+  const url = parseOptionalUrlValue(input.url, "Server URL");
+  const signalUrl = parseOptionalUrlValue(input.signalUrl, "Signal URL");
+  if (url === undefined && signalUrl === undefined) throw new Error("The server URL setting is required.");
+  return { ...(url === undefined ? {} : { url }), ...(signalUrl === undefined ? {} : { signalUrl }) };
+}
+
+function parseOptionalUrlValue(value: unknown, field: string): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return requireString(value, field);
+}
 
 /** At least one switch or the quit guard. */
 export function parseAppBehaviorPreferenceChange(input: unknown): AppBehaviorPreferenceChange {

@@ -78,8 +78,16 @@ release workflow chooses the path from the secrets:
 | Secrets | Result |
 | --- | --- |
 | none | Unsigned. Gatekeeper blocks the first open; no automatic update. |
-| `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. |
+| `APPLE_CERTIFICATE` + password | Signed with that certificate, not notarized. A self-signed Code Signing certificate from Keychain Access is enough: every build reuses it, so Squirrel.Mac accepts the next update, and the user right-clicks to open the first one. This path signs with `build/entitlements.fork.mac.plist`. |
 | the two, plus `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` | Signed and notarized with a Developer ID. First open works normally. |
+
+A self-signed certificate has no provisioning profile. `build/entitlements.mac.plist` holds
+`com.apple.developer.associated-domains` and `com.apple.developer.team-identifier`, which macOS
+accepts only with an Apple-issued profile. AMFI kills a self-signed build that carries them at
+launch (`Taskgated Invalid Signature`, `No matching profile found`). The fork path therefore uses
+`build/entitlements.fork.mac.plist`, which has neither key. Offline builds use the same file:
+`bun run package` and `bun run dist:mac` pass `--config.mac.entitlements`. App links to
+`openbot.run` stay an upstream feature.
 
 A self-signed certificate is not trusted by macOS until each Mac trusts it once, and it cannot
 remove the quarantine warning, because only notarization does that:
@@ -95,7 +103,7 @@ xattr -dr com.apple.quarantine /Applications/OpenBot.app
 
 The release workflow trusts the certificate on the runner itself, so CI does not need it.
 
-macOS builds are arm64 only (`macos-14`). Intel Macs are not built.
+macOS builds are arm64 only (`macos-26`). Intel Macs are not built.
 
 If you make a new `.p12`, export it with the legacy algorithms. macOS `security import` cannot
 read the OpenSSL 3 defaults (AES/PBES2) and fails with "MAC verification failed":
@@ -271,6 +279,12 @@ release can report where it came from. Resolve conflicts by hand, then run
 - The provider runtime block list (`BLOCKED_VERSIONS_URL` in
   `src/main/provider-runtime-releases.ts`) reads this fork's `main`, not upstream's, so upstream
   cannot hold a provider runtime back in a fork install.
+- **A server takes no provider runtime from a client or from itself.** `TeamApiProviders` in
+  `src/main/team-api/dependencies.ts` carries `runtimeDownloads` only on a desktop host, and
+  `route-providers.ts` answers `runtimesDownload` and `runtimesCancel` with 403 without it.
+  `application-services.ts` builds the `ProviderRuntimeManager` of a server mode host or a hosted
+  server with `downloads: false`: no update check, no download, Hermes included. A provider runs
+  the CLI that the operator installed on the machine. Keep both off for servers at each merge.
 - Upstream publishes a Linux arm64 AppImage. The fork builds Linux x64 only (`dist:linux`), so
   `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
   there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.

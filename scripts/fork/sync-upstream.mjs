@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 import {
+  addReleaseNotes,
   applyVersion,
   assertCleanWorktree,
   commitAll,
@@ -11,6 +12,7 @@ import {
   nextForkNumber,
   repoRootFromModule,
   run,
+  tagExists,
   tagRelease,
   writeState,
 } from "./lib.mjs";
@@ -61,9 +63,7 @@ function parseArgs(argv) {
         break;
       case "--help":
       case "-h":
-        process.stdout.write(
-          "Usage: node scripts/fork/sync-upstream.mjs [--tag v<version>] [--continue] [--push]\n",
-        );
+        process.stdout.write("Usage: node scripts/fork/sync-upstream.mjs [--tag v<version>] [--continue] [--push]\n");
         process.exit(0);
         break;
       default:
@@ -103,11 +103,23 @@ function cutAndPush(tag) {
   // The base version comes from the upstream tag, not from the file: a sync moves the base.
   const baseVersion = tag.replace(/^v/u, "");
   const version = formatForkVersion(baseVersion, nextForkNumber(root));
+  const forkTag = `fork-v${version}`;
+  // A resume after a failed run finds the tag of that run. One upstream tag gets one release.
+  if (tagExists(root, forkTag)) {
+    process.stdout.write(`Fork release ${forkTag} already exists; nothing to do.\n`);
+    return { tag, forkTag, version };
+  }
 
   const applied = applyVersion(root, version);
   writeState(root, { upstreamTag: tag, upstreamCommit: commit });
+  // The release commit runs the release-notes check of the pre-commit hook, so the notes go in
+  // before it. Edit them to say more; the commit is local until this function pushes.
+  addReleaseNotes(root, version, `### Changed\n\n- Fork builds now ship the upstream OpenBot ${baseVersion} release.`);
+  addReleaseNotes(root, version, `### Changed\n\n- The app ships the upstream OpenBot ${baseVersion} release.`, {
+    mobile: true,
+  });
   commitAll(root, `chore(fork): sync ${tag} and release ${version}`);
-  const forkTag = tagRelease(root, version, `OpenBot fork ${version} (upstream ${baseVersion})`);
+  tagRelease(root, version, `OpenBot fork ${version} (upstream ${baseVersion})`);
 
   process.stdout.write(
     `\nUpstream ${tag} (${commit.slice(0, 12)}) is merged.\n` +
@@ -127,15 +139,18 @@ function cutAndPush(tag) {
 
 if (args.continue) {
   if (!args.tag) throw new Error("--continue needs --tag <upstream-tag>.");
-  if (!mergeHeadExists(root)) throw new Error("No merge is in progress.");
   if (hasUnmergedPaths(root)) {
     process.stderr.write("The merge still has unmerged paths. Resolve and stage them first.\n");
     process.exit(2);
   }
-  if (git(root, ["diff", "--cached", "--name-only"])) {
-    run("git", ["commit", "--no-edit"], { cwd: root });
-  } else if (mergeHeadExists(root)) {
-    run("git", ["commit", "--no-edit", "--allow-empty"], { cwd: root });
+  // A first run that failed after the merge commit has no merge in progress any more: the version
+  // bump and the tag of that run are still missing, and `cutAndPush` finishes both.
+  if (mergeHeadExists(root)) {
+    if (git(root, ["diff", "--cached", "--name-only"])) {
+      run("git", ["commit", "--no-edit"], { cwd: root });
+    } else {
+      run("git", ["commit", "--no-edit", "--allow-empty"], { cwd: root });
+    }
   }
   cutAndPush(args.tag);
   process.exit(0);

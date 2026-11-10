@@ -12,4 +12,7 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "Uzak ana makine kimliği kullanılamıyor.",
   "error.app.iceServersMissing": "Remote Signal henüz ICE sunucularını sağlamadı.",
   "error.app.finishLocalTest": "Ekranları değiştirmeden önce yerel testi bitirin.",
+  "error.app.serverUrlInvalid":
+    "Hesap hizmeti URL’si bir https: adresi, ya da bu bilgisayarda bir http: adresi olmalı.",
+  "error.app.serverUrlSignalInvalid": "Signal URL’si kullanıcı adı ve parola içermeyen bir wss: adresi olmalı.",
 } as const satisfies PartialTranslation<typeof source>;

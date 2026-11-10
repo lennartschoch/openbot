@@ -41,6 +41,7 @@ import { isTailscaleConnected } from "../private-network-detection";
 import type { RemoteNetworkRoutePreferenceStore } from "../remote-network-route-preference-store";
 import type { RemoteSessionCache } from "../remote-session-cache";
 import type { RemoteSessionReusePreferenceStore } from "../remote-session-reuse-preference-store";
+import type { ServerUrlService } from "../server-url-store";
 import { readSetupState, writeSetupState } from "../setup-store";
 import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
@@ -59,6 +60,7 @@ import {
   parseRemoteNetworkRoutePreference,
   parseRemoteSessionReusePreference,
   parseRendererTimingReport,
+  parseServerUrlPreference,
   parseSetup,
 } from "./app-inputs";
 import { stringPayload } from "./validation";
@@ -145,6 +147,7 @@ export interface AppIpcDependencies {
   /** Opens a web page in the program that the user chose in Settings. */
   openLink: (url: string) => Promise<void>;
   appBehavior: AppBehaviorService;
+  serverUrl: ServerUrlService;
   language: LanguageService;
   logoColor: LogoColorService;
   appearance: AppearanceService;
@@ -183,6 +186,7 @@ export function appIpcHandlers({
   externalLinks,
   openLink,
   appBehavior,
+  serverUrl,
   language,
   logoColor,
   appearance,
@@ -286,6 +290,10 @@ export function appIpcHandlers({
       getAppBehaviorPreference: handler(() => runCauseEffect(appBehavior.get())),
       setAppBehaviorPreference: payloadHandler(parseAppBehaviorPreferenceChange, (parsed) =>
         runCauseEffect(appBehavior.set(parsed)),
+      ),
+      getServerUrlPreference: handler(() => serverUrl.get()),
+      setServerUrlPreference: payloadHandler(parseServerUrlPreference, (parsed) =>
+        runCauseEffect(serverUrl.set(parsed)),
       ),
       getAppLanguagePreference: handler(() => language.preference),
       setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) =>

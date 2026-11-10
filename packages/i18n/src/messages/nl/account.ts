@@ -96,6 +96,15 @@ export const messages = {
   "account.login.changeEmail": "E-mail wijzigen",
   "account.login.resend": "Code opnieuw sturen",
   "account.login.resendIn": "Opnieuw sturen over {time}",
+  "account.login.serverChange": "Accountservice wijzigen",
+  "account.login.serverDescription":
+    "meld je aan bij een zelf gehoste accountservice? Vul het adres hier in. Laat leeg om openbot.run te gebruiken.",
+  "account.login.serverSaved": "Opgeslagen. Start OpenBot opnieuw en meld je daarna aan.",
+  "account.login.serverRestart": "OpenBot opnieuw starten",
+  "account.login.serverRestarting": "Opnieuw gestart…",
+  "account.login.serverSaveFailed": "De server kon niet worden opgeslagen. Probeer het opnieuw.",
+  "account.login.serverRestartFailed":
+    "OpenBot kon niet opnieuw starten. Start het zelf opnieuw en meld je daarna aan.",
   "account.login.loadFailed": "OpenBot kan de accountdienst niet laden.",
   "account.otp.incorrect": "Die code klopt niet. Probeer het opnieuw.",
   "account.otp.verifying": "Controleren…",

@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
+  "settings.serverUrl.title": "URL del servizio di account",
+  "settings.serverUrl.environmentNote":
+    "OPENBOT_AUTH_API_URL è impostata, quindi questa esecuzione ignora l’URL salvato.",
+  "settings.serverUrl.signal.title": "URL di Signal",
+  "settings.serverUrl.signal.description":
+    "Solo per un server self-hosted con connessioni di team: l’indirizzo wss: del suo servizio Signal.",
+  "settings.serverUrl.signal.placeholder": "wss://signal.example.com/v1/signal",
+  "settings.serverUrl.placeholder": "https://api.example.com",
   "settings.language.title": "Lingua",
   "settings.language.description": "OpenBot mostra menu, pulsanti e messaggi in questa lingua.",
   "settings.language.system": "Predefinita di sistema",

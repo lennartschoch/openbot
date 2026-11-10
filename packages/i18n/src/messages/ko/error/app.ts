@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "원격 호스트 ID를 사용할 수 없어요.",
   "error.app.iceServersMissing": "원격 Signal이 아직 ICE 서버를 제공하지 않았어요.",
   "error.app.finishLocalTest": "디스플레이를 전환하기 전에 로컬 테스트를 끝내 주세요.",
+  "error.app.serverUrlInvalid": "계정 서비스 URL은 https: 주소이거나, 이 컴퓨터에서는 http: 주소여야 해요.",
+  "error.app.serverUrlSignalInvalid": "Signal URL은 사용자 이름과 비밀번호가 없는 wss: 주소여야 해요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -40,6 +40,8 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "アドレスまたはフォルダーが多すぎます。",
   "error.provider.credentialFileUnreadable": "プロバイダーの認証情報ファイルを読み取れません。",
   "error.provider.credentialFileTooLarge": "プロバイダーの認証情報ファイルが大きすぎます。",
+  "error.provider.downloadsDisabled":
+    "このサーバーはプロバイダー CLI をダウンロードしません。サーバーに自分で CLI をインストールし、OpenBot を更新してください。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
   "error.provider.archiveUnsafePath": "ランタイムのアーカイブに安全でないパスが含まれています。",
   "error.provider.runtimeSpecialFile": "ランタイムにリンクまたは特殊ファイルが含まれています。",

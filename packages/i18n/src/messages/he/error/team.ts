@@ -99,6 +99,7 @@ export const messages = {
   "error.team.skillsUnsupported": "מיומנויות אינן נתמכות בחיבור הזה.",
   "error.team.hostIdentityUnsupported": "שינוי זהות השרת אינו נתמך בחיבור הזה.",
   "error.team.hostUpdateUnsupported": "עדכוני מארח אינם נתמכים בחיבור הזה.",
+  "error.team.providerRuntimeClientUpdate": "השרת הזה מעדכן את ה-CLIs של הספקים בעצמו. עדכנו את OpenBot בשרת.",
   "error.team.hostTimezoneUnsupported": "אזור הזמן של השרת אינו נתמך בחיבור הזה.",
   "error.team.hostKeyRotationUnsupported": "שינוי מפתח השרת אינו נתמך בחיבור הזה.",
   "error.team.localServersUnsupported": "שרתים במחשב הזה אינם נתמכים בחיבור הזה.",

@@ -117,6 +117,7 @@ import {
   type RemoteNetworkRouteState,
   type RemoteSessionReusePreference,
   type SentMessageStats,
+  type ServerUrlPreference,
   type SpeechAudio,
   type SpeechModelStatus,
   type SpeechSettings,
@@ -446,6 +447,16 @@ export function decodeUpdatePreference(value: unknown): UpdatePreference {
     autoDownload: requiredBoolean(preference, "autoDownload"),
     allowRemoteUpdates: requiredBoolean(preference, "allowRemoteUpdates"),
     autoInstall: requiredBoolean(preference, "autoInstall"),
+  };
+}
+
+export function decodeServerUrlPreference(value: unknown): ServerUrlPreference {
+  const preference = decodeRecord(value, "server URL preference");
+  return {
+    url: nullableString(preference, "url"),
+    signalUrl: nullableString(preference, "signalUrl"),
+    effectiveUrl: requiredString(preference, "effectiveUrl"),
+    fromEnvironment: requiredBoolean(preference, "fromEnvironment"),
   };
 }
 

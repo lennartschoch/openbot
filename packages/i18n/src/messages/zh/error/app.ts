@@ -12,4 +12,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "远程主机身份不可用。",
   "error.app.iceServersMissing": "Remote Signal 尚未提供 ICE 服务器。",
   "error.app.finishLocalTest": "请先完成本地测试再切换显示器。",
+  "error.app.serverUrlInvalid": "账户服务 URL 必须是 https: 地址，或在此计算机上是 http: 地址。",
+  "error.app.serverUrlSignalInvalid": "Signal URL 必须是不含用户名和密码的 wss: 地址。",
 } as const satisfies PartialTranslation<typeof source>;

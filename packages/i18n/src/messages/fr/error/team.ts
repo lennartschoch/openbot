@@ -113,6 +113,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported":
     "Les modifications de l’identité du serveur ne sont pas prises en charge par cette connexion.",
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
+  "error.team.providerRuntimeClientUpdate":
+    "Ce serveur met à jour ses CLIs de fournisseur lui-même. Mettez OpenBot à jour sur le serveur.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
   "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",

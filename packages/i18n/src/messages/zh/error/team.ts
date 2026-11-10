@@ -97,6 +97,7 @@ export const messages = {
   "error.team.skillsUnsupported": "当前连接不支持技能。",
   "error.team.hostIdentityUnsupported": "当前连接不支持更改服务器身份。",
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
+  "error.team.providerRuntimeClientUpdate": "此服务器自行更新其提供方 CLI。请在服务器上更新 OpenBot。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",

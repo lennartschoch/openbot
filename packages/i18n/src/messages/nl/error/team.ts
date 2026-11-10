@@ -104,6 +104,8 @@ export const messages = {
   "error.team.skillsUnsupported": "Deze verbinding ondersteunt geen vaardigheden.",
   "error.team.hostIdentityUnsupported": "Deze verbinding ondersteunt het wijzigen van de serveridentiteit niet.",
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
+  "error.team.providerRuntimeClientUpdate":
+    "Deze server werkt zijn provider-CLI's zelf bij. Werk OpenBot op de server bij.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
   "error.team.localServersUnsupported": "Deze verbinding ondersteunt geen servers op deze computer.",

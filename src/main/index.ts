@@ -147,6 +147,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { readSavedServerConfig, SERVER_URL_PREFERENCE_FILE } from "./server-url-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { trustSystemCertificates } from "./system-certificates";
@@ -260,10 +261,6 @@ if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
 if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
 // A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
-const inviteLinkOptions = {
-  allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
-  selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
-};
 const developmentRemoteDebuggingPort = !app.isPackaged
   ? readDevelopmentRemoteDebuggingPort(process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT)
   : null;
@@ -293,6 +290,13 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// Read once before the windows open, so the invite links, the Content-Security-Policy and the
+// account runtime all see the same server. The setting applies at the next start.
+const savedServerConfig = readSavedServerConfig(join(app.getPath("userData"), SERVER_URL_PREFERENCE_FILE));
+const inviteLinkOptions = {
+  allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
+  selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL ?? savedServerConfig.url ?? undefined),
+};
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
@@ -745,6 +749,7 @@ function registerIpcHandlers({
   remoteNetworkRoute,
   remoteSessionCache,
   appBehavior,
+  serverUrl,
   agentInitialization,
   sidebarLayout,
   sidebarPins,
@@ -822,6 +827,7 @@ function registerIpcHandlers({
       applyRemoteNetworkRoute: () => runCauseEffect(host.applyNetworkRoute()),
       remoteSessionCache,
       appBehavior,
+      serverUrl,
       language,
       logoColor,
       appearance,
@@ -1370,7 +1376,7 @@ if (!hasSingleInstanceLock) {
         return;
       }
       if (!localServerChild) await presentApplication();
-      configureContentSecurityPolicy();
+      configureContentSecurityPolicy(savedServerConfig.signalUrl);
       configureRendererPermissions();
       // A local server keeps a window that never loads: the agent browser and the services attach to it.
       if (!localServerChild) await Effect.runPromise(windows.restoreMainWindowBounds());

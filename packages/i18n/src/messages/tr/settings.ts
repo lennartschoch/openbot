@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
+  "settings.serverUrl.title": "Hesap hizmeti URL’si",
+  "settings.serverUrl.environmentNote":
+    "OPENBOT_AUTH_API_URL ayarlı, bu yüzden bu çalışma kaydedilen URL’yi yok sayar.",
+  "settings.serverUrl.signal.title": "Signal URL’si",
+  "settings.serverUrl.signal.description":
+    "Yalnızca takım bağlantıları olan kendi kendine barındırılan sunucu için: Signal hizmetinin wss: adresi.",
+  "settings.serverUrl.signal.placeholder": "wss://signal.example.com/v1/signal",
+  "settings.serverUrl.placeholder": "https://api.example.com",
   "settings.language.title": "Dil",
   "settings.language.description": "OpenBot menüleri, düğmeleri ve mesajları bu dilde gösterir.",
   "settings.language.system": "Sistem varsayılanı",

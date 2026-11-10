@@ -154,6 +154,39 @@
 }
 
 /* The lock line and any fine print under it read as one footer. */
+/* The server choice of a self-hosted account service, under the send button of the email step. */
+.account-login-server {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.account-login-server-panel {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.account-login-server-label {
+  display: grid;
+  gap: 4px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+}
+
+.account-login-server-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+  text-wrap: balance;
+}
+
 .account-login-footer {
   display: grid;
   gap: 4px;

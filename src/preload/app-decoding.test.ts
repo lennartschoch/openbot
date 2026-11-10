@@ -34,6 +34,7 @@ import {
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeSentMessageStats,
+  decodeServerUrlPreference,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceServerProbe,
@@ -330,6 +331,21 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeProviderDetectionSettings,
     { enabled: true, addresses: ["http://192.168.1.20:11434/v1"], folders: ["~/bin"], hiddenIds: [] },
   ],
+  [
+    "a server URL preference with a saved choice",
+    decodeServerUrlPreference,
+    {
+      url: "https://api.example.com",
+      signalUrl: "wss://signal.example.com/v1/signal",
+      effectiveUrl: "https://api.example.com",
+      fromEnvironment: false,
+    },
+  ],
+  [
+    "a server URL preference with no saved choice",
+    decodeServerUrlPreference,
+    { url: null, signalUrl: null, effectiveUrl: "https://api.openbot.run", fromEnvironment: true },
+  ],
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
@@ -348,6 +364,16 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "a missing quit guard",
     decodeAppBehaviorPreference,
     { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null },
+  ],
+  [
+    "a server URL preference with a URL that is not text",
+    decodeServerUrlPreference,
+    { url: 1, signalUrl: null, effectiveUrl: "https://api.openbot.run", fromEnvironment: false },
+  ],
+  [
+    "a server URL preference with no environment flag",
+    decodeServerUrlPreference,
+    { url: null, signalUrl: null, effectiveUrl: "https://api.openbot.run" },
   ],
   ["sent message stats with a negative count", decodeSentMessageStats, { firstSentAt: null, sentCount: -1 }],
   [
