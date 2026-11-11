@@ -89,6 +89,11 @@ launch (`Taskgated Invalid Signature`, `No matching profile found`). The fork pa
 `bun run package` and `bun run dist:mac` pass `--config.mac.entitlements`. App links to
 `openbot.run` stay an upstream feature.
 
+A self-signed certificate also has no Team ID. Under the hardened runtime, library validation then
+stops the app from loading `Electron Framework` (dyld: "different Team IDs"), so the fork
+entitlements, `build/entitlements.fork.mac.plist` and `build/entitlements.fork.mac.inherit.plist`
+for the helpers, add `com.apple.security.cs.disable-library-validation`.
+
 A self-signed certificate is not trusted by macOS until each Mac trusts it once, and it cannot
 remove the quarantine warning, because only notarization does that:
 

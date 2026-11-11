@@ -15,5 +15,12 @@
     <true/>
     <key>com.apple.security.automation.apple-events</key>
     <true/>
+    <!-- A self-signed certificate has no Team ID. Under the hardened runtime, library validation
+         lets a process load only frameworks with its own Team ID, and an empty one matches nothing,
+         so dyld refused `Electron Framework` and the app aborted at launch ("mapping process and
+         mapped file (non-platform) have different Team IDs"). The fork build turns library
+         validation off; a Developer ID build keeps it. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
   </dict>
 </plist>

@@ -229,7 +229,8 @@ jobs:
             # no provisioning profile, so it must not carry the restricted entitlements of
             # build/entitlements.mac.plist; AMFI kills the app at launch when it does.
             bun run dist:release -- "${common[@]}" --config.mac.notarize=false \
-              --config.mac.entitlements=build/entitlements.fork.mac.plist
+              --config.mac.entitlements=build/entitlements.fork.mac.plist \
+              --config.mac.entitlementsInherit=build/entitlements.fork.mac.inherit.plist
           else
             bun run dist:release -- "${common[@]}" --config.mac.notarize=true
           fi
