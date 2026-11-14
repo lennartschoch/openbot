@@ -5,6 +5,8 @@ import {
   STORAGE_CAPABILITY,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
+import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
@@ -20,6 +22,27 @@ export function serverHasStorage(server: ServerSummary | undefined): server is S
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
 }
 
+/**
+ * Server Settings > Storage lists the programs that agents left running: this computer, or a joined
+ * server that serves `background-processes-v1`. Only an owner or admin sees the list.
+ */
+export function serverHasBackgroundProcesses(server: ServerSummary | undefined): server is ServerSummary {
+  return (
+    serverHasStorage(server) &&
+    (server.kind === "local" || serverSupportsCapability(server, BACKGROUND_PROCESSES_CAPABILITY))
+  );
+}
+
+/** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */
+export function serverHasChannelStorage(server: ServerSummary | undefined): server is ServerSummary {
+  return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CHANNEL_CAPABILITY)));
+}
+
+/** The plan storage in GB of a hosted server, or null for a server that is not hosted. */
+export function hostedPlanStorageGb(server: ServerSummary | undefined): number | null {
+  return server?.hosted === true && server.storageGb !== undefined ? server.storageGb : null;
+}
+
 /** Every member reads storage; the host lets only an owner or admin delete or clear. */
 export function canManageStorage(server: ServerSummary): boolean {
   return serverRoleCanAdminister(server);
@@ -27,14 +50,16 @@ export function canManageStorage(server: ServerSummary): boolean {
 
 /**
  * The agents of one server, to name the rows of its storage. They are read for that server, because a
- * storage view can be open for a server that is not the selected one.
+ * storage view can be open for a server that is not the selected one. Undefined until the list of
+ * that server arrives, so a file is not taken as a file of a deleted agent before it.
  */
 export function createServerAgents(
   serverId: () => string,
   calls: () => FilesPort = filesPort,
-): Accessor<AgentProfile[]> {
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
+): Accessor<AgentProfile[] | undefined> {
+  const [agents, setAgents] = createSignal<AgentProfile[] | undefined>(undefined);
   createEffect(serverId, (id) => {
+    setAgents(undefined);
     let current = true;
     untrack(calls)
       .agent.listAgents(id)

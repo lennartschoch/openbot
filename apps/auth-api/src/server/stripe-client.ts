@@ -139,6 +139,11 @@ export function isBillingCurrency(value: unknown): value is BillingCurrency {
   return isOneOf(BILLING_CURRENCIES, value);
 }
 
+/** True when the Price can be paid in `currency`: its base currency, or one of its currency options. */
+export function priceHasCurrency(price: StripePrice, currency: BillingCurrency): boolean {
+  return price.currency.toLowerCase() === currency || price.currency_options?.[currency] !== undefined;
+}
+
 export class StripeClient {
   constructor(
     private readonly secretKey: string,
@@ -316,6 +321,25 @@ export class StripeClient {
       currency: input.currency,
       // Card collection stays on, so a plan that a code discounts only at the start can still renew.
       allow_promotion_codes: "true",
+      // `hosted` is the name of `hosted_page` before API version 2026-03-25.dahlia.
+      ui_mode: "hosted",
+      origin_context: "web",
+      submit_type: "auto",
+      payment_method_collection: "always",
+      billing_address_collection: "required",
+      "phone_number_collection[enabled]": "false",
+      "automatic_tax[enabled]": "false",
+      "tax_id_collection[enabled]": "true",
+      // `if_supported` is refused together with an optional business name.
+      "tax_id_collection[required]": "never",
+      // Stripe refuses tax ID collection for an existing customer without these two.
+      "customer_update[name]": "auto",
+      "customer_update[address]": "auto",
+      "consent_collection[terms_of_service]": "required",
+      "name_collection[individual][enabled]": "true",
+      "name_collection[individual][optional]": "true",
+      "name_collection[business][enabled]": "true",
+      "name_collection[business][optional]": "true",
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),

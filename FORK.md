@@ -260,7 +260,7 @@ release can report where it came from. Resolve conflicts by hand, then run
   - `RELEASES` and `RELEASE_TAG_PREFIX` in `scripts/hosting/openbot-hosted-update` and in
     `scripts/install-server.sh`. The fork tags are `fork-v<version>`, not `v<version>`, and the
     version in the manifest is `-fork.<n>`, so neither script accepts only `x.y.z`.
-  - `DOWNLOAD_URL` in `src/main/app-archive-watch.ts`, which the newer-database recovery opens.
+  - `DOWNLOAD_URL` in `src/main/download-url.ts`, which the newer-database recovery and the archive watcher open.
   `newerRelease` in `src/main/host-release-service.ts` compares the fork build number on one base
   version: `-fork.14` is newer than `-fork.13`, and a plain release of that base is not newer than
   a fork build of it. Keep that too: with the upstream comparison the app offered the same version

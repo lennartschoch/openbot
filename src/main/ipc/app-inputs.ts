@@ -3,10 +3,12 @@ import type {
   AgentDefaults,
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockInputRect,
   AgentDockPresentation,
   AgentMemoryLimitPreference,
   AgentProviderId,
   AppBehaviorPreferenceChange,
+  AppFontFamily,
   AvatarColor,
   BrowserDockAction,
   BrowserDockFrame,
@@ -38,6 +40,7 @@ import type {
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAgentDockInteractiveInput,
+  SetAgentDockXWaylandInput,
   SetAnalyticsPreferenceInput,
   SetAppAppearancePreferenceInput,
   SetAppInterfaceSizePreferenceInput,
@@ -58,12 +61,15 @@ import {
   isAgentDefaults,
   isAgentDockAction,
   isAgentDockDragPhase,
+  isAgentDockInputRegion,
   isAgentDockInteractive,
   isAgentDockPresentation,
+  isAgentDockXWayland,
   isAgentMemoryLimit,
   isAgentModel,
   isAgentProvider,
   isAppAppearance,
+  isAppFontFamily,
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
@@ -153,6 +159,7 @@ export function parseAgentDefaults(input: unknown): AgentDefaults {
     quickAcknowledgement: input.quickAcknowledgement,
     planStartAfterMs: input.planStartAfterMs,
     automationRunsPerHour: input.automationRunsPerHour,
+    commitCoAuthor: input.commitCoAuthor,
   };
 }
 
@@ -204,9 +211,15 @@ function parseChatBackground(value: unknown): ChatBackgroundColor | null {
   return value;
 }
 
+function parseFontFamily(value: unknown): AppFontFamily | null {
+  if (value !== null && !isAppFontFamily(value)) throw new Error("Font is invalid.");
+  return value;
+}
+
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark } = input;
+  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark, interfaceFont, codeFont } =
+    input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
@@ -217,7 +230,9 @@ export function parseAppAppearancePreference(input: unknown): SetAppAppearancePr
     transparentWindow === undefined &&
     palette === undefined &&
     chatBackgroundLight === undefined &&
-    chatBackgroundDark === undefined
+    chatBackgroundDark === undefined &&
+    interfaceFont === undefined &&
+    codeFont === undefined
   )
     throw new Error("Appearance is required.");
   return {
@@ -226,6 +241,8 @@ export function parseAppAppearancePreference(input: unknown): SetAppAppearancePr
     ...(palette === undefined ? {} : { palette }),
     ...(chatBackgroundLight === undefined ? {} : { chatBackgroundLight: parseChatBackground(chatBackgroundLight) }),
     ...(chatBackgroundDark === undefined ? {} : { chatBackgroundDark: parseChatBackground(chatBackgroundDark) }),
+    ...(interfaceFont === undefined ? {} : { interfaceFont: parseFontFamily(interfaceFont) }),
+    ...(codeFont === undefined ? {} : { codeFont: parseFontFamily(codeFont) }),
   };
 }
 
@@ -355,6 +372,26 @@ export function parseAgentDockAction(input: unknown): AgentDockAction {
 export function parseAgentDockInteractive(input: unknown): SetAgentDockInteractiveInput {
   if (isAgentDockInteractive(input)) return input;
   throw new Error("Agent dock interaction state is required.");
+}
+
+export function parseAgentDockXWayland(input: unknown): SetAgentDockXWaylandInput {
+  if (isAgentDockXWayland(input)) return input;
+  throw new Error("Agent dock XWayland state is required.");
+}
+
+export function parseAgentDockInputRegion(input: unknown): AgentDockInputRect[] {
+  if (isAgentDockInputRegion(input)) return input;
+  throw new Error("Agent dock input region is invalid.");
+}
+
+export function parseDynamicIslandXWayland(input: unknown): SetAgentDockXWaylandInput {
+  if (isAgentDockXWayland(input)) return input;
+  throw new Error("Dynamic Island XWayland state is required.");
+}
+
+export function parseDynamicIslandInputRegion(input: unknown): AgentDockInputRect[] {
+  if (isAgentDockInputRegion(input)) return input;
+  throw new Error("Dynamic Island input region is invalid.");
 }
 
 export function parseAgentDockDragPhase(input: unknown): AgentDockDragPhase {

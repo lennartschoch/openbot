@@ -13,11 +13,9 @@ import type { AppTranslate } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Option, Schema } from "effect";
 import { dialog, shell } from "electron";
+import { DOWNLOAD_URL } from "./download-url";
 
 const logger = createOpenBotLogger("app-archive");
-// A damaged archive or a database that a newer build wrote sends the user here. The fork publishes
-// its own releases, so this must not be the upstream download page.
-export const DOWNLOAD_URL = "https://github.com/lennartschoch/openbot/releases/latest";
 // A copy of the archive writes for some seconds. Check once the writes stop.
 const SETTLE_MS = 2_000;
 

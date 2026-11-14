@@ -36,6 +36,12 @@ export type StoredPushRegistration = {
   /** The Team API protocol and capabilities of the phone, which decide the agents it can see. */
   protocol: number;
   capabilities: string[];
+  /**
+   * Whether the phone takes the notifications of side thread turns, as it said through
+   * `push-notification-threads-v1`. Absent for a phone that never said: it takes them. An earlier host
+   * does not read this field.
+   */
+  threadReplies?: boolean;
 } & PushTarget;
 
 /** More phones than members can have sessions is a fault. The oldest go first. */
@@ -123,10 +129,12 @@ function decodeFile(parsed: unknown): StoredPushRegistration[] {
     )
       return [];
     const { sessionId, memberId, protocol, capabilities } = entry;
+    const threadChoice = typeof entry.threadReplies === "boolean" ? { threadReplies: entry.threadReplies } : {};
+    const base = { sessionId, memberId, protocol, capabilities, ...threadChoice };
     try {
       if (entry.platform === "android") {
         const value = readAndroidPushRegistration(decodeAndroidRegistration?.(entry.value));
-        return value ? [{ sessionId, memberId, protocol, capabilities, platform: "android", value }] : [];
+        return value ? [{ ...base, platform: "android", value }] : [];
       }
       if (entry.platform === "android-unified") {
         const value = readAndroidUnifiedPushRegistration(decodeAndroidUnifiedRegistration?.(entry.value));
@@ -134,7 +142,7 @@ function decodeFile(parsed: unknown): StoredPushRegistration[] {
       }
       if (entry.platform !== undefined) return [];
       const value = readPushRegistration(decodeRegistration?.(entry.value));
-      return value ? [{ sessionId, memberId, protocol, capabilities, value }] : [];
+      return value ? [{ ...base, value }] : [];
     } catch {
       return [];
     }

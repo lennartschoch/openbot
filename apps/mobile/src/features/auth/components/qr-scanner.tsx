@@ -19,6 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCSSVariable } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -221,7 +222,9 @@ export function QrScanner({
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
-  const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
+  const foregroundColor = useThemeColor("foreground");
+  // The icon sits on the primary button, which has the action color.
+  const actionForeground = String(useCSSVariable("--openbot-action-foreground"));
   const { width: windowWidth } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const connecting = useSharedValue(0);
@@ -415,7 +418,7 @@ export function QrScanner({
                       : () => void Linking.openSettings()
                   }
                 >
-                  <Camera size={19} color={accentForeground} strokeWidth={2} />
+                  <Camera size={19} color={actionForeground} strokeWidth={2} />
                   <Button.Label className="font-sans font-semibold">
                     {canRequestPermission ? t("mobile.auth.camera.allow") : t("mobile.auth.camera.openSettings")}
                   </Button.Label>
