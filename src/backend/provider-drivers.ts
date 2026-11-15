@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
@@ -58,9 +58,11 @@ import {
 import { clineFreeModels } from "./cline-free-models";
 import { checkCursorApiKey, readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
+import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
+import { kimiSavedSignInCheck } from "./kimi-sign-in-check";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
@@ -124,6 +126,12 @@ interface ProviderCliCommand {
    * which it calls in place of `logout`. Only for a sign-out.
    */
   readonly acpLogout?: true | AcpExtensionMethod;
+  /**
+   * On Windows, a sign-in at this computer also gives its page to OpenBot (`signInPageByOpenBot`).
+   * Only for a sign-in, and for a CLI that runs `BROWSER` with the page and then waits without a word
+   * when its own browser launch opens nothing.
+   */
+  readonly windowsPageByOpenBot?: true;
 }
 
 /**
@@ -203,6 +211,14 @@ interface ProviderAccountKeys {
 
 const CLAUDE_COMMAND_ENV = (cli: AgentCliInfo): Record<string, string> =>
   cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {};
+
+/** The browser sign-in of Claude, for the first account and for each account after it. */
+const CLAUDE_SIGN_IN: ProviderCliCommand = {
+  argv: ["auth", "login", "--claudeai"],
+  env: CLAUDE_COMMAND_ENV,
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  windowsPageByOpenBot: true,
+};
 
 /**
  * The environment one OpenCode process gets, read at spawn time.
@@ -295,7 +311,27 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
         ? providerCall(() => connection.authenticate({ methodId: GEMINI_API_KEY_METHOD })).pipe(Effect.asVoid)
         : Effect.void,
     savedKeyRefusedMessage: () => (key() ? sourceText("error.provider.geminiKeyRefused") : null),
+    authBlockedMessage: () =>
+      antigravitySettingsUnreadable(antigravityAppDataDir({ ...process.env, ...account }))
+        ? sourceText(
+            account ? "error.provider.geminiAccountSettingsUnreadable" : "error.provider.geminiSettingsUnreadable",
+          )
+        : null,
   };
+}
+
+/**
+ * Whether the CLI cannot open its `settings.json`, which names the sign-in method. The CLI then has
+ * no method and refuses each session. A sign-in succeeds, but it cannot save the method, so the next
+ * process is refused again (#6200). A missing file is not a failure: the sign-in writes it.
+ */
+function antigravitySettingsUnreadable(appDataDir: string): boolean {
+  try {
+    readFileSync(join(appDataDir, "settings.json"));
+    return false;
+  } catch (error) {
+    return !isMissingFileError(error);
+  }
 }
 
 /**
@@ -699,6 +735,12 @@ interface ProviderModelCatalog {
    * it, because models that come later belong in the model picker too.
    */
   readonly relistAfterStart?: true;
+  /**
+   * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
+   * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
+   * not keep the list it had at its start (#8495).
+   */
+  readonly relistWhileRunning?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
@@ -951,10 +993,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "claude",
-    signIn: {
-      kind: "cli-command",
-      command: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
-    },
+    // On Windows the CLI opens its page with `rundll32`. When that opens nothing, it waits for the
+    // whole timeout, and its link goes to an output that OpenBot does not read (#8454).
+    signIn: { kind: "cli-command", command: CLAUDE_SIGN_IN },
     // With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only.
     codeSignIn: {
       kind: "cli",
@@ -965,7 +1006,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // sign-out removes that item before OpenBot removes the folder.
     accounts: {
       homeVariable: "CLAUDE_CONFIG_DIR",
-      signIn: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      signIn: CLAUDE_SIGN_IN,
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
@@ -1391,6 +1432,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readKimiUsage(isPythonKimiCli(cli), { ...process.env, ...context.agentEnvironment?.() }).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
+        // Kimi Code 2.x answers a prompt with `authRequired` when its server refuses the sign-in.
+        ...(isPythonKimiCli(cli)
+          ? { savedSignInCheck: kimiSavedSignInCheck(() => ({ ...process.env, ...context.agentEnvironment?.() })) }
+          : {}),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
@@ -1474,6 +1519,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // A sign-in writes `loggedInUsers` and `lastLoggedInUser` in `config.json`, and the token in the
     // keychain.
     signInFiles: () => [join(copilotHomeDirectory(), "config.json")],
+    // A model with the user's own key is added in Copilot's settings while the CLI runs.
+    catalog: { relistWhileRunning: true },
     resolveCli: resolveCopilotCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

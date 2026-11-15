@@ -236,7 +236,8 @@
           "groupIdentifier": "group.com.lennartschoch.openbot"
         }
       ],
-      "./plugins/with-shortcuts"
+      "./plugins/with-shortcuts",
+      "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {
       "typedRoutes": true,

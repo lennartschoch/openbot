@@ -70,6 +70,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -85,6 +86,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -95,6 +97,11 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
@@ -163,6 +170,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  ROUTINE_FLOW_STOP_CAPABILITY,
+  ROUTINE_FLOW_STOP_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
@@ -175,6 +186,7 @@ import {
   THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -1023,6 +1035,8 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
       throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
+    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
+      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
     return teamApi(method, path, decode, body);
   }
   const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
@@ -1718,9 +1732,17 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async accountUsage() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.usage);
+      // Whether an account works on credits is optional: when its read fails, the reading shows as before.
+      const [value, credits] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.usage),
+        capabilities.includes(USAGE_CREDITS_CAPABILITY)
+          ? request("POST", USAGE_CREDITS_ROUTES.list, {})
+              .then((rows) => decodeUsageCredits(isDynamicRecord(rows) ? rows.accounts : null))
+              .catch(() => [])
+          : [],
+      ]);
       if (!isAccountUsage(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withUsageCredits(value, credits);
     },
     async createAgent(input) {
       // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
@@ -1778,6 +1800,16 @@ export function createWebWorkspaceRuntime(
           reasoningEffort,
           ...(providerAccountId ? { providerAccountId } : {}),
         });
+        return;
+      }
+      // While the agent works, the released agent route refuses a provider change. A change of the runtime
+      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
+      // same change.
+      const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
+        ? pendingRuntimeUpdateBody(input)
+        : null;
+      if (runtimeChange) {
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
         return;
       }
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

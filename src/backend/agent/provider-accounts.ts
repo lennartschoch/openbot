@@ -32,7 +32,7 @@ import type { ProviderTempOptions } from "./../provider-temp";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
@@ -293,7 +293,7 @@ export class ProviderAccounts {
           });
           return yield* login.done;
         }
-        const browser = onHost ? yield* captureBrowser(openExternal) : {};
+        const browser = signInPageByOpenBot(onHost, command) ? yield* captureBrowser(openExternal) : {};
         const target = cliSpawnTarget(cli.executable, command.argv);
         const child = yield* Effect.acquireRelease(
           Effect.sync(() =>
@@ -580,6 +580,18 @@ export class ProviderAccounts {
     );
   }
 
+  /**
+   * Marks an account signed out when a start of its process found no login (#8277): its row then
+   * offers the sign-in again. Returns the text of the row, or null when a sign-in of the account
+   * runs, which reports its own end.
+   */
+  foundSignedOut(account: StoredProviderAccount): string | null {
+    if (this.#signIns.has(account.id)) return null;
+    const message = signedOutMessage(account.provider);
+    this.#setState(account.id, { state: "signed-out", message });
+    return message;
+  }
+
   #startCheck(account: StoredProviderAccount): Effect.Effect<void> {
     const provider = account.provider;
     return Effect.gen({ self: this }, function* () {
@@ -590,14 +602,7 @@ export class ProviderAccounts {
             const signedOut = error instanceof ProviderSignInError || isSignInError(error);
             this.#setState(account.id, {
               state: signedOut ? "signed-out" : "error",
-              message: signedOut
-                ? sourceText(
-                    isKeyAccountSupport(ProviderAccounts.support(provider))
-                      ? "error.provider.accountKeySignedOut"
-                      : "error.provider.accountSignedOut",
-                    { provider: providerLabel(provider) },
-                  )
-                : this.#message(provider, error),
+              message: signedOut ? signedOutMessage(provider) : this.#message(provider, error),
             });
           }),
         ),
@@ -1001,6 +1006,16 @@ function isKeyAccount(account: StoredProviderAccount): boolean {
 function homeSupport(provider: AgentProviderId): ProviderHomeAccountSupport | undefined {
   const support = ProviderAccounts.support(provider);
   return isKeyAccountSupport(support) ? undefined : support;
+}
+
+/** What the row of a signed-out account says. */
+function signedOutMessage(provider: AgentProviderId): string {
+  return sourceText(
+    isKeyAccountSupport(ProviderAccounts.support(provider))
+      ? "error.provider.accountKeySignedOut"
+      : "error.provider.accountSignedOut",
+    { provider: providerLabel(provider) },
+  );
 }
 
 function isSignInError(error: unknown): boolean {

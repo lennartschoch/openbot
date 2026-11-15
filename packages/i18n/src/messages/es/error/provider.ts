@@ -225,13 +225,17 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "El proveedor del modelo de OpenCode informó de una solicitud de carga no válida. Elige otro modelo y continúa. Comprueba las rutinas guardadas antes de crearlas de nuevo.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Este modelo no puede leer un archivo o una imagen de este chat. Elige un modelo que pueda leer archivos y vuelve a enviar tu mensaje.",
+    "Este modelo no puede leer un archivo o una imagen de este chat. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Vuelve a enviar tu mensaje sin el archivo o elige un modelo que pueda leer archivos. Si añadiste este modelo a un proveedor personalizado, desmarca «Imágenes» en «Acepta» en su configuración.",
+  "error.provider.opencodeContextTooSmall":
+    "Este chat no cabe en la ventana de contexto del modelo. En Ollama o LM Studio, carga el modelo con una longitud de contexto mayor e introduce la misma ventana en la configuración de su proveedor en OpenBot. O elige un modelo más grande.",
   "error.provider.opencodeFreeLimit":
     "Los modelos gratuitos de OpenCode alcanzaron su límite de uso. Todos los modelos gratuitos comparten este límite. Para continuar, pega una clave de OpenCode Go en los ajustes de OpenCode o elige un modelo de otro proveedor.",
   "error.provider.opencodeProviderFailed":
     "El proveedor del modelo tuvo un fallo interno. Tu conexión no es la causa. Inténtalo más tarde o elige otro modelo.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La respuesta del modelo se cortó o no era válida. Envía tu mensaje de nuevo o elige otro modelo.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode no pudo leer el razonamiento de este modelo con este esfuerzo. Selecciona un esfuerzo menor u otro modelo y vuelve a enviar tu mensaje.",
   "error.provider.opencodeNetwork":
     "OpenCode no pudo conectarse al proveedor del modelo. Comprueba la conexión de red del equipo que ejecuta OpenBot e inténtalo de nuevo.\n{detail}",
   "error.provider.codexStateBusy":
@@ -266,6 +270,8 @@ export const messages = {
     "El servidor de Gemini de OPENBOT_ANTIGRAVITY_PATH no existe o no es ejecutable. Corrige la ruta o elimina la variable y reinicia OpenBot.",
   "error.provider.antigravityVersionUnreadable": "No se pudo leer la versión del servidor de Gemini.",
   "error.provider.antigravitySignIn": "Inicia sesión con Google para usar Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google no tiene capacidad libre para este modelo de Gemini ahora. La cuota de tu plan no es la causa. Vuelve a intentarlo en unos minutos o elige otro modelo.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini rechazó la solicitud porque se alcanzó un límite de frecuencia o la cuota del plan. Espera unos minutos o elige otro modelo y vuelve a intentarlo.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -331,6 +337,8 @@ export const messages = {
     "El modelo no aceptó este chat porque tiene demasiadas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
     "OpenCode rechazó la solicitud y no indicó la causa. Esto puede ocurrir en un chat largo o después de cambiar de modelo. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo o un esfuerzo menor.",
+  "error.provider.opencodeCompactionFailed":
+    "El modelo no pudo resumir este chat largo para liberar espacio en su ventana de contexto. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige un modelo más potente.",
   "error.provider.museMcpStartupFault":
     "Muse no pudo iniciar un servidor MCP y bloqueó MCP en esta sesión. OpenBot inició una nueva sesión de Muse con el historial del chat. Inténtalo de nuevo. Si el error continúa, desactiva Uso del equipo o el servidor MCP que falló para este agente.",
   "error.provider.claudeSessionMissing":
@@ -351,12 +359,18 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo se pueden abrir en el navegador enlaces de inicio de sesión HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a conectar.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini no puede abrir el archivo de ajustes de esta cuenta, así que no puede iniciar sesión. Elimina esta cuenta y vuelve a añadirla.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini no puede abrir su archivo de ajustes en este ordenador, así que no puede iniciar sesión. Cierra las otras apps que usan Gemini y luego cierra y vuelve a abrir OpenBot.",
   "error.provider.geminiVerificationRequired":
     "Google debe verificar tu cuenta antes de que Gemini pueda responder. Verifica tu cuenta de Google en un navegador y vuelve a enviar tu mensaje.",
   "error.provider.keyProviderRefused":
     "{provider} rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a intentarlo.",
   "error.provider.keyProviderNoBalance":
     "La cuenta de {provider} de la clave de API guardada no tiene saldo. Añade saldo a la cuenta y vuelve a intentarlo.",
+  "error.provider.keyProviderLowCredit":
+    "La cuenta de {provider} de la clave de API guardada no tiene saldo suficiente para una respuesta de este modelo. Añade saldo a la cuenta o elige otro modelo, y vuelve a intentarlo.",
   "error.provider.modelServiceRefused":
     "El servicio del modelo rechazó la solicitud. Elige otro modelo o comprueba tu acceso a este modelo en el servicio.",
   "error.provider.modelServiceRefusedReason":

@@ -713,7 +713,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.contacts": "Contact info",
   "mobile.server.vault.apiKeys": "API keys",
   "mobile.server.vault.apiKeysFooter":
-    "Agents on {host} read each key from a private file by its variable name. The keys stay on {host}. This phone cannot show them.",
+    "Agents on {host} read each key from a file by its variable name. All agents run as the same system user, so an agent can also read a key file that is for other agents. The keys stay on {host}. This phone cannot show them.",
   "mobile.server.vault.empty": "No items",
   "mobile.server.vault.addLogin": "Add login",
   "mobile.server.vault.addCard": "Add card",
@@ -1028,6 +1028,7 @@ export const messages = defineMessages("mobile.server", {
     "OpenBot cannot read the saved tokens on {host}. Disconnect the workspace, then connect it again.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot on {host} cannot receive Slack events. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
+  "mobile.server.connectors.slack.helpNotLinked": "This workspace is not linked to {host}. Tap Reconnect to link it.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "This agent receives every request from Slack. It answers short ones itself, gives other work to the right agent, and posts the answer in the thread.",
@@ -1076,6 +1077,8 @@ export const messages = defineMessages("mobile.server", {
     "OpenBot cannot read the saved tokens on {host}. Disconnect the Discord server, then connect it again.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot on {host} cannot receive Discord events. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "This Discord server is not linked to {host}. Tap Reconnect to link it.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "This agent receives every request from Discord. It answers short ones itself, gives other work to the right agent, and replies with the answer in the channel.",
@@ -1112,6 +1115,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "mobile.server.connectors.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
+  "mobile.server.connectors.telegram.helpNotLinked": "This chat is not linked to {host}. Tap Reconnect to link it.",
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram asked OpenBot to wait. It tries again at {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Link a chat",

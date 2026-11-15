@@ -1,5 +1,10 @@
 import { win32 } from "node:path";
-import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import {
+  type LoadSessionResponse,
+  type NewSessionRequest,
+  type PromptResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
@@ -96,9 +101,14 @@ export interface AcpFlavor {
   emptyAnswerError?: RegExp;
   /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
-   * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
+   * starts, or list the sessions to find out whether this one exists. `list-sessions` tries a listed
+   * session once more; `confirm-missing` reports the failure of a listed session as it is. `null`
+   * reports the failure.
    */
-  restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
+  restoreFailure?(
+    error: unknown,
+    method: "load" | "resume",
+  ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
   /**
    * A turn that the agent lost, after which it refuses each request of the session until the turn is
    * discarded. `refusal` matches the text of that refusal, and `unsent` the refusal of a prompt that
@@ -164,6 +174,12 @@ export interface AcpFlavor {
   };
   /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;
+  /**
+   * The CLI version from which a second `session/prompt` during a running turn joins that turn. The
+   * CLI answers the first prompt with `end_turn` at once, and the work goes on under the new prompt.
+   * Without it, ACP has no steer request, and a second prompt can cancel the running turn.
+   */
+  steerByPromptSince?: string;
   /** A turn that does not complete marks its open tool calls as stopped. */
   interruptToolsOnStop?: true;
   /** Answer text is shown at once, not only when `session/prompt` answers. */
@@ -186,6 +202,14 @@ export interface AcpFlavor {
    * shell command that runs in the background.
    */
   unsentBackgroundTurns?: true;
+  /**
+   * The agent can end a prompt with `end_turn` while a command (`execute` tool call) that it moved to
+   * the background still runs, and then wakes its model by itself when the command ends. With no
+   * prompt open, it sends no update and no permission request for that work. OpenBot keeps the turn
+   * open, and when `session/list` shows that the session changed, a second prompt connects the work
+   * again. A command with `rawInput.IsDaemon` runs on by intent and does not keep the turn open.
+   */
+  wakesAfterPromptEnds?: true;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
   /**
@@ -234,6 +258,12 @@ export interface AcpFlavor {
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
+  /**
+   * The agent keeps the tools that a session has at its first turn. A server that the agent gets
+   * later, such as on `session/load` or `session/resume` after the user added it, reaches the model
+   * only as a note, and the model cannot call its tools. A changed MCP set must start a new session.
+   */
+  mcpToolsFixedAtStart?: true;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /**
@@ -359,6 +389,14 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
+  // Grok CLI 1.0.77 keeps a session in a folder named by its working directory. A resume of a session
+  // that is not in the folder of the workspace, such as after the workspace moved, fails with "Path
+  // not found." and `data.code` `FS_NOT_FOUND`, which Grok also sends for any other missing file. The
+  // agent then failed each message (#8936). Only a `session/list` without the session replaces it.
+  restoreFailure: (error) =>
+    error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
+      ? "confirm-missing"
+      : null,
   // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
   // fails the tool on a reply without it. `accepted` has the answers by question text, each a text
   // or a list of texts, and `annotations`. `cancelled` tells the model that the user did not answer.
@@ -476,10 +514,16 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     error.data.details.includes("config.toml"),
   // Its `Agent` call is titled `Agent: <description>`, and its arguments come as content text.
   subagentTools: ["Agent"],
+  // Kimi CLI 1.52.0 refuses a new session with `authRequired` when it has no token, or an expired
+  // one with no refresh token. A chat then showed "RequestError: Authentication required" (#8555).
+  authRequiredSignsOut: true,
   // Kimi CLI 1.52.0 stops reading a turn at `StepInterrupted`, so a model step that fails ends the
   // prompt as `end_turn`, and the step's error is lost. The chat then showed no answer and no error
   // (#6722). Kimi's thinking alone is not an answer.
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  // Kimi Code 2.6.0 gives a server added to a resumed session only as a `<tools_added>` note. The
+  // agent knew the Tavily tools and could not call them (#8931).
+  mcpToolsFixedAtStart: true,
 };
 
 /**
@@ -556,6 +600,9 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
   },
+  // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
+  // turn, as for the Kimi provider (#8931).
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
 };
 
 /**

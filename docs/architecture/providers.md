@@ -94,11 +94,12 @@ agent session through the core tools, a commit, and a hidden tool, checks each r
 `.openbot-build/pi-agent-smoke/report.json`.
 
 Codex adds its own base prompt, tools, and skill listing to each Codex request.
-`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
-for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
-The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
-adds only the skills that no entry names. A feature counts as the user's only when a file layer of
-`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest` and `features.recommended_plugins`,
+also when the user's `config.toml` turns them on: their `list_available_plugins_to_install` and
+`request_plugin_install` offer Codex plugins and ChatGPT apps that OpenBot cannot install, and the agent
+then tells the user about a prompt that never shows (#8515). It also turns off the skills about the Codex
+app (`CODEX_UNFIT_SKILLS`). The thread value of `skills.config` replaces the whole list, so the user's own
+entries go first and OpenBot adds only the skills that no entry names. On Codex 0.166 and GPT-6
 Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
 and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
 stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
@@ -137,6 +138,9 @@ Two deferred tools recover omitted text without model calls for search or summar
   Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
 - `history_read` returns recent messages, a named message, or a page before a returned cursor or
   a returned `messageId` of the same conversation.
+  A read of one visual reply by its `messageId` gives the page title and then the text of the page
+  (`visual-page-text.ts`); a page with no text outside its scripts gives its source. In a list, a
+  visual reply has only its title and a `page` hint.
   It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
   `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
   as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work
@@ -823,6 +827,13 @@ a new `antigravity-oauth-token` once, with an expired access token that the CLI 
 the marker `openbot-token-imported`. An account whose `settings.json` names another sign-in method gets
 no copy. The old file stays, and after a sign-out the marker stops a second copy.
 
+When the CLI cannot open `settings.json`, it has no sign-in method and answers `authRequired`. A sign-in
+succeeds but cannot save the method, so the next process is refused again (#6200). On that answer
+OpenBot reads the file itself (`antigravitySettingsUnreadable`). Any failure except a missing file fails
+the start with a message that names the action: remove and add the account again, or, for the own
+sign-in, quit the other apps that use Gemini and open OpenBot again. The row is in error, not signed out,
+and keeps that message after the start limit, because a refresh cannot repair it (`#startStoppedMessage`).
+
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
 (`src/backend/acp-sign-in.ts`). The CLI writes no sign-in link; it runs `open` (macOS) or `xdg-open`
 (Linux) from `PATH`. So the sign-in process gets a private folder first on `PATH` with an `open` and an
@@ -1044,6 +1055,10 @@ processes share. That process outlives OpenBot and is outside a Workspace only s
 Cline process, the sign-in included, gets `CLINE_SESSION_BACKEND_MODE=local` and
 `CLINE_NO_AUTO_UPDATE=1` (`CLINE_ENV` in `provider-drivers.ts`). Sign in is an ACP `authenticate`
 call with `cline`, as for Gemini. `CLINE_API_KEY` in the environment also signs the CLI in.
+`cline --acp` lists only the models of the session's provider, which is `cline` (Cline Credits)
+after that sign-in. `clineFreeModels` (`cline-free-models.ts`) adds the ClinePass and free models of
+Cline's public recommended-models list. Each one sets the session's `provider` option (`cline-pass`
+or `cline`) before the model, and a listed model sets the session's own provider back.
 `clineStatePaths` lets a confined process write `~/.cline/data` and protects the global settings,
 the MCP and connector settings, and the cron, task and connector databases there. The agents,
 skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. Cline answers a lost
@@ -1468,6 +1483,30 @@ After the answer `reset`, or `nothingToReset` (no limit of the account is spent)
 Settings > Providers shows **Reset usage** in the ⋯ menu of a connected account that has a credit.
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
+
+### Work on credits
+
+A ChatGPT plan can have credits: when a plan window is spent, Codex keeps taking turns and spends
+them (issues #4013 and #6046). The `rateLimits` snapshot of `account/rateLimits/read` holds
+`credits: { hasCredits, unlimited, balance }` for the `codex` bucket; a model's own bucket has `null`.
+`decodeRateLimitCredits` (`src/backend/protocol.ts`) keeps only whether credits remain
+(`hasCredits || unlimited`), and `normalizeAccountUsage` puts it in `AccountUsageLimit.creditsAvailable`.
+A full reading with `null` sets `false`. An `account/rateLimits/updated` push with `null` keeps the
+last value, as Codex's own view does. OpenBot does not show the balance, and it does not read
+`ordinaryUsageAllowed`: a turn still goes to Codex, and Codex decides if it uses credits.
+
+`spentUsageWindow` (`packages/team-client/src/plan-limits.ts`) gives `onCredits` for such an account.
+Then the composer shows **Using credits** in place of **Usage limit reached**, with the plan reset
+time, and the model picker and the iPhone agent screen do not mark the model as stopped. A notice
+closed while on credits shows again when the credits run out.
+
+The released usage routes and the `usage-changed` event of the Team API send only `id`, `primary` and
+`secondary`. A joined server reads the flag with the optional `usage-credits-v1` route (see
+[Admin capabilities](servers.md#admin-capabilities)) each time it reads usage, and `withUsageCredits`
+adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last one. When the flag of
+a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
+with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
+without the capability gives no flag, and the client shows **Usage limit reached** as before.
 
 ### Disconnect the own sign-in
 

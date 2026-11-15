@@ -20,6 +20,7 @@ import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CODECS } from "./agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1";
+import { AGENT_PENDING_RUNTIME_CODECS } from "./agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CODECS } from "./agent-queue-task-v1";
@@ -43,6 +44,7 @@ import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
+import { BROWSER_SIGN_IN_STORAGE_CODECS } from "./browser-sign-in-storage-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
@@ -116,6 +118,7 @@ import { PUSH_NOTIFICATION_THREADS_CODECS } from "./push-notification-threads-v1
 import { ANDROID_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-v1";
 import { ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-v2";
 import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
+import { ROUTINE_FLOW_STOP_CODECS } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
@@ -134,6 +137,7 @@ import { STORAGE_CHANNEL_CODECS } from "./storage-channel-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CODECS } from "./storage-user-files-v1";
 import { THREAD_MESSAGE_SEARCH_CODECS } from "./thread-message-search-v1";
+import { USAGE_CREDITS_CODECS } from "./usage-credits-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
@@ -231,6 +235,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
+  ...AGENT_PENDING_RUNTIME_CODECS,
   ...HERMES_IMPORT_CODECS,
   ...PROVIDER_DETECTION_CODECS,
   ...AGENT_QUEUE_TASK_CODECS,
@@ -238,6 +243,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PENDING_APPROVAL_CODECS,
   ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
+  ...ROUTINE_FLOW_STOP_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RUN_PLACE_CODECS,
   ...ROUTINE_RESULTS_CODECS,
@@ -251,6 +257,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_RELAY_CODECS,
   ...PROVIDER_ACCOUNT_RELAY_V2_CODECS,
   ...PROVIDER_USAGE_RESET_CODECS,
+  ...USAGE_CREDITS_CODECS,
   ...PROVIDER_SIGN_OUT_CODECS,
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
@@ -274,6 +281,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
+  ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,

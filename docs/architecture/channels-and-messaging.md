@@ -639,6 +639,12 @@ the answer. Every answer comes from OpenBot.
   one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
   like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
+- **Not linked.** The account service names the workspace IDs beside the ticket, and the host keeps
+  them for the open socket (`SignalIngress.onLinkedRoutes`). A workspace connection that is not in them
+  reports `not_linked`, not `connected`: Signal sends its events to another host, such as after the
+  workspace moved or the saved settings were copied to a new server. It is not fatal and unlinks
+  nothing. Reconnect opens the Slack install page, which links the workspace to this host. A new
+  workspace opens a new socket before its connection starts, so an older list does not judge it.
 
 Telegram uses the same socket with one difference: one OpenBot bot serves every user, so its token
 must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the contract is
@@ -658,7 +664,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
   answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
-  and `telegram-route-revoked` work as the Slack ones do.
+  and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
+  reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat
+  that Signal links on the open socket joins the socket's list at once.
 - **Calls.** The host sends `telegram-call` only to a Signal whose `ready` names the `telegram`
   capability, because Signal closes a socket on a frame it does not know. Signal accepts only the
   methods and parameters of `TelegramCallParams`, as strict objects, only for a chat routed to that
@@ -745,6 +753,14 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   when its instructions say not to answer a contact. `finalPost` then keeps the reaction and posts
   nothing, and the adapter's `remove` deletes the status post. An adapter without `remove` edits it
   to the no-answer text.
+- **Quiet end.** On a personal WhatsApp number, a post in another person's chat shows as the
+  owner's own message (`WhatsAppConnect.postsAsOwner`). There a request that fails or stops keeps
+  its reaction and posts no "could not finish" or "Stopped." text, also when a restart ends the
+  request. The status post is deleted, and the failure shows in OpenBot. When the answer cannot be
+  sent there, the status post is deleted too. But when a later part fails, the WhatsApp adapter
+  reports `WhatsAppAnswerPartlySent`: the status post holds the first part, so OpenBot leaves it.
+  The owner's "Message yourself" chat, a number only for OpenBot, Slack, Telegram and Discord still
+  get the text.
 - **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
   work and behind channel work that holds the host. The Slack thread shows a waiting post.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status

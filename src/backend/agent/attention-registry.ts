@@ -88,6 +88,7 @@ import {
   browserTakeoverError,
   browserTakeoverResult,
   commandText,
+  declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
   expiredPromptResult,
@@ -252,7 +253,7 @@ function sameSite(address: string, merchant: string): boolean {
   return domain !== null && domain === getDomain(merchant, { allowPrivateDomains: true });
 }
 
-/** What `save_vault_item` saves: a change, or a new login, which `saveLogin` merges by site and username. */
+/** What `save_vault_item` saves: a change, or a new login, which `saveLogin` merges by host and username. */
 type VaultAgentSave = VaultAgentChange | { kind: "newLogin"; login: VaultTypedLogin; twoStepKey?: string | undefined };
 
 /** The save that `save_vault_item` asks for, or the text that tells the agent what is wrong. */
@@ -618,6 +619,24 @@ export class AttentionRegistry {
       [...this.#prompts.values()].some((pending) => pending.agentId === agentId) ||
       [...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId) ||
       [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)
+    );
+  }
+
+  /** Whether a question, an approval or a browser takeover of this turn waits, matched as `clearForTurn` does. */
+  hasAttentionForTurn(threadId: string, turnId: string): boolean {
+    return (
+      [...this.#prompts.values()].some(
+        (pending) =>
+          getString(pending.params, "threadId") === threadId && getString(pending.params, "turnId") === turnId,
+      ) ||
+      [...this.#approvals.values()].some(
+        (pending) =>
+          (getString(pending.params, "threadId") ?? getString(pending.params, "conversationId")) === threadId &&
+          (getString(pending.params, "turnId") ?? turnId) === turnId,
+      ) ||
+      [...this.#takeovers.values()].some(
+        (pending) => pending.params.threadId === threadId && pending.params.turnId === turnId,
+      )
     );
   }
 
@@ -1667,13 +1686,21 @@ export class AttentionRegistry {
         ? this.#passwordVault.loginsFor(tab.url, tab.ownerAgentId ?? undefined)
         : Effect.succeed(null),
     );
-    if (Result.isFailure(listed)) {
+    // The router logs the failure of each source that it names.
+    const unreadable = Result.isFailure(listed) ? listed.failure.sources : undefined;
+    if (Result.isFailure(listed) && !unreadable) {
       logger.warn("Unable to list the shared logins", { error: toLogValue(listed.failure.cause) });
       return browserTakeoverError("The shared password vault could not be read. Use submit_secret without loginId.");
     }
-    const logins = listed.success;
-    const answer =
-      logins === null
+    const logins = Result.isFailure(listed) ? (listed.failure.logins ?? []) : listed.success;
+    const answer = unreadable
+      ? {
+          connected: true,
+          logins,
+          unreadable,
+          next: `OpenBot could not read the saved logins of ${unreadable.join(", ")}, so this list can be incomplete. Tell the user which of them could not be read: the page of each password manager in Marketplace shows what to do. Use a listed login only when it is the account for the task; else use submit_secret without loginId.`,
+        }
+      : logins === null
         ? { connected: false, logins: [], next: "No password vault is connected. Use submit_secret without loginId." }
         : { connected: true, logins };
     const result: DynamicToolResult = {
@@ -1938,11 +1965,7 @@ export class AttentionRegistry {
     const questions = mcpElicitationQuestions(request.params);
     if (!owner || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
-      this.#emitError(
-        "mcp_safety_handoff",
-        "A local plugin requested an unsupported security hand-off, so OpenBot declined it.",
-        owner?.agentId,
-      );
+      this.#emitError("mcp_safety_handoff", declinedMcpElicitationText(request.params), owner?.agentId);
       return;
     }
     const { agentId, publicThreadId, turnId, params } = owner;
@@ -2281,9 +2304,16 @@ export class AttentionRegistry {
               (login) => kind === "password" || login.hasOneTimePassword,
             );
         const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        return chosen
-          ? { loginId: chosen, secret: yield* vault.secretFor(chosen, request.origin, kind, agentId) }
-          : null;
+        if (!chosen) return null;
+        const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
+        // With no value, an id that list_logins does not give for this site is a wrong id, not a login
+        // with no password. When the list cannot be read, the reason stays as before.
+        const listed = secret || !loginId ? null : yield* Effect.result(vault.loginsFor(request.origin, agentId));
+        const unknown =
+          listed !== null &&
+          Result.isSuccess(listed) &&
+          !(listed.success ?? []).some((candidate) => candidate.id === loginId);
+        return { loginId: chosen, secret, unknown };
       }),
     );
     if (Result.isFailure(found)) {
@@ -2297,6 +2327,12 @@ export class AttentionRegistry {
       return skip(
         "no-login",
         "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+      );
+    if (login.unknown)
+      return skip(
+        "unknown-login",
+        `no saved login for this site has the id ${login.loginId}. Call list_logins and give the id of a login exactly as list_logins shows it, with its prefix, for example openbot:.`,
+        login.loginId,
       );
     if (!login.secret)
       return skip(

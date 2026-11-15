@@ -781,7 +781,7 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     const page = await context.newPage();
     await page.goto(url);
     const frame = page.frameLocator('iframe[title="Secure embedded form frame"]');
-    const framed = frame.locator("#billingAddress-nameInput");
+    const framed = frame.getByTestId("payment-form-submit-button");
     const radio = page.getByRole("radio", { name: "Card", exact: true });
     try {
       await Promise.race([framed.waitFor(), radio.waitFor(), page.locator("#cardNumber").waitFor()]);
@@ -796,8 +796,9 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
           number: "#payment-numberInput",
           expiry: "#payment-expiryInput",
           cvc: "#payment-cvcInput",
-          name: "#billingAddress-nameInput",
-          country: "#billingAddress-countryInput",
+          // Checkout asks for the full billing address only when the payment needs it.
+          name: "#billingAddress-nameInput, #payment-nameInput",
+          country: "#billingAddress-countryInput, #payment-countryInput",
           line1: "#billingAddress-addressLine1Input",
           zip: "#billingAddress-postalCodeInput",
           city: "#billingAddress-localityInput",
@@ -825,16 +826,16 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     await form.locator(id.number).fill("4242424242424242");
     await form.locator(id.expiry).fill("12 / 34");
     await form.locator(id.cvc).fill("123");
-    await form.locator(id.name).fill("Stripe E2E");
-    const country = form.locator(id.country);
+    const country = form.locator(id.country).first();
     if (await country.count()) await country.selectOption("PL");
     // The fields of the address depend on the country, so fill only the ones that the page shows.
     for (const [field, value] of [
+      [id.name, "Stripe E2E"],
       [id.line1, "Marszalkowska 1"],
       [id.zip, "00-001"],
       [id.city, "Warszawa"],
     ] as const) {
-      const input = form.locator(field);
+      const input = form.locator(field).first();
       if ((await input.count()) && (await input.isVisible())) await input.fill(value);
     }
     const save = form.locator(id.save);
@@ -3081,7 +3082,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
     // The migration gives 1 to each hosted server row from before it. This row stands for one of them.
     d1(`UPDATE hosted_servers SET legacy_member_limits = 1 WHERE server_id = ${quote(legacyId)}`, z.unknown());
-    // Starter is sold out, so both servers pay Standard. These rows stand for Starter plans from before.
+    // Both servers pay Standard. These rows stand for Starter plans from before the member limits.
     d1(
       `UPDATE billing_subscriptions SET plan = 'starter'
        WHERE stripe_subscription_id IN (${quote(freshSub)}, ${quote(legacySub)})`,
