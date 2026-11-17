@@ -721,8 +721,12 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from
   a Slack turn carries `messagingReturn`, the origin of that turn; `MailboxStore.enqueue` gives the
   answer to it that origin as `messaging`, so the answer runs in the same execution thread, and its
-  turn posts to Slack as a follow-up. `DrainScheduler` asks `MessagingThreads.prepare` for the thread
-  and the prompt, which frames the text as external input and adds earlier messages of the thread
+  turn posts to Slack as a follow-up. These deliveries run in one lane of the agent,
+  `MESSAGING_LANE`, beside its own chat: a turn of the own chat, such as one that waits on a card,
+  does not hold external messages (#9890). The external conversations still run one turn at a time.
+  A conversation whose thread is also the agent's own chat (#2120), and each conversation of an agent
+  whose provider runs one turn at a time, keep the own chat's lane (`MailboxStore.useMessagingLane`).
+  `DrainScheduler` asks `MessagingThreads.prepare` for the thread and the prompt, which frames the text as external input and adds earlier messages of the thread
   and the connection's facts, rebuilt each turn, so a new fact needs no provider-thread reload.
   `MessagingService.#receive` names each user mention (`InboundMessage.mentionedUserIds`) with the
   adapter's name cache; the adapters do the same for context messages.
@@ -761,8 +765,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   reports `WhatsAppAnswerPartlySent`: the status post holds the first part, so OpenBot leaves it.
   The owner's "Message yourself" chat, a number only for OpenBot, Slack, Telegram and Discord still
   get the text.
-- **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
-  work and behind channel work that holds the host. The Slack thread shows a waiting post.
+- **Order.** The external conversations of an agent run one turn at a time in `MESSAGING_LANE`, beside
+  its own chat. On a provider that runs one turn at a time (`concurrentTurns: false`) they keep the own
+  chat's lane, so Slack requests wait behind the agent's own work, in queue order, and behind its
+  channel work. A waiting request gets a waiting post in its Slack thread.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status
   with a Stop button, replaces it with the answer, uploads the files the agent attached, and sets
   reactions. It serializes the posts of one conversation, so a fast turn cannot race its status. No
@@ -874,6 +880,17 @@ is one linked number (`workspace_id` is the number in digits).
   before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
   the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
   the quoted menu or the newest one of the conversation.
+- **Saved history.** WhatsApp sends no history to a linked device. `WhatsAppArchive` saves each
+  message of an allowed chat, also one that does not mention the number, in
+  `projection_messaging_history` (migration 62, `MessagingHistoryStore`), and downloads its file one at
+  a time to `<userData>/whatsapp/files/<connection id>/`. `seq` keeps the arrival order. The context of
+  a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
+  download copies the saved file, and waits for the download at arrival when it did not finish. A
+  download stops after 10 minutes or when the connection closes. The copies of one connection stay
+  under 2 GB (`trimFiles`, the oldest first, by the size on disk). A delete for everyone deletes the row
+  and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
+  chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
+  each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 

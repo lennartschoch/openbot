@@ -282,6 +282,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Aggiorna OpenBot su questo server per cambiarne qui il nome e il logo.",
   "mobile.server.settings.identityOffline": "Connettiti a questo server per cambiarne il nome e il logo.",
+  "mobile.server.settings.appearance": "Forma e colore",
+  "mobile.server.settings.appearanceShape": "Forma",
+  "mobile.server.settings.appearanceShapeOption": "Forma {number}",
+  "mobile.server.settings.appearanceColor": "Colore del server",
+  "mobile.server.settings.appearanceAutomatic": "Automatico",
+  "mobile.server.settings.appearanceReset": "Ripristina",
+  "mobile.server.settings.appearanceSaveFailed": "Impossibile salvare la forma e il colore del server. Riprova.",
   "mobile.server.route.cropLogo": "Ritaglia logo",
   "mobile.server.members.remove": "Rimuovi membro",
   "mobile.server.members.invitePeople": "Invita persone",
@@ -444,7 +451,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Nessun fuso orario corrisponde alla ricerca.",
   "mobile.server.settings.timezoneMore": "Scrivi più lettere del nome per vedere altri fusi orari.",
   "mobile.server.settings.timezoneDescription":
-    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente.",
+    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente. Su un server, anche il browser lo usa dopo il prossimo riavvio.",
   "mobile.server.settings.timezoneLoading": "Caricamento fuso orario…",
   "mobile.server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
   "mobile.server.settings.timezoneSaveFailed": "Impossibile salvare il fuso orario. Riprova.",
@@ -893,6 +900,8 @@ export const messages = {
     "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot non riesce a raggiungere WhatsApp su questo numero. Riconnettiti, oppure disconnetti il numero.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot non riesce a leggere le chiavi salvate di questo numero. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.retryAt":
     "WhatsApp ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Ricollega",
@@ -902,6 +911,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Disattiva per inviare solo la risposta.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Reazioni di stato",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reagisce con 👀 quando arriva un messaggio e con ✅ quando la risposta è pronta. Disattiva per non inviare reazioni.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Questo agente riceve i messaggi per OpenBot da tutti i tuoi numeri collegati. Risponde da solo a quelli brevi, passa il resto all'agente giusto e risponde su WhatsApp.",
@@ -1134,6 +1146,22 @@ export const messages = {
   "mobile.server.providers.compactWindowTokens": "{size} token",
   "mobile.server.providers.compactWindowLoadFailed":
     "Impossibile caricare la dimensione di compattazione di questo server.",
+  "mobile.server.environment.row": "Variabili",
+  "mobile.server.environment.title": "Ambiente",
+  "mobile.server.environment.hint":
+    "Chiavi API, URL di base e altre impostazioni che riceve ogni processo di {name}. Una modifica si applica quando finiscono i turni in corso.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, con OPENAI_API_KEY come chiave, invia le richieste ai modelli di ChatGPT a quell’indirizzo.",
+  "mobile.server.environment.shellNote": "I comandi che gli agenti eseguono possono leggere questi valori.",
+  "mobile.server.environment.add": "Aggiungi variabile",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Valore",
+  "mobile.server.environment.saved": "Salvata",
+  "mobile.server.environment.sensitive": "Sensibile",
+  "mobile.server.environment.remove": "Rimuovi",
+  "mobile.server.environment.save": "Salva",
+  "mobile.server.environment.loadFailed": "Impossibile caricare le variabili di {name}.",
+  "mobile.server.environment.invalid": "Correggi prima i nomi.",
   "mobile.server.providers.disconnect": "Disconnetti",
   "mobile.server.providers.disconnectTitle": "Disconnettere {name}?",
   "mobile.server.providers.disconnectBody":

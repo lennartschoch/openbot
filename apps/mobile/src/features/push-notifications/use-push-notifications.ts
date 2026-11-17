@@ -27,6 +27,7 @@ import {
   setNotificationPermission,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
+import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { isAndroid } from "@/shared/lib/platform";
 import { usePushEnvironment } from "@/shared/lib/push-environment";
@@ -52,6 +53,28 @@ interface PushNotificationsInput {
 /** A request that failed is sent again after this time, or at the next change or connection. */
 const RETRY_MS = 30_000;
 /** An iPhone registers through `push-notifications-v1`, an Android phone through a capability of its own. */
+
+let lastPushLine = "";
+/**
+ * Writes a step of the notification setup to the support log when it is new. "I get no notifications"
+ * needs to show where the setup stopped: the setting, the permission, the token or a server. Never the
+ * token.
+ */
+function logPush(level: "info" | "warn", text: string): void {
+  if (text === lastPushLine) return;
+  lastPushLine = text;
+  supportLog.add(level, "app", `Notifications: ${text}`);
+}
+
+/** The last result for each server, so a registration sent again each time the app comes back is logged once. */
+const serverLines = new Map<string, string>();
+function logServerPush(serverId: string, level: "info" | "warn", text: string): void {
+  if (serverLines.get(serverId) === text) return;
+  serverLines.set(serverId, text);
+  // A connection line starts with the server ID, which a public report replaces with `server-1`.
+  supportLog.add(level, "connection", `${serverId} notifications ${text}`);
+}
+/** An iPhone registers through `push-notifications-v1`, an Android phone through `push-notifications-android-v1`. */
 const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATIONS_ROUTES;
 /** The ntfy registration of `push-notifications-android-v2`, for a host that takes it. */
 const UNIFIED_ROUTES = ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES;
@@ -136,14 +159,17 @@ export function usePushNotifications({
   useEffect(() => {
     // A local name, so that the check above also holds in the function below.
     const push = native;
+    if (preference.ready && !preference.enabled) logPush("info", "off in the app settings");
     if (!push || !enabled || !foreground) return;
     let current = true;
     let again: ReturnType<typeof setTimeout> | null = null;
     const readToken = async () => {
       try {
         const device = await push.deviceToken();
+        logPush(device ? "info" : "warn", device ? "push token received" : "the phone gave no push token");
         if (current) setToken(device);
-      } catch {
+      } catch (error) {
+        logPush("warn", `push token not read: ${supportLogValue(error)}`);
         if (current) again = setTimeout(() => void readToken(), RETRY_MS);
       }
     };
@@ -151,6 +177,7 @@ export function usePushNotifications({
       const permission = await push.permission((answer) =>
         mobileAnalytics.track("notification_settings_action", { action: "permission_prompted", permission: answer }),
       );
+      logPush(permission === "denied" ? "warn" : "info", `permission ${permission}`);
       if (!current) return;
       setNotificationPermission(permission);
       if (permission === "granted") await readToken();
@@ -159,7 +186,7 @@ export function usePushNotifications({
       current = false;
       if (again) clearTimeout(again);
     };
-  }, [enabled, foreground]);
+  }, [enabled, foreground, preference.ready, preference.enabled]);
 
   useEffect(() => native?.onDeviceToken(setToken), []);
 
@@ -279,9 +306,17 @@ export function usePushNotifications({
               registration ? routes.register : routes.remove,
               registration ? { ...registration } : {},
             );
+            logServerPush(
+              serverId,
+              "info",
+              registration
+                ? `registered, level ${registration.level}, ${registration.token ? "with" : "without"} a push token`
+                : "removed",
+            );
           }
           if (replies !== null) await postRef.current(serverId, PUSH_NOTIFICATION_THREADS_ROUTES.set, { replies });
-        } catch {
+        } catch (error) {
+          logServerPush(serverId, "warn", `not registered: ${supportLogValue(error)}`);
           const current = registered.current.get(serverId);
           if (current?.key === key) registered.current.delete(serverId);
           // A later request has the registration of this one, but not the choice for side threads that

@@ -25,6 +25,11 @@
  * `bun run api:stripe:bootstrap` to have made the license Prices in the sandbox. A subscription made here
  * with the license metadata stands for a paid license Checkout page, as for a server plan.
  *
+ * The `storage-tier` scenario needs the storage add-on Prices of `bun run api:stripe:bootstrap`. It checks
+ * that a boat server cannot buy storage, then moves the row to a VPS of the operator in D1 and buys tier 1
+ * and tier 2 with `POST /v1/me/billing/storage`: the answer, the D1 tier, the invoices, a refused payment
+ * (402), and the renewal amount. The `portal` scenario checks that the Portal has no plan change.
+ *
  * The license tiers have their own scenarios:
  * - `license-prices`: the 8 license lookup keys give active Prices with the tier, the interval, the bundle
  *   flag and the amounts of `LICENSE_PLAN_PRICES` in EUR, USD and PLN. No license key is a server plan key.
@@ -55,6 +60,11 @@
  * - `order-trial`: a server order with a license gives a Checkout page with the server Price only, and
  *   the order in its metadata. After the payment a trialing license of the order starts on its own
  *   subscription, the order metadata leaves the server subscription, and a second order is refused.
+ *
+ * The `vat` scenario needs the VAT Tax Rate of `bun run api:stripe:bootstrap`. It sets the billing details
+ * of `PUT /v1/me/billing/details` and reads the VAT of each new Checkout page: Polish VAT for Poland and for
+ * an EU consumer, none outside the EU, reverse charge for an Irish company that VIES confirms, Polish VAT
+ * for a Polish company, and 409 with no country. The reverse charge steps call the real VIES service.
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -68,10 +78,14 @@ import {
   type BillingCurrency,
   type BillingPlanId,
   type BillingPortalRequest,
+  type BillingStorageRequest,
   LEGACY_MEMBER_LIMITS,
   memberLimitForPlan,
   parseBillingLookupKey,
+  storageTierGb,
+  storageTierOf,
 } from "@openbot/contracts/billing";
+import { type BillingDetailsRequest, VAT_TAX_RATE } from "@openbot/contracts/billing-details";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
   LICENSE_INCLUDED_USERS,
@@ -95,7 +109,7 @@ import {
 } from "@openbot/contracts/license";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
-import { STRIPE_API_VERSION } from "../apps/auth-api/src/server/stripe-client";
+import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -105,6 +119,7 @@ const SCENARIOS = [
   "failed-renewal",
   "cancel-at-period-end",
   "plan-change",
+  "storage-tier",
   "renew",
   "delete",
   "foreign",
@@ -136,6 +151,7 @@ const SCENARIOS = [
   "license-self-hosted-limit",
   "license-trial",
   "order-trial",
+  "vat",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 const DAY = 86_400;
@@ -215,6 +231,19 @@ const planSchema = z.object({
 });
 type Plan = z.infer<typeof planSchema>;
 const billingSchema = z.object({ servers: z.array(planSchema) });
+const storagePlanSchema = planSchema.extend({
+  amount: z.number().nullable(),
+  storageGb: z.number().optional(),
+  storageUpgrades: z
+    .array(z.object({ tier: z.number(), storageGb: z.number(), amount: z.number().nullable() }))
+    .optional(),
+});
+type StoragePlan = z.infer<typeof storagePlanSchema>;
+const storageBillingSchema = z.object({ servers: z.array(storagePlanSchema) });
+const storageRowSchema = z.object({ storage_tier: z.number() });
+const portalConfigurationSchema = z.object({
+  data: z.array(z.object({ features: z.object({ subscription_update: z.object({ enabled: z.boolean() }) }) })),
+});
 const errorSchema = z.object({ error: z.object({ code: z.string() }) });
 const hostSchema = z.object({
   claim_redeemed_at: z.number().nullable(),
@@ -288,11 +317,18 @@ const checkoutLinesSchema = z.object({
   currency: z.string().nullable(),
   amount_total: z.number().nullable(),
   metadata: z.record(z.string(), z.string()).nullable(),
+  automatic_tax: z.object({ enabled: z.boolean() }),
+  amount_subtotal: z.number().nullable(),
+  total_details: z.object({ amount_tax: z.number() }).nullable(),
   line_items: z.object({
     data: z.array(
       z.object({
         quantity: z.number().nullable(),
-        price: z.object({ id: z.string(), lookup_key: z.string().nullable() }),
+        price: z.object({
+          id: z.string(),
+          lookup_key: z.string().nullable(),
+          tax_behavior: z.string().nullable(),
+        }),
       }),
     ),
   }),
@@ -316,6 +352,8 @@ type BrowserApiBody =
   | { name: string; plan: BillingPlanId; interval: "month"; currency: "eur"; license?: LicenseOrder }
   | { confirmName: string }
   | BillingPortalRequest
+  | BillingStorageRequest
+  | BillingDetailsRequest
   | LicenseCheckoutRequest
   | LicenseUsersRequest
   | LicensePlanRequest
@@ -469,6 +507,8 @@ class Account {
       payment_method: "pm_card_visa",
       "invoice_settings[default_payment_method]": "pm_card_visa",
       "metadata[openbot_user_id]": this.id,
+      // The billing country decides the VAT of a Checkout page. `payCheckout` pays with an address in Poland.
+      "address[country]": "PL",
     });
     this.customer = customer.id;
     // The Worker makes a customer without a test clock, so the account gets this one before its first Checkout.
@@ -481,7 +521,7 @@ class Account {
   }
 
   async request(
-    method: "GET" | "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: BrowserApiBody,
     headers: Record<string, string> = {},
@@ -540,6 +580,23 @@ class Account {
 
   async billing() {
     return billingSchema.parse((await this.request("GET", "v1/me/billing")).body).servers;
+  }
+
+  /** The plan with its amount and storage fields, from the billing state or from a storage purchase answer. */
+  async storagePlan(subscriptionId: string, body?: unknown): Promise<StoragePlan | null> {
+    const state = storageBillingSchema.parse(body ?? (await this.request("GET", "v1/me/billing")).body);
+    return state.servers.find((entry) => entry.subscriptionId === subscriptionId) ?? null;
+  }
+
+  storageTier(serverId: string): number | null {
+    return (
+      d1(`SELECT storage_tier FROM hosted_servers WHERE server_id = ${quote(serverId)}`, storageRowSchema)[0]
+        ?.storage_tier ?? null
+    );
+  }
+
+  buyStorage(subscriptionId: string, tier: BillingStorageRequest["tier"]) {
+    return this.request("POST", "v1/me/billing/storage", { subscriptionId, tier });
   }
 
   async plan(subscriptionId: string): Promise<Plan | null> {
@@ -1283,6 +1340,36 @@ function legacyMemberLimits(serverId: string) {
   );
 }
 
+type CheckoutView = z.infer<typeof checkoutLinesSchema>;
+
+/** The VAT facts of a Checkout page, for the report. */
+function vatView(session: CheckoutView | null) {
+  return (
+    session && {
+      country: session.metadata?.openbot_vat_country ?? null,
+      treatment: session.metadata?.openbot_vat_treatment ?? null,
+      subtotal: session.amount_subtotal,
+      tax: session.total_details?.amount_tax ?? null,
+    }
+  );
+}
+
+/** The page charges the VAT rate of `VAT_TAX_RATE` on top of its subtotal. */
+function addsPolishVat(session: CheckoutView | null) {
+  const view = vatView(session);
+  return (
+    view?.treatment === "standard" &&
+    view.subtotal !== null &&
+    view.tax === Math.round((view.subtotal * VAT_TAX_RATE.percentage) / 100)
+  );
+}
+
+/** The page charges no VAT, for the `treatment` that the billing details give. */
+function addsNoVat(session: CheckoutView | null, treatment: "reverse" | "none") {
+  const view = vatView(session);
+  return view?.treatment === treatment && view.tax === 0;
+}
+
 /** The Checkout Session of a license page, with its line and metadata. */
 function licenseSession(url: string) {
   return stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, checkoutLinesSchema, {
@@ -1423,7 +1510,8 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await provisioned(account, server.serverId);
     const item = (await subscription(sub)).items.data[0]?.id;
     if (!item) throw new Error("No subscription item");
-    // The Portal upgrade: a higher price now, charged now (`always_invoice`).
+    // A plan change that an operator makes in Stripe (the Portal has no plan change): a higher price now,
+    // charged now (`always_invoice`).
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, {
       "items[0][id]": item,
       "items[0][price]": await priceId("pro", "month"),
@@ -1443,7 +1531,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     });
     const yearly = await rowWhere(account, server.serverId, "yearly", (row) => row.billing_interval === "year");
     record("plan-change", "month to year: the server interval follows", yearly.plan === "pro", yearly);
-    // The Portal downgrade: a schedule changes the price at the period end.
+    // A downgrade in Stripe: a schedule changes the price at the period end.
     const schedule = await stripe("POST", "/v1/subscription_schedules", scheduleSchema, { from_subscription: sub });
     const phase = schedule.phases[0];
     if (!phase) throw new Error("No schedule phase");
@@ -1470,6 +1558,121 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       downgraded.desired_state === "running",
       downgraded,
     );
+  },
+
+  /**
+   * Storage tiers: a boat server has none. On a VPS of the operator the owner buys tier 1, then tier 2.
+   * Each purchase is invoiced at once, a refused payment changes nothing, and the renewal charges the plan
+   * and the add-on. The check gives the row an operator host in D1, as a move to a VPS does.
+   */
+  async "storage-tier"(account) {
+    const { server } = await account.createServer("Storage");
+    const sub = await account.pay(server.serverId);
+    await provisioned(account, server.serverId);
+    const boat = await account.buyStorage(sub, 1);
+    const boatPlan = await account.storagePlan(sub);
+    record(
+      "storage-tier",
+      "a boat server has no storage upgrades, and a purchase is refused",
+      boat.status === 409 && boat.code === "storage_unavailable" && !boatPlan?.storageUpgrades?.length,
+      { status: boat.status, code: boat.code, plan: boatPlan },
+    );
+    const id = quote(server.serverId);
+    d1(
+      `UPDATE hosted_servers SET operator_host = ${quote(`leaseweb:e2e-${server.serverId}`)},
+         retired_sandbox_id = provider_sandbox_id, provider_sandbox_id = NULL WHERE server_id = ${id}`,
+      z.unknown(),
+    );
+    try {
+      const before = await account.storagePlan(sub);
+      const offered = before?.storageUpgrades ?? [];
+      record(
+        "storage-tier",
+        "a VPS server offers tiers 1 and 2, smallest first, each with the plan and the add-on amount",
+        before?.storageGb === storageTierGb("standard", 0) &&
+          offered.map((upgrade) => upgrade.tier).join() === "1,2" &&
+          offered.every(
+            (upgrade) =>
+              upgrade.storageGb === storageTierGb("standard", storageTierOf(upgrade.tier)) &&
+              upgrade.amount !== null &&
+              before.amount !== null &&
+              upgrade.amount > before.amount,
+          ),
+        before,
+      );
+
+      const first = await account.buyStorage(sub, 1);
+      const tier1 = first.status === 200 ? await account.storagePlan(sub, first.body) : null;
+      const items = (await subscription(sub)).items.data.length;
+      record(
+        "storage-tier",
+        "tier 1: the answer has the new storage and amount, D1 has the tier, and the add-on is invoiced at once",
+        tier1?.storageGb === storageTierGb("standard", 1) &&
+          tier1.amount === offered[0]?.amount &&
+          tier1.storageUpgrades?.map((upgrade) => upgrade.tier).join() === "2" &&
+          account.storageTier(server.serverId) === 1 &&
+          items === 2,
+        { status: first.status, code: first.code, plan: tier1, items, invoices: await invoices(sub) },
+      );
+
+      const again = await account.buyStorage(sub, 1);
+      record(
+        "storage-tier",
+        "tier 1 again is refused: a tier never goes down or repeats",
+        again.status === 409 && again.code === "storage_unavailable",
+        { status: again.status, code: again.code },
+      );
+
+      // The new card goes on the subscription too, as a payment method update in the Portal does.
+      const failing = await account.useCard("pm_card_chargeCustomerFail");
+      await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { default_payment_method: failing });
+      const refused = await account.buyStorage(sub, 2);
+      const afterRefused = await account.storagePlan(sub);
+      record(
+        "storage-tier",
+        "a refused payment gives 402, and the server keeps tier 1",
+        refused.status === 402 &&
+          refused.code === "storage_payment_failed" &&
+          afterRefused?.storageGb === storageTierGb("standard", 1) &&
+          account.storageTier(server.serverId) === 1,
+        { status: refused.status, code: refused.code, plan: afterRefused },
+      );
+
+      const working = await account.useCard("pm_card_visa");
+      await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { default_payment_method: working });
+      const second = await account.buyStorage(sub, 2);
+      const tier2 = second.status === 200 ? await account.storagePlan(sub, second.body) : null;
+      const itemsAfter = (await subscription(sub)).items.data.length;
+      record(
+        "storage-tier",
+        "tier 2 after a new card: the storage item changes its Price, and no tier is left to buy",
+        tier2?.storageGb === storageTierGb("standard", 2) &&
+          tier2.amount === offered[1]?.amount &&
+          !tier2.storageUpgrades?.length &&
+          account.storageTier(server.serverId) === 2 &&
+          itemsAfter === 2,
+        { status: second.status, code: second.code, plan: tier2, items: itemsAfter, invoices: await invoices(sub) },
+      );
+
+      await account.advance(32);
+      const renewal = await waitFor("storage renewal", async () => {
+        const list = await invoices(sub);
+        return list.find((invoice) => invoice.reason === "subscription_cycle" && invoice.status === "paid") ?? null;
+      });
+      record(
+        "storage-tier",
+        "the renewal charges the plan and the tier 2 add-on, and the server keeps tier 2",
+        renewal.amount === tier2?.amount && account.storageTier(server.serverId) === 2,
+        { renewal, plan: await account.storagePlan(sub) },
+      );
+    } finally {
+      // The server goes back to its sandbox, so that the scenario end deletes it as a boat server.
+      d1(
+        `UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
+           operator_host = NULL WHERE server_id = ${id}`,
+        z.unknown(),
+      );
+    }
   },
 
   async renew(account) {
@@ -1593,18 +1796,21 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       stored.cancel_at_period_end ? { cancel_at_period_end: "false" } : { cancel_at: "" },
     );
     await planWhere(account, sub, "undo", (plan) => !plan.cancelAtPeriodEnd);
-    print(`PORTAL_UPDATE ${(await account.portal("update", sub)).url}`);
-    const upgraded = await rowWhere(
-      account,
-      server.serverId,
-      "Portal upgrade",
-      (row) => row.plan !== "standard",
-      600_000,
-    );
-    record("portal", "Portal plan change: the server plan follows, and an upgrade is invoiced at once", true, {
-      row: upgraded,
-      invoices: await invoices(sub),
+    // An app from before the storage tiers asks for the plan change page. It gets the Portal home, which
+    // has no plan change.
+    const update = await account.portal("update", sub);
+    const configuration = await stripe("GET", "/v1/billing_portal/configurations", portalConfigurationSchema, {
+      is_default: "true",
+      limit: "1",
     });
+    const planChange = configuration.data[0]?.features.subscription_update.enabled ?? null;
+    print(`PORTAL_MANAGE ${update.url}`);
+    record(
+      "portal",
+      "the plan change flow of an old app opens the Portal home, and the Portal has no plan change",
+      update.status === 200 && update.url !== null && planChange === false,
+      { status: update.status, url: update.url, subscriptionUpdateEnabled: planChange },
+    );
   },
 
   async "customer-deleted"(account) {
@@ -2115,6 +2321,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         line.price.lookup_key === licenseLookupKey(TEAM_MONTH) &&
         session?.currency === "eur",
       { status: opened.status, code: opened.code, session: session && { status: session.status, line } },
+    );
+    record(
+      "license-checkout",
+      "the license Checkout page adds Polish VAT on top for a buyer in Poland",
+      addsPolishVat(session) && line?.price.tax_behavior === "exclusive",
+      { vat: vatView(session), taxBehavior: line?.price.tax_behavior },
     );
     if (REAL_CHECKOUT) {
       const returned = await payCheckout(url, account.api, "license-e2e-checkout.png");
@@ -2817,6 +3029,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         licenseLine?.quantity === order.users,
       { status: opened.status, code: opened.code, lines },
     );
+    record(
+      "order-bundle",
+      "the order Checkout page adds Polish VAT on top of both Prices for a buyer in Poland",
+      addsPolishVat(session) && lines.length > 0 && lines.every((line) => line.price.tax_behavior === "exclusive"),
+      { vat: vatView(session), taxBehavior: lines.map((line) => line.price.tax_behavior) },
+    );
     if (!created) return;
 
     const serverId = created.server.serverId;
@@ -3398,6 +3616,231 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       "a second server order with a license: 409 license_exists",
       again.status === 409 && again.code === "license_exists",
       { status: again.status, code: again.code },
+    );
+  },
+
+  async vat(account) {
+    const detailsSchema = z.object({ country: z.string().nullable(), vatId: z.string().nullable() });
+    const details = async () =>
+      detailsSchema.safeParse((await account.request("GET", "v1/me/billing/details")).body).data;
+    const save = (body: BillingDetailsRequest) => account.request("PUT", "v1/me/billing/details", body);
+    const taxExempt = async () =>
+      (await stripe("GET", `/v1/customers/${account.customer}`, z.object({ tax_exempt: z.string().nullable() })))
+        .tax_exempt;
+
+    const first = await details();
+    record(
+      "vat",
+      "the billing details give the country of the Stripe customer and no VAT ID",
+      first?.country === "PL" && first.vatId === null,
+      first,
+    );
+
+    const created = await account.createServer("VAT server");
+    const serverId = created.server.serverId;
+    const page = async () => {
+      const opened = await account.checkout(serverId);
+      return opened.checkoutUrl ? licenseSession(opened.checkoutUrl) : null;
+    };
+    const domestic = created.checkoutUrl ? await licenseSession(created.checkoutUrl) : null;
+    record("vat", "a buyer in Poland pays 23% Polish VAT on top", addsPolishVat(domestic), vatView(domestic));
+
+    const consumer = await save({ country: "DE" });
+    const consumerPage = await page();
+    record(
+      "vat",
+      "a buyer in Germany with no VAT ID pays Polish VAT: the seller is not in the One Stop Shop",
+      consumer.status === 200 && addsPolishVat(consumerPage) && vatView(consumerPage)?.country === "DE",
+      { status: consumer.status, vat: vatView(consumerPage) },
+    );
+
+    const outside = await save({ country: "US" });
+    const outsidePage = await page();
+    record(
+      "vat",
+      "a buyer in the United States pays no VAT",
+      outside.status === 200 && addsNoVat(outsidePage, "none"),
+      { status: outside.status, vat: vatView(outsidePage) },
+    );
+
+    const foreignId = await save({ country: "US", vatId: "DE123456789" });
+    const otherPrefix = await save({ country: "DE", vatId: "FR40303265045" });
+    record(
+      "vat",
+      "a VAT ID outside the EU, or of another country: 400 invalid_billing_details",
+      foreignId.code === "invalid_billing_details" && otherPrefix.code === "invalid_billing_details",
+      { foreignId: foreignId.code, otherPrefix: otherPrefix.code },
+    );
+
+    // A real VAT ID of a company in Ireland: the Worker checks it with VIES, which has no test numbers there.
+    const company = await save({ country: "IE", vatId: "IE 6388047V" });
+    if (company.status === 503 && company.code === "vat_id_unverified") {
+      print("SKIP [vat] reverse charge: VIES did not answer");
+    } else {
+      const companyPage = await page();
+      const saved = await details();
+      record(
+        "vat",
+        "a company in Ireland with a VAT ID that VIES confirms pays no VAT (reverse charge), and its customer is tax exempt as reverse",
+        company.status === 200 &&
+          saved?.vatId === "IE6388047V" &&
+          addsNoVat(companyPage, "reverse") &&
+          (await taxExempt()) === "reverse",
+        { status: company.status, code: company.code, saved, vat: vatView(companyPage) },
+      );
+      const unknown = await save({ country: "DE", vatId: "DE000000000" });
+      const kept = await details();
+      record(
+        "vat",
+        "a VAT ID that VIES does not know: 400 vat_id_invalid, and the saved details do not change",
+        unknown.status === 400 && unknown.code === "vat_id_invalid" && kept?.vatId === "IE6388047V",
+        { status: unknown.status, code: unknown.code, kept },
+      );
+    }
+
+    const polishCompany = await save({ country: "PL", vatId: "5260250995" });
+    const polishPage = await page();
+    record(
+      "vat",
+      "a company in Poland pays Polish VAT also with a VAT ID, and its customer is not tax exempt",
+      polishCompany.status === 200 && addsPolishVat(polishPage) && (await taxExempt()) === "none",
+      { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
+    );
+
+    // A customer from before the billing details step that never paid has no address. The Worker reads
+    // BILLING_COUNTRY_REQUIRED from the same shell as this script.
+    await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
+    const noCountry = await account.checkout(serverId);
+    const cleared = await details();
+    if (process.env.BILLING_COUNTRY_REQUIRED?.trim() === "true") {
+      record(
+        "vat",
+        "with no billing country a Checkout page is refused: 409 billing_country_required",
+        noCountry.status === 409 && noCountry.code === "billing_country_required" && cleared?.country === null,
+        { status: noCountry.status, code: noCountry.code, details: cleared },
+      );
+    } else {
+      const stripeTax = noCountry.checkoutUrl ? await licenseSession(noCountry.checkoutUrl) : null;
+      record(
+        "vat",
+        "with no billing country, while the country is not required, Checkout uses Stripe Tax as before",
+        noCountry.status === 200 &&
+          cleared?.country === null &&
+          stripeTax?.automatic_tax.enabled === true &&
+          stripeTax.metadata?.[VAT_METADATA.treatment] === undefined,
+        { status: noCountry.status, code: noCountry.code, details: cleared, vat: vatView(stripeTax) },
+      );
+    }
+
+    // Cloudflare sets CF-IPCountry; a local Worker reads the header that the client sends.
+    const located = async (country: string) =>
+      (await account.request("GET", "v1/me/billing/details", undefined, { "CF-IPCountry": country })).body;
+    const [france, unknownPlace, tor] = [await located("FR"), await located("XX"), await located("T1")];
+    // The desktop app reads the details through the bearer route, not through the browser API.
+    const desktop = async () => {
+      const response = await fetch(`${account.api}/v1/me/billing/details`, {
+        headers: { Authorization: `Bearer ${account.token}`, "CF-IPCountry": "FR" },
+      });
+      return z.unknown().parse(await response.json().catch(() => null));
+    };
+    const desktopFrance = await desktop();
+    const suggestion = (value: unknown) =>
+      z.object({ suggestedCountry: z.string().optional() }).safeParse(value).data?.suggestedCountry;
+    await save({ country: "DE" });
+    const savedFirst = await located("FR");
+    const desktopSaved = await desktop();
+    record(
+      "vat",
+      "with no saved country the details suggest the CF-IPCountry country (not XX or T1), in the browser and on the desktop; a saved country gets no suggestion",
+      suggestion(france) === "FR" &&
+        suggestion(desktopFrance) === "FR" &&
+        suggestion(unknownPlace) === undefined &&
+        suggestion(tor) === undefined &&
+        suggestion(savedFirst) === undefined &&
+        suggestion(desktopSaved) === undefined,
+      { france, desktopFrance, unknownPlace, tor, savedFirst, desktopSaved },
+    );
+
+    // The One Stop Shop count: a paid invoice of a consumer in Germany adds its net amount, in euro cents.
+    const rates = await stripe(
+      "GET",
+      "/v1/tax_rates",
+      z.object({ data: z.array(z.object({ id: z.string(), metadata: z.record(z.string(), z.string()) })) }),
+      { active: "true", limit: "100" },
+    );
+    const vatRate = rates.data.find((rate) => rate.metadata[VAT_TAX_RATE.metadataKey] === VAT_TAX_RATE.metadataValue);
+    if (!vatRate) throw new Error("No VAT Tax Rate: run bun run api:stripe:bootstrap.");
+    const paid = await stripe("POST", "/v1/subscriptions", z.object({ id: z.string(), latest_invoice: z.string() }), {
+      customer: account.customer,
+      "items[0][price]": await priceId("standard", "month"),
+      currency: "eur",
+      "default_tax_rates[0]": vatRate.id,
+      [`metadata[${VAT_METADATA.treatment}]`]: "standard",
+      payment_behavior: "error_if_incomplete",
+    });
+    // A plan from before VAT has no rate and no VAT treatment. A change of the details must not add VAT to it.
+    const older = await stripe("POST", "/v1/subscriptions", idSchema, {
+      customer: account.customer,
+      "items[0][price]": await priceId("standard", "month"),
+      currency: "eur",
+      trial_period_days: "7",
+    });
+    const invoice = await stripe(
+      "GET",
+      `/v1/invoices/${paid.latest_invoice}`,
+      z.object({ total: z.number(), total_excluding_tax: z.number().nullable() }),
+    );
+    const counted = await waitFor("OSS sale", async () => {
+      const rows = d1(
+        `SELECT country, amount_eur FROM billing_vat_oss_sales WHERE invoice_id = ${quote(paid.latest_invoice)}`,
+        z.object({ country: z.string(), amount_eur: z.number() }),
+      );
+      return rows[0] ?? null;
+    });
+    // Checkout puts the rate on the subscription, so a change of the details must change it there too.
+    const subscriptionTax = async (id: string) => {
+      const read = await stripe(
+        "GET",
+        `/v1/subscriptions/${id}`,
+        z.object({
+          default_tax_rates: z.array(z.object({ id: z.string() })),
+          metadata: z.record(z.string(), z.string()),
+        }),
+      );
+      return { rates: read.default_tax_rates.map((rate) => rate.id), treatment: read.metadata[VAT_METADATA.treatment] };
+    };
+    const movedOut = await save({ country: "US" });
+    const outsideTax = await subscriptionTax(paid.id);
+    const movedBack = await save({ country: "DE" });
+    const back = await subscriptionTax(paid.id);
+    const olderTax = await subscriptionTax(older.id);
+    record(
+      "vat",
+      "a change of the billing details also changes the VAT of a running subscription: no rate in the United States, the Polish rate again in Germany",
+      movedOut.status === 200 &&
+        outsideTax.rates.length === 0 &&
+        outsideTax.treatment === "none" &&
+        movedBack.status === 200 &&
+        back.rates.length === 1 &&
+        back.rates[0] === vatRate.id &&
+        back.treatment === "standard",
+      { movedOut: movedOut.status, outsideTax, movedBack: movedBack.status, back },
+    );
+    record(
+      "vat",
+      "a plan from before VAT keeps no VAT when the billing details change",
+      olderTax.rates.length === 0 && olderTax.treatment === undefined,
+      olderTax,
+    );
+    await stripe("DELETE", `/v1/subscriptions/${paid.id}`, idSchema);
+    await stripe("DELETE", `/v1/subscriptions/${older.id}`, idSchema);
+    record(
+      "vat",
+      "a paid invoice of a consumer in Germany adds its net amount, not the VAT, to the One Stop Shop count",
+      counted.country === "DE" &&
+        counted.amount_eur === invoice.total_excluding_tax &&
+        invoice.total > counted.amount_eur,
+      { counted, invoice },
     );
   },
 };

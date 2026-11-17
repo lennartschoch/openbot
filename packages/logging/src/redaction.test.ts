@@ -41,6 +41,7 @@ describe("redactText", () => {
       `gsk_${run(52)}`,
       `ASIA${"A1".repeat(8)}`,
       `rk_live_${run(24)}`,
+      `rk_test_${run(24)}`,
       `whsec_${run(32)}`,
       // A Standard Webhooks secret in base64 has `+`, `/` and `=`.
       `whsec_${run(10)}+${run(10)}/${run(10)}=`,
@@ -366,6 +367,20 @@ describe("registerSecretValue", () => {
     registerSecretValue("Basic c2VjcmV0");
 
     expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
+  });
+
+  // A saved password such as a company name made every link to the company's site `https:[redacted]`.
+  it("keeps the host of a web address, and masks its user part and path", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+    registerSecretValue("feedtoken42x");
+
+    expect(redactText("see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl")).toBe(
+      "see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl",
+    );
+    expect(redactText("https://example.com/feed/feedtoken42x")).toBe("https://example.com[redacted]");
+    expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
+    expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
+    expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

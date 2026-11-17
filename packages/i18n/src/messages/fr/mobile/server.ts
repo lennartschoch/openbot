@@ -285,6 +285,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son nom et son logo ici.",
   "mobile.server.settings.identityOffline": "Connectez-vous à ce serveur pour changer son nom et son logo.",
+  "mobile.server.settings.appearance": "Forme et couleur",
+  "mobile.server.settings.appearanceShape": "Forme",
+  "mobile.server.settings.appearanceShapeOption": "Forme {number}",
+  "mobile.server.settings.appearanceColor": "Couleur du serveur",
+  "mobile.server.settings.appearanceAutomatic": "Automatique",
+  "mobile.server.settings.appearanceReset": "Réinitialiser",
+  "mobile.server.settings.appearanceSaveFailed":
+    "Impossible d’enregistrer la forme et la couleur du serveur. Réessayez.",
   "mobile.server.route.cropLogo": "Recadrer le logo",
   "mobile.server.members.remove": "Retirer le membre",
   "mobile.server.members.invitePeople": "Inviter des personnes",
@@ -451,7 +459,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Aucun fuseau horaire ne correspond à cette recherche.",
   "mobile.server.settings.timezoneMore": "Saisissez plus de lettres pour voir d’autres fuseaux horaires.",
   "mobile.server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "mobile.server.settings.timezoneLoading": "Chargement du fuseau horaire…",
   "mobile.server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "mobile.server.settings.timezoneSaveFailed": "Impossible d’enregistrer le fuseau horaire. Réessayez.",
@@ -904,6 +912,8 @@ export const messages = {
     "WhatsApp a retiré ce serveur des appareils connectés. Associez à nouveau le numéro.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot ne peut pas joindre WhatsApp sur ce numéro. Reconnectez-le ou déconnectez-le.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot ne peut pas lire les clés enregistrées de ce numéro. Associez à nouveau le numéro.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Réassocier",
   "mobile.server.connectors.whatsapp.ownNumber": "Numéro personnel",
@@ -912,6 +922,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Message « En cours… »",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Désactivez pour n’envoyer que la réponse.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Réactions d’état",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot réagit avec 👀 quand un message arrive et avec ✅ quand la réponse est prête. Désactivez pour n’envoyer aucune réaction.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Cet agent reçoit les messages destinés à OpenBot depuis tous vos numéros associés. Il répond lui-même aux messages courts, confie les autres tâches au bon agent et répond dans WhatsApp.",
@@ -1143,6 +1156,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Défaut de Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} jetons",
   "mobile.server.providers.compactWindowLoadFailed": "Impossible de charger la taille de compactage de ce serveur.",
+  "mobile.server.environment.row": "Variables",
+  "mobile.server.environment.title": "Environnement",
+  "mobile.server.environment.hint":
+    "Clés d’API, URL de base et autres réglages que reçoit chaque processus {name}. Un changement s’applique à la fin des tours en cours.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, avec OPENAI_API_KEY comme clé, envoie les requêtes de modèle de ChatGPT à cette adresse.",
+  "mobile.server.environment.shellNote": "Les commandes que lancent les agents peuvent lire ces valeurs.",
+  "mobile.server.environment.add": "Ajouter une variable",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Valeur",
+  "mobile.server.environment.saved": "Enregistrée",
+  "mobile.server.environment.sensitive": "Sensible",
+  "mobile.server.environment.remove": "Retirer",
+  "mobile.server.environment.save": "Enregistrer",
+  "mobile.server.environment.loadFailed": "Impossible de charger les variables de {name}.",
+  "mobile.server.environment.invalid": "Corrigez d’abord les noms.",
   "mobile.server.providers.disconnect": "Déconnecter",
   "mobile.server.providers.disconnectTitle": "Déconnecter {name} ?",
   "mobile.server.providers.disconnectBody":

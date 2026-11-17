@@ -11,13 +11,19 @@ import { createEffect, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -46,6 +52,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     branchThread,
     messagePins,
   } = useConversationViewScope();
+  const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -75,6 +82,7 @@ export function ConversationSideThread(props: { threadId: string }) {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const { appFocused } = usePlatform();
   // The person reads the thread in the side panel while the window has focus.
   createEffect(
@@ -115,6 +123,10 @@ export function ConversationSideThread(props: { threadId: string }) {
     ) : undefined;
   /** Continue on a sign-in card goes to this thread, as the person's next message there. */
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
+  const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
+  /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
+  const visualReplyCard = useThreadVisualReplyCard(draftKey);
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -203,6 +215,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onSelectAgent={view.onSelectAgent}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            backdropAction={backdropAction}
             approval={current().thread.approval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
@@ -211,7 +224,12 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
-            messageCard={mcpSignInCard}
+            messageCard={(message, quote) =>
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
+            }
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}
             focusMessage={current().thread.focusMessage}
@@ -222,6 +240,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
+            bubbleStyle={bubbleStyle()}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
             messagePins={threadPins(current().thread.task.id)}

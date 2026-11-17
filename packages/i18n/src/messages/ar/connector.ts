@@ -413,6 +413,7 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "connector.whatsapp.helpKeysUnreadable": "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "connector.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "connector.whatsapp.pause": "إيقاف مؤقت",
   "connector.whatsapp.resume": "استئناف",
@@ -431,6 +432,9 @@ export const messages = {
   "connector.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "connector.whatsapp.workingMessageDescription":
     "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+  "connector.whatsapp.statusReactions": "تفاعلات الحالة",
+  "connector.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",

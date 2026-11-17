@@ -119,11 +119,14 @@ export interface WorkflowHost {
   openUrl(url: string): Promise<void>;
 }
 
-/** The pictures of a Library scan that the host can send to an image or video model. */
+/**
+ * The pictures of a Library scan that the host can send to an image or video model, newest first.
+ * The scan lists the largest file first, which would put a new upload out of Recent.
+ */
 export function libraryPictures(usage: StorageUsage | null): readonly StoredFileRow[] {
-  return (usage?.files ?? []).filter(
-    (file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType),
-  );
+  return (usage?.files ?? [])
+    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 /** Refuses a file that the host does not keep as a picture, before its bytes come into memory. */
@@ -210,9 +213,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
       keepPicture: (draftId) => api().keepPicture(draftId, serverId),
-      // Main answers `{ sunra: false }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: false` for a joined server without `workflows-sunra-v1`, and
+      // `higgsfield: false` for one without `workflows-higgsfield-v1`.
       mediaProviders: () => api().mediaProviders(serverId),
-      // Main answers `{ sunra: null }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: null` or `higgsfield: null` for a joined server without that capability.
       mediaCredits: () => api().mediaCredits(serverId),
     },
     onChanged(changed) {

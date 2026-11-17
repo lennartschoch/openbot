@@ -24,6 +24,7 @@ import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
+import { isRoutineSteerRefusal } from "./routine-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -221,7 +222,7 @@ const Turns = createSimpleContext({
       },
     );
 
-    function loadWaits(agentId: string, serverId: string): void {
+    function loadWaits(agentId: string): void {
       const request = (waitSnapshotRequests.get(agentId) ?? 0) + 1;
       waitSnapshotRequests.set(agentId, request);
       void turnsPort()
@@ -230,16 +231,16 @@ const Turns = createSimpleContext({
           if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
-        .catch((error) => {
-          if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
-          appendUiError(agentId, error, currentText().t("app.errorStatus.waitsLoad"), serverId);
-        });
+        // As in `loadQueue`: this background read can time out on a joined server while the agent
+        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
+        // `waits-changed` event updates them. A failed cancel still reports an error.
+        .catch(() => undefined);
     }
 
     createEffect(
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
-      ({ agentId, serverId }) => {
-        if (agentId) loadWaits(agentId, serverId);
+      ({ agentId }) => {
+        if (agentId) loadWaits(agentId);
       },
     );
 
@@ -315,6 +316,23 @@ const Turns = createSimpleContext({
       // A side thread marks its answer by its own key: the agent id marks the agent's own chat.
       const mark = threadId === undefined ? agent.id : attentionKey(agent.id, threadId);
       return submitPromptAnswers(agent.id, mark, prompt, answers, options);
+    }
+
+    /**
+     * Answers the prompt `requestId` of the thread `threadId` of any agent, from outside its chat, as the
+     * agent dock does. False when the thread no longer waits for that prompt.
+     */
+    async function answerPromptRequest(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      answers: Record<string, string[]>,
+    ): Promise<boolean> {
+      const prompt = pendingPrompts()[attentionKey(agentId, threadId)];
+      if (prompt?.type !== "prompt" || String(prompt.requestId) !== String(requestId)) return false;
+      // The agent id marks the agent's own chat, as `answerPrompt` does.
+      const own = agentList().some((agent) => agent.id === agentId && agent.threadId === threadId);
+      return submitPromptAnswers(agentId, own ? agentId : attentionKey(agentId, threadId), prompt, answers);
     }
 
     async function submitPromptAnswers(
@@ -402,9 +420,27 @@ const Turns = createSimpleContext({
       options?: PromptAnswerOptions,
     ): Promise<boolean> {
       const agent = activeAgent();
-      const key = agent ? attentionKey(agent.id, threadId ?? agent.threadId) : undefined;
-      const event = key ? pendingPrompts()[key] : undefined;
-      if (!agent || !key || event?.type !== "browser-takeover-requested") return false;
+      const thread = threadId ?? agent?.threadId ?? null;
+      const event = agent ? pendingPrompts()[attentionKey(agent.id, thread)] : undefined;
+      if (!agent || event?.type !== "browser-takeover-requested") return false;
+      return respondToBrowserTakeoverRequest(agent.id, thread, event.request.requestId, decision, options);
+    }
+
+    /**
+     * Answers the takeover `requestId` of the thread `threadId` of any agent. The agent dock answers from
+     * outside the chat. False when the thread no longer waits for that takeover.
+     */
+    async function respondToBrowserTakeoverRequest(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      decision: "complete" | "cancel",
+      options?: PromptAnswerOptions,
+    ): Promise<boolean> {
+      const key = attentionKey(agentId, threadId);
+      const event = pendingPrompts()[key];
+      if (event?.type !== "browser-takeover-requested" || String(event.request.requestId) !== String(requestId))
+        return false;
       const serverId = activeServerId();
       try {
         await turnsPort().agent.respondToBrowserTakeover({ requestId: event.request.requestId, decision });
@@ -412,7 +448,7 @@ const Turns = createSimpleContext({
         return true;
       } catch (error) {
         if (options?.onError) options.onError(error);
-        else appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
+        else appendUiError(agentId, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
         return false;
       }
     }
@@ -438,7 +474,7 @@ const Turns = createSimpleContext({
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
         // A joined server sends no event when a wait closes, so the list is read again.
-        .then(() => loadWaits(agent.id, serverId))
+        .then(() => loadWaits(agent.id))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 
@@ -459,6 +495,8 @@ const Turns = createSimpleContext({
           // sent while it works can take it first.
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
+          // A routine run refuses the steer, and the queue row says why the message waits.
+          if (isRoutineSteerRefusal(error)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
@@ -642,9 +680,11 @@ const Turns = createSimpleContext({
       activeRoutines,
       refreshRoutineIds,
       answerPrompt,
+      answerPromptRequest,
       respondToApproval,
       respondToApprovalRequest,
       respondToBrowserTakeover,
+      respondToBrowserTakeoverRequest,
       cancelQueuedMessage,
       cancelWait,
       steerQueuedMessage,

@@ -49,6 +49,7 @@ the [root changelog](../../CHANGELOG.md).
 
 - The app reports the fork version (`0.66.0-fork.N`), not the upstream store version.
 ## [1.4.10] - In review
+## [1.4.10] - 2026-11-16
 
 ### Added
 

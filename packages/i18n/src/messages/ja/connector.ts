@@ -361,6 +361,8 @@ export const messages = {
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot はこの番号の保存済みキーを読み取れません。番号をもう一度リンクしてください。",
   "connector.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
   "connector.whatsapp.pause": "一時停止",
   "connector.whatsapp.resume": "再開",
@@ -379,6 +381,9 @@ export const messages = {
   "connector.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "connector.whatsapp.workingMessageDescription":
     "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
+  "connector.whatsapp.statusReactions": "ステータスのリアクション",
+  "connector.whatsapp.statusReactionsDescription":
+    "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",

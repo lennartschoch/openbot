@@ -28,6 +28,12 @@ export function visualReplyMessageId(threadId: string, turnId: string, callId: s
   return `visual-reply:${digest}`;
 }
 
+/** The id of the message that one `set_backdrop` call adds, so a retried call adds no second page. */
+export function backdropMessageId(threadId: string, turnId: string, callId: string): string {
+  const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
+  return `window-backdrop:${digest}`;
+}
+
 /** A file name from a page title, without the characters that file systems refuse. */
 export function visualReplyFileName(title: string): string {
   return (
@@ -82,6 +88,8 @@ export interface DeliveryPromptSources {
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
+  /** The zone of a routine delivery's routine. The run time is also given on its clock. */
+  routineTimezone?: string | undefined;
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
@@ -93,6 +101,13 @@ export interface DeliveryPromptSources {
    * session. That session closed with the run, so the answer gives the task again (#6457).
    */
   answeredRoutine?: AnsweredRoutine | null;
+  /**
+   * A steer that the provider shows to its model as a message from the user, next to the result of
+   * the running tool. Claude Code does this. With the header and rules of a teammate prompt, Claude
+   * Haiku took the message for text in the tool result and ignored it, mostly when two came in one
+   * result. A teammate message then goes in plain words (`userFramedTeammateText`).
+   */
+  steerFramedAsUser?: boolean;
 }
 
 /** A routine run's name and task, for the answer to a request that the run sent. */
@@ -175,6 +190,8 @@ const ROUTINE_TASK_START = "--- routine task ---";
 const ROUTINE_TASK_END = "--- end of routine task ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
+const RESULT_FORMAT =
+  "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 /** The first words of a provider handoff. */
 export const HANDOFF_START = "Continue this OpenBot conversation.";
@@ -249,8 +266,71 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
   return messages;
 }
 
+/**
+ * A teammate message in a steer that the provider frames as the user's (`steerFramedAsUser`). It
+ * has no header or `Message ID` line: the steer's uuid is the delivery ID, so the history import
+ * finds the delivery without `teammatePrompts`. The developer instructions still say that a teammate
+ * message is collaborator input. An answer to a routine run's request keeps the full prompt, which
+ * gives the routine task.
+ */
+function userFramedTeammateText(
+  delivery: QueueDelivery,
+  senderAgentId: string,
+  agentNames: ReadonlyMap<string, string>,
+  displayText: string,
+): string {
+  const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
+  const teammate = `Your teammate ${senderName} (${senderAgentId})`;
+  if (delivery.replyToMessageId)
+    return [
+      `${teammate} answered your message through OpenBot:`,
+      displayText,
+      "Give the result to the user naturally, starting with the teammate's name. Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.",
+    ].join("\n");
+  if (delivery.expectsReply === false)
+    return [
+      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      displayText,
+    ].join("\n");
+  return [
+    `${teammate} sent you this request through OpenBot:`,
+    displayText,
+    `Do it, then send the result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false. ${RESULT_FORMAT}`,
+  ].join("\n");
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The run time on the routine's clock. `Scheduled for` is in UTC, so without this line an agent takes
+ * the UTC date as today: a 23:30 run in America/Sao_Paulo is the next day in UTC (#9276).
+ */
+function routineLocalTime(scheduledFor: string, timeZone: string | undefined): string[] {
+  const date = new Date(scheduledFor);
+  if (!timeZone || Number.isNaN(date.getTime())) return [];
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "long",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "longOffset",
+    }).formatToParts(date);
+  } catch {
+    return [];
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((one) => one.type === type)?.value ?? "";
+  const local = `${part("weekday")}, ${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+  return [
+    `Local time of this run: ${local} in ${timeZone} (${part("timeZoneName")}). Read dates such as today on this clock.`,
+  ];
 }
 
 /**
@@ -291,6 +371,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
+  } else if (
+    delivery.sender.kind === "agent" &&
+    sources.steerFramedAsUser &&
+    !(delivery.replyToMessageId && sources.answeredRoutine)
+  ) {
+    text = userFramedTeammateText(delivery, delivery.sender.agentId, agentNames, displayText);
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
@@ -312,7 +398,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
-            "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
+            `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
           ];
     text = [
@@ -346,11 +432,13 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `Routine name: ${delivery.sender.routineName}`,
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
+      ...routineLocalTime(delivery.sender.scheduledFor, sources.routineTimezone),
       "The routine already exists, and its schedule is already configured.",
       ...(canPause
         ? [
             "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
+            `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
@@ -391,7 +479,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     );
     const continuation = [
       HANDOFF_START,
-      "The previous provider reached its usage limit after starting this task.",
+      "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.",
       "Continue the unfinished task from the conversation and captured work steps. The request below is the original goal, not a new task. Do not repeat completed actions. Check the outcome of any interrupted action before you retry it. If the task is already complete, report the result.",
       ...(progress ? ["--- interrupted task progress ---", progress.slice(-8000)] : []),
       "--- captured work steps ---",
@@ -456,6 +544,17 @@ export function compactionContinuationPrompt(): string {
   return [
     "OpenBot note, not a message from the user. Your last turn stopped because the connection failed while your context was compacted.",
     "Continue the work now, from where you stopped. Do not repeat finished work or restate earlier answers. Check the result of an action that was interrupted before you do it again. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+  ].join("\n");
+}
+
+/**
+ * The note for a turn whose provider process exited during the agent's answer (#9729). The rest of the
+ * answer was never made, so the agent continues from what it said before.
+ */
+export function providerExitContinuationPrompt(): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn stopped because your provider process exited while you wrote your answer, so the user got only its first part.",
+    "Continue now: give the complete answer to the user's last message. Do not repeat finished work. An action that you started before the stop possibly finished or possibly still runs: check its result before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
   ].join("\n");
 }
 

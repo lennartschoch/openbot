@@ -1,4 +1,4 @@
-import { RequestError } from "@agentclientprotocol/sdk";
+import { RequestError, type SessionUpdate } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
@@ -11,6 +11,21 @@ import {
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
+
+/**
+ * OpenCode 2.2.5 to 2.3.0 wait 300 s for a model's response headers, the stall limit, then retry.
+ * They report each retry as `_meta["opencode/retry"]` on a `session_info_update`, and a failed
+ * retried attempt as the same key with null (#9941). Only a retry after a timeout counts here. A
+ * retry after a rate limit, a provider failure or a lost network comes sooner, and each such notice
+ * keeps the turn open, as any update does.
+ */
+function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return false;
+  if (!("opencode/retry" in update._meta)) return false;
+  const retry = update._meta["opencode/retry"];
+  if (retry === null) return true;
+  return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
+}
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -55,8 +70,17 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * user's country: `opencode run` shows "This model is not available in your country". A free model
  * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
  * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
+ *
+ * OpenCode 2.2.5 also answers this way for an OpenCode Go key that the service refuses, such as an
+ * expired key. Only OpenCode's log has the reason, so a user with a saved key was told to add a key
+ * (#9095). OpenBot sends its saved key only to OpenCode Go.
  */
-function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
+function openCodeAuthRequired(
+  error: unknown,
+  model: string | null,
+  endpoint: AcpCustomEndpoint | null,
+  savedKey: boolean,
+): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
@@ -65,6 +89,7 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
+  if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -200,8 +225,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))
@@ -242,11 +267,15 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
   // added one more copy of the instructions to a long chat (#7171).
   reopenKeepsPrompts: true,
+  modelRetryUpdate: isOpenCodeTimeoutRetry,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
+  // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
+  relayStdioMcpServers: true,
   // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
   // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
   childSessionUpdates: true,
