@@ -334,6 +334,11 @@ export interface BoardOptions {
   stretch?: (id: string) => WfnStretch;
   resetSize?: (id: string) => void;
   edgeTone?: (edge: WfnEdge) => WfnEdgeTone;
+  /**
+   * The node that the user works on, such as a hovered or selected asset. Its connections draw again
+   * above the other nodes, in the highlight colour.
+   */
+  focus?: () => string | null;
   /** The results that the steps have before the story opens. */
   results?: Record<string, readonly WfnResult[]> | undefined;
   /**
@@ -1212,6 +1217,40 @@ export function createBoard(options: BoardOptions) {
     schedule();
   };
 
+  /**
+   * Takes the connections, the locks and the fields of a snapshot that another device changed, and
+   * writes only what is different. Typing, a drag, an open connection and the selection stay, unless
+   * the snapshot no longer has their node or connection.
+   */
+  const sync = (saved: BoardSnapshot) => {
+    const gone = new Set(saved.removed);
+    const kept = (id: string) => id in saved.fields && !gone.has(id);
+    const edgeIds = new Set(saved.edges.map((edge) => edge.id));
+    if (typing !== null && !kept(typing.slice(0, typing.lastIndexOf(":")))) typing = null;
+    setState((draft) => {
+      if (JSON.stringify(draft.edges) !== JSON.stringify(saved.edges)) {
+        draft.edges = saved.edges.map((edge) => ({ ...edge }));
+      }
+      if (draft.removed.join("\u0000") !== saved.removed.join("\u0000")) draft.removed = [...saved.removed];
+      if (draft.locked.join("\u0000") !== saved.locked.join("\u0000")) draft.locked = [...saved.locked];
+      for (const id of Object.keys(draft.fields)) if (!(id in saved.fields)) delete draft.fields[id];
+      for (const [id, fields] of Object.entries(saved.fields)) {
+        if (JSON.stringify(draft.fields[id]) !== JSON.stringify(fields)) draft.fields[id] = { ...fields };
+      }
+      if (draft.selection.some((id) => !kept(id))) draft.selection = draft.selection.filter(kept);
+      if (draft.pending && !kept(draft.pending.node)) {
+        draft.pending = null;
+        draft.draft = null;
+        draft.target = null;
+      }
+      if (draft.edge !== null && !edgeIds.has(draft.edge)) draft.edge = null;
+      if (draft.hover !== null && !edgeIds.has(draft.hover)) draft.hover = null;
+      if (draft.hoverAt && !edgeIds.has(draft.hoverAt.edge)) draft.hoverAt = null;
+      if (draft.removing !== null && !edgeIds.has(draft.removing)) draft.removing = null;
+    });
+    schedule();
+  };
+
   onSettled(() => {
     const onKey = (event: KeyboardEvent) => {
       const active = document.activeElement;
@@ -1361,6 +1400,46 @@ export function createBoard(options: BoardOptions) {
       if (reason) return { text: reason, tone: "refused" };
       return draftLoops() ? { text: t("workflow.board.loop.makes"), tone: "loop" } : null;
     };
+    /** The connections of the focused node. A second layer draws them above the other nodes. */
+    const isFocusEdge = (edge: WfnEdge) => {
+      const focus = options.focus?.() ?? null;
+      return focus !== null && (edge.from === focus || edge.to === focus);
+    };
+    const focusEdges = () => state.edges.filter(isFocusEdge);
+    /** One connection line. Only the layer under the nodes has the hit path that takes the pointer. */
+    const EdgeLine = (props: { edge: WfnEdge; path: string; focus: boolean; hit?: boolean }) => (
+      <g
+        class="wfn-edge"
+        data-type={props.edge.type}
+        data-tone={tone(props.edge)}
+        data-selected={state.edge === props.edge.id ? "" : undefined}
+        data-focus={props.focus ? "" : undefined}
+        data-removing={
+          state.removing === props.edge.id || isDoomed(props.edge.from) || isDoomed(props.edge.to) ? "" : undefined
+        }
+        data-motion={motion ? "" : undefined}
+        data-build={options.buildState?.(props.edge.id)}
+      >
+        <path class="wfn-edge-line" d={props.path} />
+        <Show when={tone(props.edge) === "run"}>
+          <path class="wfn-edge-comet" d={props.path} pathLength="1" />
+        </Show>
+        <Show when={props.hit}>
+          <path
+            class="wfn-edge-hit"
+            data-edge-id={props.edge.id}
+            d={props.path}
+            onPointerDown={() =>
+              setState((draft) => {
+                draft.edge = props.edge.id;
+              })
+            }
+            onPointerMove={(event) => trackEdge(props.edge.id, event)}
+            onPointerLeave={(event) => leaveEdge(props.edge.id, event.relatedTarget)}
+          />
+        </Show>
+      </g>
+    );
     return (
       <>
         <svg ref={edgeLayer} class="wfn-edges" aria-hidden="true">
@@ -1369,36 +1448,7 @@ export function createBoard(options: BoardOptions) {
               <For each={targets(edge)}>
                 {(slot) => (
                   <Show when={endsAt(edge, slot)}>
-                    {(line) => (
-                      <g
-                        class="wfn-edge"
-                        data-type={edge.type}
-                        data-tone={tone(edge)}
-                        data-selected={state.edge === edge.id ? "" : undefined}
-                        data-removing={
-                          state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
-                        }
-                        data-motion={motion ? "" : undefined}
-                        data-build={options.buildState?.(edge.id)}
-                      >
-                        <path class="wfn-edge-line" d={line().path} />
-                        <Show when={tone(edge) === "run"}>
-                          <path class="wfn-edge-comet" d={line().path} pathLength="1" />
-                        </Show>
-                        <path
-                          class="wfn-edge-hit"
-                          data-edge-id={edge.id}
-                          d={line().path}
-                          onPointerDown={() =>
-                            setState((draft) => {
-                              draft.edge = edge.id;
-                            })
-                          }
-                          onPointerMove={(event) => trackEdge(edge.id, event)}
-                          onPointerLeave={(event) => leaveEdge(edge.id, event.relatedTarget)}
-                        />
-                      </g>
-                    )}
+                    {(line) => <EdgeLine edge={edge} path={line().path} focus={isFocusEdge(edge)} hit />}
                   </Show>
                 )}
               </For>
@@ -1409,6 +1459,18 @@ export function createBoard(options: BoardOptions) {
           </Show>
           <For each={companionPaths()}>
             {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path} />}
+          </For>
+        </svg>
+        {/* The lines only: the hit paths stay in the layer under the nodes. */}
+        <svg class="wfn-edges wfn-edges-focus" aria-hidden="true">
+          <For each={focusEdges()}>
+            {(edge) => (
+              <For each={targets(edge)}>
+                {(slot) => (
+                  <Show when={endsAt(edge, slot)}>{(line) => <EdgeLine edge={edge} path={line().path} focus />}</Show>
+                )}
+              </For>
+            )}
           </For>
         </svg>
         <Show when={draftNote()}>
@@ -1516,6 +1578,7 @@ export function createBoard(options: BoardOptions) {
     addEdges,
     snapshot,
     restore,
+    sync,
     /** Ends the typing burst, so the next key stroke is a new change. */
     endTyping: () => {
       typing = null;

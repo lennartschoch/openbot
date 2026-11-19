@@ -5,12 +5,19 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentModelOption,
   type AgentSummary,
+  CHANNEL_RESUME_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
-import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
-import { type AgentProvider, ProviderSessionBusyError, ProviderTurnActiveError } from "../agent-client";
+import {
+  type AgentProvider,
+  ProviderModelNotOfferedError,
+  ProviderSessionBusyError,
+  ProviderStoppedError,
+  ProviderTurnActiveError,
+} from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { incomingAgentExchange } from "../conversation-snapshots";
@@ -27,6 +34,7 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
 } from "./delivery-content";
@@ -60,6 +68,22 @@ export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved"
 
 const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
+/**
+ * The catalog keys of a start that found its provider not downloaded (`cli.ts`). They hold no detail:
+ * the one placeholder, in `nativeMissing`, is OpenBot's own provider name.
+ */
+const PROVIDER_MISSING_KEYS: ReadonlySet<string> = new Set([
+  "error.provider.codexMissing",
+  "error.provider.claudeMissing",
+  "error.provider.grokMissing",
+  "error.provider.opencodeMissing",
+  "error.provider.antigravityMissing",
+  "error.provider.cursorMissing",
+  "error.provider.clineMissing",
+  "error.provider.kimiMissing",
+  "error.provider.hermesMissing",
+  "error.provider.nativeMissing",
+]);
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
 /**
@@ -68,6 +92,20 @@ const TURN_START_GRACE_MS = 5 * 60_000;
  */
 const PROVIDER_SESSION_BUSY_RETRY_MS = 15_000;
 const PROVIDER_SESSION_BUSY_RETRY_MAX_MS = 2 * 60_000;
+/** How many times in a row a session that did not open in time tries again before its message fails. */
+const SESSION_RESUME_TIMEOUT_RETRIES = 3;
+
+/**
+ * The retries of an agent whose provider could not open a session: the busy refusals in a row, whether
+ * a retry waits, and, for each lane, the starts in a row that did not open in time (#11607) or that the
+ * stopped provider did not get (#11843). The lanes of one agent fail together when the provider stops,
+ * so each lane counts its own tries.
+ */
+interface SessionRetry {
+  refusals: number;
+  waiting: boolean;
+  resumeTimeouts: Map<string, number>;
+}
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -99,6 +137,8 @@ export interface DrainHooks {
    * usage limit stopped after it started.
    */
   mayContinueOnBackup(agentId: string): boolean;
+  /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
+  mayFailOver(agentId: string): boolean;
   /**
    * Starts the move of this agent to another model for a usage limit, if one is due: back to its own
    * model, or to a backup model during a hold. True when a move started; the move schedules the drain
@@ -245,8 +285,9 @@ export class DrainScheduler {
   /**
    * Agents whose provider refused to open a session because a stopped prompt still runs in it, with
    * the refusals in a row and whether a retry waits. No event tells when that prompt ends (#9938).
+   * A session that did not open in time waits here too (#11607).
    */
-  readonly #busyRetries = new Map<string, { refusals: number; waiting: boolean }>();
+  readonly #busyRetries = new Map<string, SessionRetry>();
   /**
    * The `scheduleDrain` calls of each agent. A start that a call overtook is not held: the call can
    * be the end of the provider's turn, and no later one would come.
@@ -501,6 +542,11 @@ export class DrainScheduler {
     });
   }
 
+  /** Whether a turn runs in an external conversation of the messaging lane, also one with no delivery. */
+  messagingTurnActive(agentId: string): boolean {
+    return this.#ownThreadTurnActive(agentId, true);
+  }
+
   /** Why a new message in the agent's own chat waits now, or null when it can start at once. */
   ownChatHold(agentId: string): string | null {
     return this.#heldBy({ agentId, taskId: null });
@@ -537,12 +583,21 @@ export class DrainScheduler {
   }
 
   /**
-   * Drains the agent again after a wait, once for all its lanes that the busy session refused. A
-   * turn that starts, `forgetAgent` and `dispose` end the retry.
+   * Schedules each agent with one read of each lane. Each `scheduleDrain` alone reads all lanes of all
+   * agents again, also for the slot retry that it starts (#11710).
+   */
+  scheduleDrains(agentIds: Iterable<string>): void {
+    this.#slots.round(() => {
+      for (const agentId of agentIds) this.scheduleDrain(agentId);
+    });
+  }
+
+  /**
+   * Drains the agent again after a wait, once for all its lanes that the busy session refused or
+   * whose session did not open in time. A turn that starts, `forgetAgent` and `dispose` end the retry.
    */
   #retryBusySession(agentId: string): Effect.Effect<void> {
-    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false };
-    this.#busyRetries.set(agentId, entry);
+    const entry = this.#busyRetryEntry(agentId);
     if (entry.waiting) return Effect.void;
     entry.waiting = true;
     entry.refusals += 1;
@@ -559,6 +614,29 @@ export class DrainScheduler {
   }
 
   /**
+   * Counts one start of this lane that did not open in time, or that the stopped provider did not get.
+   * False after the last try: that message fails, and the next message gets all its tries and, when no
+   * other lane waits, the shortest wait again, as after a turn that starts.
+   */
+  #mayRetryResume(agentId: string, lane: string): boolean {
+    const entry = this.#busyRetryEntry(agentId);
+    const tries = entry.resumeTimeouts.get(lane) ?? 0;
+    if (tries >= SESSION_RESUME_TIMEOUT_RETRIES) {
+      entry.resumeTimeouts.delete(lane);
+      if (entry.resumeTimeouts.size === 0 && !entry.waiting) this.#busyRetries.delete(agentId);
+      return false;
+    }
+    entry.resumeTimeouts.set(lane, tries + 1);
+    return true;
+  }
+
+  #busyRetryEntry(agentId: string): SessionRetry {
+    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false, resumeTimeouts: new Map() };
+    this.#busyRetries.set(agentId, entry);
+    return entry;
+  }
+
+  /**
    * Tries the agents that wait for a turn slot again. Each drain that ends can free a slot, and the
    * memory sample calls this too, for a turn that ended on a path that schedules no drain.
    */
@@ -568,7 +646,10 @@ export class DrainScheduler {
     try {
       const waiters = [...this.#slotWaiters];
       this.#slotWaiters.clear();
-      for (const key of waiters) this.#scheduleLane(laneOf(key));
+      // Each lane schedules its drain in a microtask, so no lane starts during this loop.
+      this.#slots.round(() => {
+        for (const key of waiters) this.#scheduleLane(laneOf(key));
+      });
     } finally {
       this.#wakingSlotWaiters = false;
     }
@@ -1023,7 +1104,7 @@ export class DrainScheduler {
       const promptInput = (executionText: string | undefined) => {
         // The deliveries of one interrupted turn share its continuation, so the prompt states it once.
         const continued = new Set<string>();
-        return combinedPromptInput(
+        const input = combinedPromptInput(
           batch.map((item) => {
             const { resumeAfterUsageLimit, ...rest } = item;
             const repeated = resumeAfterUsageLimit !== undefined && continued.has(resumeAfterUsageLimit.turnId);
@@ -1046,6 +1127,7 @@ export class DrainScheduler {
           [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
           agentNames,
         );
+        return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
       };
       // The request is already in the session, so a plan continuation sends only its note. A new
       // session, which gets the history handoff, gets the request again before the note (#8779).
@@ -1098,7 +1180,10 @@ export class DrainScheduler {
               }
             : this.#mailbox.isWelcomeDelivery(item.id)
               ? { itemType: AGENT_WELCOME_ITEM_TYPE }
-              : {}),
+              : // The continuation of a channel request is not a new message from the person (#8812).
+                channelDelivery && this.#channels?.resumesAfterSubtasks(item.id)
+                ? { itemType: CHANNEL_RESUME_ITEM_TYPE }
+                : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);
@@ -1245,18 +1330,59 @@ export class DrainScheduler {
           // agent's provider signed out. Nothing ran, and `mayDrain` holds the messages until that turn
           // ends or the provider is signed in again.
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
+          // The session did not open in time. Codex opens the sessions of all its agents one at a time,
+          // so when many agents start together, the last ones wait behind the others past the request
+          // timeout (#11607). The provider can also stop, or not answer, before the turn is sent, as when
+          // it restarts (#11843). Nothing ran, so the messages wait and try again, a limited number of times.
+          const providerStopped = error instanceof ProviderStoppedError;
+          const resumeTimedOut =
+            (providerStopped || isRequestTimeout(error, "thread/resume")) &&
+            this.#mayRetryResume(
+              delivery.recipientAgentId,
+              laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }),
+            );
           if (
             error instanceof ProviderTurnActiveError ||
+            resumeTimedOut ||
             (recipient && this.#providers.signInRequired(providerForAgent(recipient)) && this.#waitsForSignIn(delivery))
           ) {
             if (
-              error instanceof ProviderTurnActiveError &&
+              (error instanceof ProviderTurnActiveError || resumeTimedOut) &&
               (this.#drainCalls.get(delivery.recipientAgentId) ?? 0) === drainCallsAtStart
             )
               this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-            if (error instanceof ProviderSessionBusyError) yield* this.#retryBusySession(delivery.recipientAgentId);
+            if (resumeTimedOut)
+              logger.warn(
+                providerStopped
+                  ? "The provider stopped before the turn was sent. Its messages try again."
+                  : "A session did not open in time. Its messages try again.",
+                { agentId: delivery.recipientAgentId, provider: error.providerName },
+              );
+            if (error instanceof ProviderSessionBusyError || resumeTimedOut)
+              yield* this.#retryBusySession(delivery.recipientAgentId);
+            return;
+          }
+          // The session does not offer the agent's model, so nothing ran. An agent that moves to a backup
+          // model on a provider error passes over this model, and the messages run on the backup (#11797).
+          if (
+            error instanceof ProviderModelNotOfferedError &&
+            !channelDelivery &&
+            !messagingDelivery &&
+            this.#hooks.mayFailOver(delivery.recipientAgentId)
+          ) {
+            logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
+              agentId: delivery.recipientAgentId,
+              model: requestedModel,
+            });
+            this.#usageLimits.failed(delivery.recipientAgentId, requestedModel);
+            for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            // The move drains the agent again when it ends. A turn of the agent that still runs holds the
+            // move, and the lane waits for the drain at that turn's end: a start now fails the same way.
+            if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
+              this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             return;
           }
           // The provider of a routine run did not start, such as with no internet connection. Nothing
@@ -1298,7 +1424,14 @@ export class DrainScheduler {
           const detail = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
           // Another Codex app holds the thread. The user reads what to do, and the log keeps the detail.
           const threadInUse = isCodexThreadInUse(error);
-          const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : detail;
+          // After its last try, a message that the stopped provider did not start says what to do.
+          const stoppedReason =
+            providerStopped && recipient
+              ? sourceText("error.provider.stoppedBeforeStart", {
+                  provider: providerLabel(providerForAgent(recipient)),
+                })
+              : null;
+          const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : (stoppedReason ?? detail);
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.
           if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
@@ -1339,18 +1472,23 @@ export class DrainScheduler {
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           // The agent that asked gets the failure as its answer; the drain of the sender below starts it.
           yield* this.#answerFailedRequest(delivery.id, delivery.recipientAgentId);
+          const startReason = this.#startReason(recipient, error);
           if (this.#channels)
             yield* this.#channels
-              .deliveryFailed(delivery.id, this.#channelStartReason(recipient, error))
+              .deliveryFailed(delivery.id, startReason ?? CHANNEL_START_FAILED)
               .pipe(toDeliveryStartFailed);
-          this.#messaging?.deliveryFailed(delivery.id);
+          this.#messaging?.deliveryFailed(delivery.id, startReason);
           // The provider refused the session or the turn, so no turn line records the failure.
           logger.warn("A message did not start.", {
             agentId: delivery.recipientAgentId,
             model: requestedModel,
             reason: detail,
           });
-          this.#hooks.emitError("delivery_start_failed", threadInUse ? reason : error, delivery.recipientAgentId);
+          this.#hooks.emitError(
+            "delivery_start_failed",
+            threadInUse || stoppedReason ? reason : error,
+            delivery.recipientAgentId,
+          );
           this.scheduleDrain(delivery.recipientAgentId);
           // The requester may hold the other answers until this request ends.
           if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);
@@ -1531,28 +1669,33 @@ export class DrainScheduler {
   }
 
   /**
-   * What a stopped channel task says when its provider did not start it. A sign-in is the start
-   * failure that the reader can fix, so the task names it instead of the general reason (#6684): the
-   * provider's own sign-in text when the start failed with it, such as a request for an API key, and an
-   * expired sign-in otherwise, also when the provider refused the account before its check marked it.
-   * Only catalog text goes to the channel: every reader of it sees it, in the reader's language.
-   * Another Codex app that holds the thread is the same: Resume fails until the reader closes it there.
+   * What a stopped channel task or an external conversation says when the provider did not start
+   * it, or null for the general reason. A sign-in is the start failure that the reader can fix, so it
+   * is named instead of the general reason (#6684): the provider's own sign-in text when the start
+   * failed with it, such as a request for an API key, and an expired sign-in otherwise, also when the
+   * provider refused the account before its check marked it. A provider that is not downloaded is
+   * named too (#10597). Only catalog text goes out: every reader of it sees it, in the reader's
+   * language. Another Codex app that holds the thread is the same: a new try fails until the reader
+   * closes it there.
    */
-  #channelStartReason(recipient: AgentSummary | undefined, error: unknown): string {
+  #startReason(recipient: AgentSummary | undefined, error: unknown): string | null {
     if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
-    if (!recipient || !(error instanceof Error)) return CHANNEL_START_FAILED;
+    if (!recipient || !(error instanceof Error)) return null;
     const provider = providerForAgent(recipient);
-    const signInText =
-      error instanceof ProviderSignInError ||
-      (this.#providers.signInRequired(provider) &&
-        this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message);
+    const statusText =
+      this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message;
+    // The status of the agent's own provider keeps the text of the missing download, and the start
+    // fails with it. The general status message can be about another provider, so it is not used.
+    if (statusText && matchingSourceKeys(error.message).some((key) => PROVIDER_MISSING_KEYS.has(key)))
+      return error.message;
+    const signInText = error instanceof ProviderSignInError || (this.#providers.signInRequired(provider) && statusText);
     // A fixed catalog text holds nothing from the provider. A placeholder can carry the provider's own
     // words, and a text outside the catalog, such as "Connect ChatGPT to continue.", is not translated.
     if (signInText && isFixedSourceText(error.message)) return error.message;
     // The agent runs on this provider, which it can only choose while signed in, so its sign-in expired.
     if (signInText || classifyUserError(error) === "auth")
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
-    return CHANNEL_START_FAILED;
+    return null;
   }
 
   /**
@@ -1592,20 +1735,22 @@ const { sync: drainStep, rewrap: toDeliveryStartFailed } = causeHelpers(Delivery
 
 /**
  * The Codex or Claude service tier of a turn. The provider keeps the tier for the next turns of the
- * thread. An agent that never set fast mode sends nothing, so the provider keeps its own tier; `null`
- * returns the thread to the standard tier, also for a model with no fast tier. While the catalog does
- * not know the model, such as before the CLI lists its models, the turn sends nothing and keeps the
- * tier of the thread.
+ * thread. `null` returns the thread to the standard tier, also for a model with no fast tier. A Claude
+ * agent that never set fast mode sends nothing, so the provider keeps its own tier. A Codex agent that
+ * never set it also sends `null` when its model has a fast tier: the picker shows Standard for it, and
+ * a `service_tier` in the Codex config must not run the turn at a faster, more expensive tier (#11879).
+ * While the catalog does not know the model, such as before the CLI lists its models, the turn sends
+ * nothing and keeps the tier of the thread.
  */
 function serviceTier(
   agent: Pick<AgentSummary, "fastMode" | "ultrafast" | "model">,
   provider: "codex" | "claude",
   models: readonly AgentModelOption[],
 ): { serviceTier?: string | null } {
-  if (agent.fastMode === undefined) return {};
-  if (!agent.fastMode) return { serviceTier: null };
+  if (agent.fastMode === false) return { serviceTier: null };
   const model = models.find((candidate) => candidate.provider === provider && candidate.id === agent.model);
   if (!model) return {};
+  if (agent.fastMode === undefined) return provider === "codex" && model.fastServiceTier ? { serviceTier: null } : {};
   // Ultrafast on a model or account without the tier runs at Fast, the next fastest tier.
   if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? model.fastServiceTier ?? null };
   return { serviceTier: model.fastServiceTier ?? null };

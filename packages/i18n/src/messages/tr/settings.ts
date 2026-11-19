@@ -31,6 +31,13 @@ export const messages = {
   "settings.codeFont.title": "Kod yazı tipi",
   "settings.codeFont.description": "Kodun, terminallerin ve dosya yollarının yazı tipi.",
   "settings.codeFont.default": "Varsayılan",
+  "settings.motion.title": "Hareket",
+  "settings.backgroundBlur.title": "Arka plan bulanıklığı",
+  "settings.backgroundBlur.description":
+    "Menülerin ve iletişim kutularının arkasındaki bulanıklık. GPU’su olmayan bir bilgisayarda başta kapalıdır.",
+  "settings.movingFaces.title": "Hareketli ajan yüzleri",
+  "settings.movingFaces.description":
+    "Ajan yüzleri göz kırpar ve hareket eder. GPU’su olmayan bir bilgisayarda başta durağandır.",
   "settings.logoColor.title": "Logo rengi",
   "settings.logoColor.description": "Dock'ta, görev çubuğunda ve Dynamic Island'da gösterilir.",
   "settings.logoColor.buildNote": "Bu derleme kendi logo rengini korur. Seçim, yayımlanan uygulamaya uygulanır.",
@@ -786,6 +793,13 @@ export const messages = {
   "settings.transfer.import.lede": "Diğer sunucudan dışa aktardığınız dosyayı seçin. Dosya adı .zip ile biter.",
   "settings.transfer.import.choose": "Dosya seç…",
   "settings.transfer.import.reading": "Dosya okunuyor…",
+  "settings.transfer.upload.label": "Sunucuya yükleme",
+  "settings.transfer.upload.sending": "Dosya gönderiliyor…",
+  "settings.transfer.upload.sent": "{total} içinden {sent} gönderildi",
+  "settings.transfer.upload.serverReading": "Sunucu dosyayı okuyor…",
+  "settings.transfer.upload.etaSoon": "Bir dakikadan az kaldı",
+  "settings.transfer.upload.etaMinutes": "Yaklaşık {minutes} dk kaldı",
+  "settings.transfer.upload.etaHours": "Yaklaşık {hours} sa {minutes} dk kaldı",
   "settings.transfer.import.openFailed": "Dosya açılamadı",
   "settings.transfer.import.contains": "Bu dosyanın içeriği",
   "settings.transfer.import.source": "OpenBot {version} · {date} tarihinde dışa aktarıldı",
@@ -829,7 +843,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Bu sunucuda ajan yok.",
   "settings.transfer.copy.new": "Yeni",
   "settings.transfer.copy.notCopied":
-    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+    "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {

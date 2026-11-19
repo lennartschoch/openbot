@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import type { HostReleaseStatus, UpdateStatus } from "@openbot/contracts/ipc";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { Deferred, Effect, Exit, Schema } from "effect";
 import { parse } from "yaml";
-import { isValidSemver } from "./update-service";
 
 class ReleaseCheckFailed extends Schema.TaggedError<ReleaseCheckFailed>()("ReleaseCheckFailed", {}) {}
 

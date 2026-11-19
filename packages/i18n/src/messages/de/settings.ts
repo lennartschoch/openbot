@@ -31,6 +31,13 @@ export const messages = {
   "settings.codeFont.title": "Code-Schrift",
   "settings.codeFont.description": "Die Schrift von Code, Terminals und Dateipfaden.",
   "settings.codeFont.default": "Standard",
+  "settings.motion.title": "Bewegung",
+  "settings.backgroundBlur.title": "Hintergrundunschärfe",
+  "settings.backgroundBlur.description":
+    "Unschärfe hinter Menüs und Dialogen. Auf einem Computer ohne GPU ist sie anfangs aus.",
+  "settings.movingFaces.title": "Bewegte Agentengesichter",
+  "settings.movingFaces.description":
+    "Agentengesichter blinzeln und bewegen sich. Auf einem Computer ohne GPU sind sie anfangs still.",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -802,6 +809,13 @@ export const messages = {
   "settings.transfer.import.lede": "Wähle die Datei, die du vom anderen Server exportiert hast. Sie endet auf .zip.",
   "settings.transfer.import.choose": "Datei wählen…",
   "settings.transfer.import.reading": "Datei wird gelesen…",
+  "settings.transfer.upload.label": "Upload zum Server",
+  "settings.transfer.upload.sending": "Datei wird gesendet…",
+  "settings.transfer.upload.sent": "{sent} von {total} gesendet",
+  "settings.transfer.upload.serverReading": "Server liest die Datei…",
+  "settings.transfer.upload.etaSoon": "Weniger als eine Minute übrig",
+  "settings.transfer.upload.etaMinutes": "Noch etwa {minutes} Min.",
+  "settings.transfer.upload.etaHours": "Noch etwa {hours} Std. {minutes} Min.",
   "settings.transfer.import.openFailed": "Die Datei konnte nicht geöffnet werden",
   "settings.transfer.import.contains": "Diese Datei enthält",
   "settings.transfer.import.source": "OpenBot {version} · exportiert am {date}",
@@ -845,7 +859,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Dieser Server hat keine Agenten.",
   "settings.transfer.copy.new": "Neu",
   "settings.transfer.copy.notCopied":
-    "Ihre Kanäle und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
+    "Ihre Kanäle, Routinenabläufe, Workflows und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
   "settings.transfer.copy.submit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
   "settings.transfer.copy.copying": "Wird kopiert…",
   "settings.transfer.copy.done": {

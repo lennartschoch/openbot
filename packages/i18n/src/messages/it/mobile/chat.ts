@@ -137,6 +137,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "FILE",
   "mobile.chat.attachment.tooLargeForMobile":
     "Questo file supera il limite di {limit} per il telefono. Aprilo sul desktop.",
+  "mobile.chat.backdrop.agentSet": "{name} ha impostato lo sfondo",
+  "mobile.chat.backdrop.undo": "Annulla",
+  "mobile.chat.backdrop.dismiss": "Chiudi",
   "mobile.chat.attachment.sharingUnavailable": "La condivisione dei file non è disponibile su questo dispositivo.",
   "mobile.chat.attachment.unavailable": "L'allegato non è disponibile. Riprova.",
   "mobile.chat.attachment.openFailed": "Impossibile aprire l'allegato",
@@ -199,9 +202,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Annulla risposta",
   "mobile.chat.composer.messageAgent": "Scrivi a {name}",
   "mobile.chat.composer.pasteFailed": "Impossibile allegare il testo incollato",
-  "mobile.chat.composer.cancelDictation": "Annulla dettatura",
   "mobile.chat.voice.listening": "In ascolto…",
-  "mobile.chat.voice.continue": "Continua dettatura",
   "mobile.chat.liveVoice.start": "Avvia conversazione vocale",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Avvio",
@@ -370,7 +371,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Accedi dal tuo computer",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Questo sito non accetta un accesso dal server. Apri questa chat nell’app desktop di OpenBot sul tuo computer e accedi da lì.",
-  "mobile.chat.browserSecret.takeoverReload": "Poi ricarica la pagina prima di scegliere «Ho finito».",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot non è riuscito a finire di inserire la password o il codice. Inserisci nella pagina ciò che manca. Poi ricarica la pagina prima di scegliere «Ho finito».",
   "mobile.chat.browserSecret.takeoverFailed": "Impossibile completare la richiesta.",
   "mobile.chat.browserSecret.done": "Ho finito",
   "mobile.chat.browserSecret.submitOnce":
@@ -487,7 +489,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Ultimi",
   "mobile.chat.history.loadingOlder": "Caricamento dei messaggi precedenti…",
   "mobile.chat.history.retryOlder": "Riprova a caricare i messaggi precedenti",
-  "mobile.chat.history.loadOlder": "Carica i messaggi precedenti",
   "mobile.chat.history.connecting": "Connessione al server",
   "mobile.chat.history.loading": "Caricamento della cronologia della chat",
   "mobile.chat.history.waiting": "In attesa della connessione",
@@ -539,6 +540,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Ferma l’agente e invia ora il prossimo messaggio in coda",
   "mobile.chat.queue.deleteNext": "Elimina il prossimo messaggio in coda",
   "mobile.chat.queue.moveFirst": "Sposta al primo posto",
+  "mobile.chat.queue.runInNewThread": "Esegui in un nuovo thread",
+  "mobile.chat.queue.runNextInNewThread": "Esegui il prossimo messaggio in coda in un nuovo thread",
   "mobile.chat.queue.deleteTitle": "Eliminare il messaggio in coda?",
   "mobile.chat.queue.deleteMessage": "L'agente non lo riceverà mai.",
   "mobile.chat.queue.keep": "Mantieni",

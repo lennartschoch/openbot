@@ -11,6 +11,7 @@ import {
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import type {
   WorkflowChannel,
@@ -29,8 +30,8 @@ import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability 
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
 /** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits";
-/** Each method with its input only; `list`, `githubCatalog`, `mediaProviders` and `mediaCredits` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog";
+/** Each method with its input only; the methods of `NoInputMethod` take none. */
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
@@ -98,6 +99,12 @@ export interface WorkflowHost {
    * with the model's own background.
    */
   mediaTransparentSupported(): boolean;
+  /**
+   * Whether an image step can have a custom size in pixels or the aspect ratios 4:5 and 5:4: this
+   * computer always, and a joined server only when it advertises `workflows-media-size-v1`. An older
+   * host reads them as the first aspect ratio of the model.
+   */
+  mediaSizeSupported(): boolean;
   /**
    * The pictures of the host's Library that an asset step can use: this computer's, or a joined
    * server's when it serves `storage-v1`. The host gives a member only the files of the agents that
@@ -174,13 +181,25 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   /** The host runs Telegram and Slack nodes, and their chats and workspaces come from its connections. */
   const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
   const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
-  const options = () => window.openbot.routineResults.options(serverId);
+  /**
+   * The places, Discord servers, Telegram chats and Slack workspaces read the connections at the same
+   * time, so they share one call while it runs.
+   */
+  let optionsCall: ReturnType<OpenBotDesktopApi["routineResults"]["options"]> | undefined;
+  const options = () => {
+    optionsCall ??= window.openbot.routineResults.options(serverId).finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
   const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
   const mediaAccountSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
   const mediaTransparentSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+  const mediaSizeSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
   // A joined server without GitHub workflows gets no call: its port rejects before main.
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   // A joined server's attachment comes through main, which downloads it from the host.
@@ -218,6 +237,9 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       mediaProviders: () => api().mediaProviders(serverId),
       // Main answers `sunra: null` or `higgsfield: null` for a joined server without that capability.
       mediaCredits: () => api().mediaCredits(serverId),
+      // Main answers no models and no quote for a joined server without `workflows-media-catalog-v1`.
+      mediaCatalog: () => api().mediaCatalog(serverId),
+      mediaPrice: (input) => api().mediaPrice(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -326,6 +348,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported,
     mediaAccountSupported,
     mediaTransparentSupported,
+    mediaSizeSupported,
     mediaUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;

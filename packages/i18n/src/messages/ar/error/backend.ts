@@ -85,6 +85,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
+  "error.backend.channelArchiveRunning": "أوقف العمل الجاري في هذه القناة، ثم احذفها.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
   "error.backend.channelTaskNotFound": "لم يتم العثور على مهمة القناة.",
   "error.backend.channelTaskComplete": "هذه المهمة مكتملة بالفعل.",
@@ -115,6 +116,8 @@ export const messages = {
   "error.backend.memoryGone": "هذه الذكرى لم تعد موجودة.",
   "error.backend.routineGone": "هذه المهمة الدورية لم تعد موجودة.",
   "error.backend.routineRunGone": "تشغيل المهمة الدورية هذا لم يعد موجودًا.",
+  "error.backend.routineRunFailedNoReason":
+    "توقف التشغيل بسبب خطأ، لكن لم يصل معه أي سبب. افتح التشغيل لترى ما فعله الوكيل.",
   "error.backend.turnNotStarted": "لم يبدأ المزوّد هذا الدور.",
   "error.backend.routineResultConnectionOff": "اتصال المراسلة هذا متوقف أو تمت إزالته. اختر مكانًا آخر.",
   "error.backend.routineResultNoDelivery": "لا توجد لهذا التشغيل إجابة لإرسالها مرة أخرى.",
@@ -255,9 +258,11 @@ export const messages = {
   "error.backend.mcpSignInAnswerUnreadable":
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
+  "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
+  "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
@@ -272,6 +277,8 @@ export const messages = {
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
     "انتهى تسجيل الدخول إلى خادم MCP هذا. يجب على المستخدم تسجيل الدخول إليه مرة أخرى في OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "تعذّر على OpenBot تجديد تسجيل الدخول إلى خادم MCP هذا الآن. يبقى تسجيل الدخول محفوظًا، وسيحاول الطلب التالي مرة أخرى. إذا استمر هذا الخطأ، يمكن للمستخدم تسجيل الخروج من الخادم في OpenBot ثم تسجيل الدخول مرة أخرى.",
   "error.backend.mcpServerUnreachable": "تعذّر على OpenBot الوصول إلى الخادم. تحقق من URL ومن شبكتك.",
   "error.backend.mcpLocalServerOff":
     "لا يُجيب أي خادم على {address} في هذا الحاسوب. شغّل الخادم، أو فعّله في التطبيق الذي يشغّله، ثم حاول مرة أخرى.",

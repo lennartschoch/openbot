@@ -30,6 +30,13 @@ export const messages = {
   "settings.codeFont.title": "Fonte do código",
   "settings.codeFont.description": "A fonte do código, dos terminais e dos caminhos de arquivo.",
   "settings.codeFont.default": "Padrão",
+  "settings.motion.title": "Movimento",
+  "settings.backgroundBlur.title": "Desfoque do fundo",
+  "settings.backgroundBlur.description":
+    "Desfoque atrás de menus e caixas de diálogo. Começa desligado em um computador sem GPU.",
+  "settings.movingFaces.title": "Rostos de agentes em movimento",
+  "settings.movingFaces.description":
+    "Os rostos dos agentes piscam e se movem. Começam parados em um computador sem GPU.",
   "settings.logoColor.title": "Cor do logotipo",
   "settings.logoColor.description": "Aparece no Dock, na barra de tarefas e na Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -784,6 +791,13 @@ export const messages = {
   "settings.transfer.import.lede": "Escolha o arquivo que você exportou do outro servidor. Ele termina em .zip.",
   "settings.transfer.import.choose": "Escolher arquivo…",
   "settings.transfer.import.reading": "Lendo o arquivo…",
+  "settings.transfer.upload.label": "Envio para o servidor",
+  "settings.transfer.upload.sending": "Enviando o arquivo…",
+  "settings.transfer.upload.sent": "{sent} de {total} enviados",
+  "settings.transfer.upload.serverReading": "O servidor está lendo o arquivo…",
+  "settings.transfer.upload.etaSoon": "Menos de um minuto restante",
+  "settings.transfer.upload.etaMinutes": "Faltam cerca de {minutes} min",
+  "settings.transfer.upload.etaHours": "Faltam cerca de {hours} h {minutes} min",
   "settings.transfer.import.openFailed": "Não foi possível abrir o arquivo",
   "settings.transfer.import.contains": "Este arquivo contém",
   "settings.transfer.import.source": "OpenBot {version} · exportado em {date}",
@@ -821,7 +835,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Este servidor não tem agentes.",
   "settings.transfer.copy.new": "Novo",
   "settings.transfer.copy.notCopied":
-    "Os canais deles e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
+    "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {

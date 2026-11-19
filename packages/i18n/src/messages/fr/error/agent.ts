@@ -14,6 +14,8 @@ export const messages = {
     "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
   "error.agent.toolCallEnvelopeKeys":
     "L’outil ne s’est pas exécuté. tool_call accepte seulement name et arguments. Mettez les arguments de l’outil dans arguments, sous forme d’objet, puis renvoyez l’appel.",
+  "error.agent.toolCallMissingName":
+    "L’outil ne s’est pas exécuté. Le tool_call n’a pas de name. Mettez dans name le nom qualifié que donne tool_search, par exemple openbot.history_read, et envoyez l’appel à nouveau.",
   "error.agent.toolCallUnknownTool":
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -67,6 +69,8 @@ export const messages = {
   "error.agent.modelNotListed": "Le modèle « {model} » n’est pas disponible. Modèles disponibles : {models}.",
   "error.agent.providerNotListed":
     "Aucun modèle {provider} n’est disponible pour le moment. Appelez list_models pour voir les modèles disponibles.",
+  "error.agent.creatorModelNotListed":
+    "Votre modèle « {model} » n’est pas dans la liste des modèles pour le moment, donc le nouvel agent ne peut pas démarrer avec. Réessayez dans quelques secondes, ou indiquez dans provider et model un modèle que list_models affiche.",
   "error.agent.reasoningEffortUnsupported":
     "Le modèle « {model} » ne prend pas en charge l’effort de raisonnement « {effort} ». Efforts pris en charge : {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -104,12 +108,15 @@ export const messages = {
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
   "error.agent.turnStalled":
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.promptCancelled": "{provider} a annulé ce message avant son début. Renvoyez le message.",
   "error.agent.toolLoopStopped":
     "{provider} a répété de nombreuses fois une étape en échec, donc OpenBot a arrêté ce tour. Renvoyez le message ou choisissez un autre modèle.",
   "error.agent.answerCutOff":
     "L’agent s’est arrêté avant de terminer sa réponse, donc la réponse n’est pas complète. Renvoyez le message.",
   "error.agent.compactionConnectionLost":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet, puis envoyez un message pour continuer.",
+  "error.agent.compactionConnectionLostAddress":
+    "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet et que {variable}, sous Variables dans les réglages de {provider}, est l’adresse API de votre service de modèles (souvent en /v1). Puis envoyez un message.",
   "error.agent.compactionLoopStopped":
     "{provider} a compacté le contexte encore et encore, et il restait chaque fois trop plein pour continuer : OpenBot a donc arrêté ce tour. Désactivez les serveurs MCP ou l'utilisation de l'ordinateur dont cet agent n'a pas besoin, puis envoyez un message. Si vous ou l'agent avez changé le moment où {provider} compacte, annulez ce changement.",
   "error.agent.selectedGone": "L’agent sélectionné n’existe plus.",
@@ -128,6 +135,8 @@ export const messages = {
   "error.agent.stopBeforeDelete": "Arrêtez l’agent et annulez ses messages en file d’attente avant de le supprimer.",
   "error.agent.deleteIncomplete":
     "Les données de l’agent n’ont pas pu être entièrement supprimées. Relancez la suppression de l’agent.",
+  "error.agent.deleteFolderInUse":
+    "Le travail d'un autre agent utilise encore le dossier de cet agent. Supprimez à nouveau cet agent quand ce travail se termine, ou après avoir redémarré OpenBot.",
   "error.agent.duplicationBusy": "Cet agent est déjà en cours de duplication.",
   "error.agent.waitBeforeDuplicate":
     "Attendez que l’agent ait terminé et videz sa file d’attente avant de le dupliquer.",

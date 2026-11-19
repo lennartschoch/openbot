@@ -14,6 +14,8 @@ export const messages = {
     "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
   "error.agent.toolCallEnvelopeKeys":
     "Il tool non è stato eseguito. tool_call accetta solo name e arguments. Metti gli argomenti del tool in arguments, come oggetto, e invia di nuovo la chiamata.",
+  "error.agent.toolCallMissingName":
+    "Il tool non è stato eseguito. Il tool_call non ha name. Metti in name il nome qualificato fornito da tool_search, ad esempio openbot.history_read, e invia di nuovo la chiamata.",
   "error.agent.toolCallUnknownTool":
     "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Usa il nome qualificato esatto fornito da tool_search, ad esempio openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -66,6 +68,8 @@ export const messages = {
   "error.agent.modelNotListed": "Il modello «{model}» non è disponibile. Modelli disponibili: {models}.",
   "error.agent.providerNotListed":
     "Al momento nessun modello di {provider} è disponibile. Chiama list_models per vedere i modelli disponibili.",
+  "error.agent.creatorModelNotListed":
+    "Il tuo modello «{model}» al momento non è nell’elenco dei modelli, quindi il nuovo agente non può iniziare con esso. Riprova tra qualche secondo, oppure imposta provider e model su un modello mostrato da list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Il modello «{model}» non supporta il livello di impegno «{effort}». Livelli supportati: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -101,12 +105,16 @@ export const messages = {
   "error.agent.endpointRemoved": "L'endpoint usato da questo agente è stato rimosso. Scegli un altro modello.",
   "error.agent.turnStalled":
     "{provider} ha smesso di rispondere, quindi OpenBot ha terminato questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
+  "error.agent.promptCancelled":
+    "{provider} ha annullato questo messaggio prima che iniziasse. Invia di nuovo il messaggio.",
   "error.agent.toolLoopStopped":
     "{provider} ha ripetuto molte volte un passaggio non riuscito, quindi OpenBot ha interrotto questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
   "error.agent.answerCutOff":
     "L’agente si è fermato prima di finire la risposta, quindi la risposta non è completa. Invia di nuovo il messaggio.",
   "error.agent.compactionConnectionLost":
     "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet, poi invia un messaggio per continuare.",
+  "error.agent.compactionConnectionLostAddress":
+    "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet e che {variable}, in Variabili nelle impostazioni di {provider}, sia l’indirizzo API del servizio di modelli (spesso finisce in /v1). Poi invia un messaggio.",
   "error.agent.compactionLoopStopped":
     "{provider} ha compattato il contesto più e più volte, e ogni volta è rimasto troppo pieno per continuare, quindi OpenBot ha fermato questo turno. Disattiva i server MCP o l'uso del computer che questo agente non usa, poi invia un messaggio. Se tu o l'agente avete cambiato quando {provider} compatta, annulla la modifica.",
   "error.agent.selectedGone": "L'agente selezionato non esiste più.",
@@ -123,6 +131,8 @@ export const messages = {
   "error.agent.deletionBusy": "L'eliminazione dell'agente è già in corso.",
   "error.agent.stopBeforeDelete": "Ferma l'agente e annulla i suoi messaggi in coda prima di eliminarlo.",
   "error.agent.deleteIncomplete": "Non è stato possibile rimuovere del tutto i dati dell'agente. Riprova a eliminarlo.",
+  "error.agent.deleteFolderInUse":
+    "Il lavoro di un altro agente usa ancora la cartella di questo agente. Eliminalo di nuovo quando quel lavoro finisce, o dopo aver riavviato OpenBot.",
   "error.agent.duplicationBusy": "Questo agente è già in fase di duplicazione.",
   "error.agent.waitBeforeDuplicate": "Aspetta che l'agente finisca e svuoti la coda prima di duplicarlo.",
   "error.agent.saveOtherAgent": "Questo salvataggio appartiene a un altro agente.",

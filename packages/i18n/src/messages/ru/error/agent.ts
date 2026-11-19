@@ -14,6 +14,8 @@ export const messages = {
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
   "error.agent.toolCallEnvelopeKeys":
     "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallMissingName":
+    "Инструмент не запущен. В tool_call нет name. Укажите в name полное имя из tool_search, например openbot.history_read, и отправьте вызов снова.",
   "error.agent.toolCallUnknownTool":
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -61,6 +63,8 @@ export const messages = {
   "error.agent.modelNotListed": "Модель «{model}» недоступна. Доступные модели: {models}.",
   "error.agent.providerNotListed":
     "Сейчас нет доступных моделей {provider}. Вызовите list_models, чтобы увидеть доступные модели.",
+  "error.agent.creatorModelNotListed":
+    "Вашей модели «{model}» сейчас нет в списке моделей, поэтому новый агент не может начать работу на ней. Повторите попытку через несколько секунд или укажите в provider и model модель, которую показывает list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Модель «{model}» не поддерживает уровень усилий «{effort}». Поддерживаются: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -96,12 +100,15 @@ export const messages = {
   "error.agent.endpointRemoved": "Эндпоинт, который использовал этот агент, удалён. Выберите для него другую модель.",
   "error.agent.turnStalled":
     "{provider} перестал отвечать, поэтому OpenBot завершил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.promptCancelled": "{provider} отменил это сообщение до его начала. Отправьте сообщение ещё раз.",
   "error.agent.toolLoopStopped":
     "{provider} много раз повторил неудачный шаг, поэтому OpenBot остановил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
   "error.agent.answerCutOff":
     "Агент остановился, не закончив ответ, поэтому ответ неполный. Отправьте сообщение ещё раз.",
   "error.agent.compactionConnectionLost":
     "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету, затем отправьте сообщение, чтобы продолжить.",
+  "error.agent.compactionConnectionLostAddress":
+    "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету. Также проверьте, что {variable} в разделе «Переменные» настроек {provider} — это адрес API вашего сервиса моделей (часто заканчивается на /v1). Затем отправьте сообщение.",
   "error.agent.compactionLoopStopped":
     "{provider} снова и снова сжимал контекст, но каждый раз он оставался слишком полным, чтобы продолжить, поэтому OpenBot остановил этот ход. Отключите серверы MCP или управление компьютером, которые этому агенту не нужны, затем отправьте сообщение. Если вы или агент изменили, когда {provider} сжимает контекст, отмените это изменение.",
   "error.agent.selectedGone": "Выбранного агента больше нет.",
@@ -118,6 +125,8 @@ export const messages = {
   "error.agent.deletionBusy": "Агент уже удаляется.",
   "error.agent.stopBeforeDelete": "Остановите агента и отмените его сообщения в очереди, прежде чем удалять.",
   "error.agent.deleteIncomplete": "Данные агента удалены не полностью. Повторите удаление.",
+  "error.agent.deleteFolderInUse":
+    "Работа другого агента ещё использует папку этого агента. Удалите агента снова, когда эта работа закончится, или после перезапуска OpenBot.",
   "error.agent.duplicationBusy": "Этот агент уже дублируется.",
   "error.agent.waitBeforeDuplicate":
     "Дождитесь, пока агент закончит работу, и очистите его очередь, прежде чем дублировать.",

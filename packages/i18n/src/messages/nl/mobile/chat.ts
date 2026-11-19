@@ -129,6 +129,9 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "BESTAND",
   "mobile.chat.attachment.tooLargeForMobile":
     "Dit bestand is groter dan de mobiele limiet van {limit}. Open het op je computer.",
+  "mobile.chat.backdrop.agentSet": "{name} heeft de achtergrond ingesteld",
+  "mobile.chat.backdrop.undo": "Ongedaan maken",
+  "mobile.chat.backdrop.dismiss": "Sluiten",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
   "mobile.chat.attachment.unavailable": "De bijlage is niet beschikbaar. Probeer opnieuw.",
   "mobile.chat.attachment.openFailed": "Kan bijlage niet openen",
@@ -191,9 +194,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Annuleer antwoord",
   "mobile.chat.composer.messageAgent": "Bericht aan {name}",
   "mobile.chat.composer.pasteFailed": "Kan geplakte tekst niet bijvoegen",
-  "mobile.chat.composer.cancelDictation": "Annuleer dicteren",
   "mobile.chat.voice.listening": "Luisteren…",
-  "mobile.chat.voice.continue": "Ga door met dicteren",
   "mobile.chat.composer.addAttachment": "Voeg bijlage toe",
   "mobile.chat.composer.ask": "Vraag {name}",
   "mobile.chat.composer.stopFailed": "Kan de agent niet stoppen. Misschien is die al klaar.",
@@ -337,7 +338,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Log in op je computer",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Deze site accepteert geen aanmelding vanaf de server. Open deze chat in de OpenBot-desktopapp op je computer en log daar in.",
-  "mobile.chat.browserSecret.takeoverReload": "Laad daarna de pagina opnieuw voordat je Ik ben klaar kiest.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot kon het wachtwoord of de code niet helemaal invullen. Vul op de pagina in wat ontbreekt. Laad daarna de pagina opnieuw voordat je Ik ben klaar kiest.",
   "mobile.chat.browserSecret.takeoverFailed": "Het verzoek kan niet worden voltooid.",
   "mobile.chat.browserSecret.done": "Ik ben klaar",
   "mobile.chat.browserSecret.submitOnce":
@@ -455,7 +457,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Nieuwste",
   "mobile.chat.history.loadingOlder": "Oudere berichten laden…",
   "mobile.chat.history.retryOlder": "Probeer oudere berichten opnieuw te laden",
-  "mobile.chat.history.loadOlder": "Laad oudere berichten",
   "mobile.chat.history.connecting": "Verbinden met server",
   "mobile.chat.history.loading": "Chatgeschiedenis laden",
   "mobile.chat.history.waiting": "Wachten op verbinding",
@@ -507,6 +508,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Stop de agent en verzend het volgende wachtrijbericht nu",
   "mobile.chat.queue.deleteNext": "Volgend bericht in wachtrij verwijderen",
   "mobile.chat.queue.moveFirst": "Zet bovenaan",
+  "mobile.chat.queue.runInNewThread": "Uitvoeren in nieuwe thread",
+  "mobile.chat.queue.runNextInNewThread": "Volgend bericht in de wachtrij uitvoeren in nieuwe thread",
   "mobile.chat.queue.deleteTitle": "Bericht in wachtrij verwijderen?",
   "mobile.chat.queue.deleteMessage": "De agent ontvangt het nooit.",
   "mobile.chat.queue.keep": "Behouden",

@@ -68,11 +68,14 @@ interface ChatActionMarkerProps {
   onToggleAgentMessage?: ((messageId: string) => void) | undefined;
   /** Draws the text of an open agent message under its marker, by its `messageId`. */
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
-  /** The instruction file of the agent, for View and Undo on its change line. */
+  /** The instruction file of the agent, for Undo on its change line. Without it, the line has View only. */
   instructions?: AgentInstructionsFileCalls | undefined;
   /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
   onOpenInstructions?: ((agentId: string) => void) | undefined;
 }
+
+/** The actions of a skill or instruction change line, the same in the agent's chat and in its threads. */
+export type ChangeMarkerActions = Pick<ChatActionMarkerProps, "onOpenSkill" | "instructions" | "onOpenInstructions">;
 
 /** The parts of a marker that open the text of an agent message, for the markers in a group. */
 type AgentMessageTextProps = Pick<ChatActionMarkerProps, "onToggleAgentMessage" | "agentMessageText">;
@@ -373,8 +376,15 @@ function AgentMessageGroupMarker(
             onClick={control.toggle}
           >
             <span class="chat-action-avatar-stack" aria-hidden="true">
-              <For each={agents().slice(0, 3)}>
-                {(agent) => <AgentAvatar agent={agent} class="chat-action-agent-avatar" />}
+              {/* Keyed by agent id: the agents come as new objects on each update, and a new face
+                  plays its entry again. */}
+              <For each={agentIds().slice(0, 3)}>
+                {(agentId) => (
+                  <AgentAvatar
+                    agent={props.agents.find((agent) => agent.id === agentId)}
+                    class="chat-action-agent-avatar"
+                  />
+                )}
               </For>
             </span>
             <span>{agentsLabel()}</span>
@@ -576,7 +586,7 @@ function SingleChatActionMarker(
               </span>
             )}
           </Show>
-          <Show when={instructionsChange(props.marker, props.instructions)}>
+          <Show when={instructionsChange(props.marker, props.instructions, props.onOpenInstructions)}>
             {(target) => (
               <InstructionsChangeActions
                 agentId={target().agentId}
@@ -1064,9 +1074,13 @@ function skillInstallCount(marker: SingleChatActionMarkerModel): number | undefi
   return count > 1 ? count : undefined;
 }
 
-/** The change line of a local agent, which can show View and Undo. */
-function instructionsChange(marker: SingleChatActionMarkerModel, calls: AgentInstructionsFileCalls | undefined) {
-  if (marker.kind !== "instructions-change" || !marker.agentId || !calls) return undefined;
+/** The change line of a local agent, which can show View, and Undo when it has the file calls. */
+function instructionsChange(
+  marker: SingleChatActionMarkerModel,
+  calls: AgentInstructionsFileCalls | undefined,
+  onView: ((agentId: string) => void) | undefined,
+) {
+  if (marker.kind !== "instructions-change" || !marker.agentId || (!calls && !onView)) return undefined;
   return { agentId: marker.agentId, change: marker.change, calls };
 }
 

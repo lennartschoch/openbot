@@ -19,18 +19,31 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import {
+  createRoutineFlows,
+  type RoutineFlowsHandle,
+  routineFlowNoticeEvent,
+} from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
-import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import {
+  createRoutineResults,
+  type RoutineResultsHandle,
+  routineResultNoticeEvent,
+} from "../backend/routine-results/routine-results";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowNotice,
+  type WorkflowsHandle,
+  workflowNoticeEvent,
+} from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
-import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "./agent-defaults-settings";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
@@ -54,6 +67,7 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
+import { sizeWorkflowPicture } from "./workflow-picture-size";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
  * function, in dependency order, and handed back as a single record.
@@ -75,8 +89,9 @@ import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-eff
  * when - see `teardown-registry.ts` for why shutdown here is not the reverse of construction.
  */
 
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -112,6 +127,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -310,7 +326,7 @@ import {
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
-import { LocalServers } from "./local-servers/local-servers";
+import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -379,7 +395,6 @@ import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
 import { createRemoteControlQuestion } from "./remote-control-question";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
-import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { decodeVoid } from "./remote-host-decoding";
 import {
@@ -396,6 +411,7 @@ import {
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
@@ -449,7 +465,6 @@ import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
@@ -529,7 +544,6 @@ const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const REMOTE_SESSIONS_FILE = "openbot-remote-sessions-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
-const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
@@ -570,6 +584,8 @@ const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
   startupTiming: 9.5,
+  // Before the updater and the requested update that it drives.
+  requiredUpdate: 9.8,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -742,6 +758,8 @@ export interface ApplicationServices {
   requestedUpdate: RequestedUpdate;
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
+  /** Null in a development run and in a local server child. */
+  requiredUpdate: RequiredUpdate | null;
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
@@ -859,17 +877,42 @@ function secretStorage(): SecretStorage {
   return userDataSecretStorage;
 }
 
-/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux key file. */
+/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux and macOS key file. */
 function safeStorageCipher(
   unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
 ): SecretStorageCipher {
   return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
+/**
+ * The account service requests go through Chromium's network stack, which uses the computer's proxy
+ * settings as the built-in browser does. Node `fetch` ignores them, so the server list and a
+ * connection timed out on a network that needs the system proxy (#10314). The requests carry a
+ * bearer token: they send no browser cookie and use no HTTP cache, as with Node `fetch`.
+ *
+ * A Chromium network failure (`net::ERR_CONNECTION_REFUSED`) is thrown as Node `fetch` throws one,
+ * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
+ * An abort rejects with the signal's reason, as in Node.
+ */
+async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  try {
+    return await net.fetch(input instanceof URL ? input.href : input, {
+      ...init,
+      credentials: "omit",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    const code = /^net::(ERR_[A-Z0-9_]+)$/u.exec(error.message)?.[1];
+    if (code === undefined) throw error;
+    throw new TypeError("fetch failed", { cause: Object.assign(error, { code }) });
+  }
+}
+
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
-  if (state.status === "permissions-required") return "setup-required";
+  if (state.status === "permissions-required" || state.status === "restart-required") return "setup-required";
   return "unavailable";
 }
 
@@ -1288,6 +1331,7 @@ export async function createApplicationServices({
     apiUrl: centralAuthApiUrl,
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
+    fetch: accountServiceFetch,
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
     keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
@@ -1350,7 +1394,7 @@ export async function createApplicationServices({
   const store = new AgentStore(
     app.getPath("userData"),
     homedir(),
-    new OpenBotDatabase(app.getPath("userData")),
+    new OpenBotDatabase(app.getPath("userData"), checkDatabaseIntegrityInHost),
     () => agentDefaults.get(),
     localServerChild?.agentRoot,
   );
@@ -2069,6 +2113,11 @@ export async function createApplicationServices({
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
       onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
+        logger.warn(
+          `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
+          output.length > 0 ? `Its last output: ${output}` : "It wrote no output.",
+        ),
     }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
@@ -2443,6 +2492,10 @@ export async function createApplicationServices({
       // never the token; only a test the user pressed may open a browser.
       mcpOAuth,
       mcpOAuthProxySettings,
+      // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+      // Node `fetch` ignores them, so the Gemini quota read timed out behind a system proxy (#11278).
+      // The requests carry a bearer token: no browser cookie and no HTTP cache.
+      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
@@ -2651,8 +2704,31 @@ export async function createApplicationServices({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
           })),
         ),
+      // The new PNG replaces the picture that the model made, so Storage keeps one file for the step.
+      sizePicture: (attachmentId, size) =>
+        Effect.gen(function* () {
+          const file = yield* mailbox.resolveAttachment(attachmentId);
+          if (!file) return yield* Effect.fail(new Error("The generated picture is gone."));
+          const source = yield* Effect.tryPromise(() => readFile(file.path));
+          // A throw from the image decoder fails the crop, so the step keeps the model's picture.
+          const bytes = yield* Effect.try(() => sizeWorkflowPicture(source, size));
+          if (!bytes) return yield* Effect.fail(new Error("The generated picture could not be decoded."));
+          const stored = yield* mailbox.storeGeneratedAttachment({
+            bytes,
+            name: "generated-image.png",
+            mimeType: "image/png",
+          });
+          yield* mailbox.deleteStoredFile(attachmentId).pipe(Effect.ignore);
+          return stored.id;
+        }).pipe(
+          Effect.mapError((failure) => ({
+            message: failure instanceof Error ? failure.message : String(failure),
+          })),
+        ),
       mediaProviders: () => service.workflowMediaProviders(),
       mediaCredits: (only) => service.workflowMediaCredits(only),
+      mediaCatalog: (only) => service.workflowMediaCatalog(only),
+      mediaPrice: (request) => service.workflowMediaPrice(request),
       // A kept picture is new in the Library, so the next scan must not answer from before it. A failure
       // after the file is stored also clears the scan.
       keepPicture: (draftId, types) =>
@@ -2793,10 +2869,12 @@ export async function createApplicationServices({
       },
     }),
   );
+  // Most events are streamed text that no sweep waits for, so a fiber starts only for an event that a
+  // sweep uses.
   service.on("event", (event) => {
-    Effect.runFork(routineFlowRuntime.notice(event));
-    Effect.runFork(routineResultRuntime.notice(event));
-    Effect.runFork(workflowRuntime.notice(event));
+    if (routineFlowNoticeEvent(event)) Effect.runFork(routineFlowRuntime.notice(event));
+    if (routineResultNoticeEvent(event)) Effect.runFork(routineResultRuntime.notice(event));
+    if (workflowNoticeEvent(event)) Effect.runFork(workflowRuntime.notice(event));
   });
   teardown.push(TEARDOWN_ORDER.routineResults, "the routine results", () =>
     Effect.runPromise(routineResultRuntime.close()),
@@ -3323,8 +3401,11 @@ export async function createApplicationServices({
       return {
         list: () =>
           library.pipe(
-            Effect.flatMap((local) => local.list()),
-            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+            Effect.flatMap((local) => local.listWithUnreadable()),
+            Effect.map(({ skills, unreadable }) => ({
+              skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+              unreadable: unreadable.map(({ skillId }) => skillId),
+            })),
           ),
         assigned: (agentIds: readonly string[]) =>
           Effect.forEach(agentIds, (agentId) =>
@@ -3437,6 +3518,8 @@ export async function createApplicationServices({
         url,
         Date.now(),
       ),
+    // A server on this computer: only the desktop app here signs in with its owner password.
+    atHost: (sessionId) => localServerChild !== null && teamStore.isStoredOwnerSession(sessionId),
   });
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),
@@ -3488,6 +3571,10 @@ export async function createApplicationServices({
       }),
     remove: (mcpServerId) => mcpAccessStore.remove(mcpServerId),
   };
+  // The login of the remote desktop runtime. Only this process uses it, on loopback, and each runtime
+  // start gives it to Sunshine again. So it stays in memory: the remote desktop also starts when the
+  // system keyring or the macOS Keychain is not available.
+  const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3581,7 +3668,8 @@ export async function createApplicationServices({
     crm,
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
-    // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
+    // Present, so the host advertises `routine-run-place-v1` and `routine-pause-reasons-v1`. Any member reads
+    // the places and the pause reasons; a change of place needs manage access.
     routineRunPlaces: service.routineRecords,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
@@ -3830,17 +3918,7 @@ export async function createApplicationServices({
         catch: (cause) => new RemoteWorkflowError({ cause }),
       }),
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
-    getRemoteDesktopRuntimeCredentials: () =>
-      Effect.suspend(() => {
-        if (!secretCipher.canPersist())
-          return Effect.fail(
-            new RemoteWorkflowError({ cause: new Error(sourceText("error.app.secretStorageUnavailable")) }),
-          );
-        return loadOrCreateRemoteDesktopCredentials(
-          join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE),
-          secretCipher,
-        ).pipe(toRemoteWorkflowError);
-      }),
+    getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
@@ -4157,7 +4235,11 @@ export async function createApplicationServices({
           remoteServers,
           command: {
             executable: process.execPath,
-            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+            args: [
+              ...(app.isPackaged ? [] : [app.getAppPath()]),
+              ...ozonePlatformArguments(),
+              ...sandboxArguments(process.argv.slice(1)),
+            ],
           },
           trash: (path) => shell.trashItem(path),
           account: {
@@ -4286,6 +4368,7 @@ export async function createApplicationServices({
       const contents = webContents.fromId(owner);
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
+    writeClipboard: (text) => clipboard.writeText(text),
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({
@@ -4360,6 +4443,10 @@ export async function createApplicationServices({
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
     );
   }
+  // A model file that this version replaced, such as the int8 Whisper turbo decoder.
+  void Effect.runPromise(voice.removeRetiredModelFiles()).catch((error) =>
+    logger.warn("Could not remove the old voice model files.", toLogValue(error)),
+  );
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
@@ -4570,6 +4657,22 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
   });
   teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
+  const requiredUpdate =
+    app.isPackaged && !localServerChild
+      ? new RequiredUpdate({
+          surface: hostedServer || serverModeEnvironment ? "host" : "desktop",
+          currentVersion,
+          resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+          updater,
+          setRequired: (required) => remoteUpdate.setRequired(required),
+          log: (message) => logger.info(message),
+        })
+      : null;
+  if (requiredUpdate) {
+    teardown.push(TEARDOWN_ORDER.requiredUpdate, "the minimum version check", () =>
+      Effect.runPromise(requiredUpdate.dispose()),
+    );
+  }
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -4786,6 +4889,7 @@ export async function createApplicationServices({
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
     idleRestart,
+    requiredUpdate,
     describeRestartReadiness,
     sidebarLayout,
     host,

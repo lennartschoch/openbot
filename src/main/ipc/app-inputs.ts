@@ -13,6 +13,7 @@ import type {
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
+  BrowserTakeoverPage,
   BusyMessageModePreference,
   ChatBackgroundColor,
   ChatWindowTarget,
@@ -79,6 +80,7 @@ import {
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
+  isBrowserTakeoverPage,
   isBusyMessageMode,
   isChatBackgroundColor,
   isDynamicIslandAction,
@@ -345,6 +347,11 @@ export function parseDynamicIslandAction(input: unknown): DynamicIslandAction {
   throw new Error("Dynamic Island action is invalid.");
 }
 
+export function parseBrowserTakeoverPage(input: unknown): BrowserTakeoverPage {
+  if (isBrowserTakeoverPage(input)) return input;
+  throw new Error("Browser takeover page is invalid.");
+}
+
 export function parseBrowserDockPresentation(input: unknown): BrowserDockPresentation | null {
   if (input === null || isBrowserDockPresentation(input)) return input;
   throw new Error("Browser dock presentation is invalid.");
@@ -453,6 +460,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     !isSocialDestination(input) &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
+    input !== "download" &&
     input !== "mac-screen-recording"
   ) {
     throw new Error("Unknown external destination.");

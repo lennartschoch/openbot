@@ -191,6 +191,7 @@ import {
   type UpdateStatus,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { ACTIVE_QUEUE_STATUSES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
   AGENT_IMPORT_PREVIEW,
@@ -1489,6 +1490,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getPresentation: async () => clone(dynamicIslandPresentation),
       getBuiltInDisplayGeometry: async () => ({ width: 192, height: 32 }),
+      openBrowserTakeover: async () => undefined,
       onPreference: () => () => undefined,
       onPresentation: () => () => undefined,
       onGeometry: () => () => undefined,
@@ -3392,6 +3394,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         });
       },
       listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
+      listActiveQueues: async (agentIds) => ({
+        queues: agentIds.map((agentId) => {
+          const queue = clone(queues.get(agentId) ?? emptyQueue(agentId));
+          return {
+            ...queue,
+            deliveries: queue.deliveries.filter((delivery) => ACTIVE_QUEUE_STATUSES.has(delivery.status)),
+          };
+        }),
+        omitted: [],
+      }),
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
       listTasks: async (agentId) => taskList(agentId),
@@ -4009,6 +4021,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         return clone({ agents: copied, skipped: [], signIn: ["claude"], warnings: [] });
       },
+      // The preview has no joined server to send a file to.
+      onUploadProgress: () => () => undefined,
     },
     remoteDesktop: mockTeam.remoteDesktop,
   };
