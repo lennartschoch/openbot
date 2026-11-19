@@ -7,6 +7,12 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.73.0-fork.28] - 2026-11-19
+
+### Changed
+
+- Fork-only release of the phone app: the fixes of `main` without a new upstream merge.
+
 ## [0.73.0-fork.27] - 2026-11-19
 
 ### Changed
