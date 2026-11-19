@@ -57,7 +57,16 @@ interface TeamWebRtcBridgeOptions {
   developmentUrl?: string | null | undefined;
   preloadPath?: string;
   iceTransportPolicy?: "all" | "relay";
+  ipHandlingPolicy?: WebRtcIpHandlingPolicy;
 }
+
+export const WEBRTC_IP_HANDLING_POLICIES = [
+  "default",
+  "default_public_interface_only",
+  "default_public_and_private_interfaces",
+  "disable_non_proxied_udp",
+] as const;
+export type WebRtcIpHandlingPolicy = (typeof WEBRTC_IP_HANDLING_POLICIES)[number];
 
 // The envelope the hidden peer window posts back, not the Signal protocol - it is one flat bag
 // because a single `port.on("message")` handler dispatches every reply and event on it, and the
@@ -307,6 +316,9 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     );
     this.#window = window;
     yield* remoteDecode(() => window.webContents.setWindowOpenHandler(() => ({ action: "deny" })));
+    // A VPN interface such as tailscale0 is not on the default route, so Chromium gathers no candidates on it.
+    const ipHandlingPolicy = this.#options.ipHandlingPolicy;
+    if (ipHandlingPolicy) yield* remoteDecode(() => window.webContents.setWebRTCIPHandlingPolicy(ipHandlingPolicy));
     yield* remoteCall(() =>
       this.#options.developmentUrl
         ? window.loadURL(new URL("team-webrtc.html", `${this.#options.developmentUrl}/`).toString())

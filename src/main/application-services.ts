@@ -453,7 +453,7 @@ import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
 import { TeamStore } from "./team-store";
-import { TeamWebRtcBridge } from "./team-webrtc-bridge";
+import { TeamWebRtcBridge, WEBRTC_IP_HANDLING_POLICIES, type WebRtcIpHandlingPolicy } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
@@ -1477,6 +1477,7 @@ export async function createApplicationServices({
   const teamWebRtcBridge = new TeamWebRtcBridge({
     developmentUrl: developmentUrl ?? null,
     iceTransportPolicy: developmentUrl && process.env.OPENBOT_DEV_ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all",
+    ipHandlingPolicy: readWebRtcIpHandlingPolicy(process.env.OPENBOT_WEBRTC_IP_HANDLING_POLICY),
   });
   teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>
@@ -4936,4 +4937,15 @@ export async function createApplicationServices({
     appliedAccount: signedInState,
     centralAuthInitialization,
   };
+}
+
+function readWebRtcIpHandlingPolicy(value: string | undefined): WebRtcIpHandlingPolicy | undefined {
+  if (!value) return undefined;
+  const policy = WEBRTC_IP_HANDLING_POLICIES.find((candidate) => candidate === value);
+  if (policy) return policy;
+  logger.warn("OPENBOT_WEBRTC_IP_HANDLING_POLICY is not a WebRTC IP handling policy, so it is ignored.", {
+    value,
+    expected: WEBRTC_IP_HANDLING_POLICIES,
+  });
+  return undefined;
 }
