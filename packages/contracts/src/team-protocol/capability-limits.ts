@@ -3,6 +3,11 @@
 // capabilities. Each list that a client can send to a peer must fit the limit of that peer's protocol;
 // a list for an unknown protocol must fit the smallest limit. These values are released wire limits:
 // do not change one.
+//
+// Fork: protocol 9 reads 384, not upstream's 256. Upstream's own protocol 9 list reached exactly 256 in
+// 0.73.0, and the fork's `push-notifications-android-v2` made it 257, so every fork 0.73 host refused
+// every request of a fork 0.73 client with `unsupported_operation`. 384 names stay under the 8 KB
+// protocol 9 header limit in `src/main/team-api/request-helpers.ts`. See FORK.md.
 export const TEAM_PROTOCOL_CAPABILITY_LIMITS = {
   1: 64,
   2: 64,
@@ -12,7 +17,7 @@ export const TEAM_PROTOCOL_CAPABILITY_LIMITS = {
   6: 64,
   7: 128,
   8: 128,
-  9: 256,
+  9: 384,
 } as const;
 
 /**
