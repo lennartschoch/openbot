@@ -294,6 +294,16 @@ release can report where it came from. Resolve conflicts by hand, then run
   `latest-linux-arm64.yml` does not exist for arm64 servers. The update check reports an error
   there, and the arm64 install needs `dist:linux:arm64` added to `fork-release.yml` first.
 - The account service lives in `account/`. Upstream's `apps/auth-api` stays only for merges.
+- **Protocol 9 reads 384 capabilities, not 256.** `TEAM_PROTOCOL_CAPABILITY_LIMITS[9]` in
+  `packages/contracts/src/team-protocol/capability-limits.ts`. The fork adds
+  `push-notifications-android-v2` to the current list, and upstream 0.73.0 filled protocol 9 to
+  exactly 256, so `0.73.0-fork.27` sent 257 and every fork host refused every client request with
+  `400 unsupported_operation` ("The Team API operation is not supported."), while events still
+  arrived. Keep 384 at each merge, and if upstream moves capabilities to a protocol 10, give that
+  protocol room for the fork's extra one too. `bun run test:team-legacy-clients` fails when a list is
+  over its limit: run it after each sync, because the fork does not run `ci.yml`. 384 names stay
+  under the 8 KB protocol 9 header limit in `src/main/team-api/request-helpers.ts`; a higher limit
+  needs that raised as well.
 
 ## Licence
 

@@ -13,6 +13,12 @@ the [root changelog](../../CHANGELOG.md).
 
 - The app ships the upstream OpenBot 0.74.0 release.
 
+## [0.73.0-fork.28] - 2026-11-19
+
+### Changed
+
+- Fork-only release of the phone app: the fixes of `main` without a new upstream merge.
+
 ## [0.73.0-fork.27] - 2026-11-19
 
 ### Changed
