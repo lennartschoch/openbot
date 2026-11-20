@@ -13,10 +13,6 @@ export function androidChannelId(sound: NotificationSound | null): string {
   return `openbot.sound.${sound}.v2`;
 }
 
-/**
- * The sound files of `NOTIFICATION_SOUND_FILES`, as `with-notification-sounds.js` copies them into
- * the Android resources, which do not accept `-`.
- */
 const SOUND_FILES: Readonly<Record<Exclude<NotificationSound, "default">, string>> = {
   openbot: "openbot_task.wav",
   warm: "openbot_warm.wav",
@@ -34,14 +30,8 @@ const SOUND_LABELS = {
   default: "mobile.settings.notifications.sound.defaultAndroid",
 } as const satisfies Record<NotificationSound, MobileTextKey>;
 
-/**
- * Creates the channels, or gives them the names of the current app language. Android 13 asks for
- * the notification permission only when the app has a channel.
- */
 export async function createAndroidChannels(): Promise<void> {
   const { t } = currentText();
-  // Release builds up to 1.4.5 had no sound files, so the first channels of the sounds play the
-  // Android notification sound. A channel keeps its sound, so the sounds have new channels.
   for (const sound of Object.keys(SOUND_FILES)) {
     await Notifications.deleteNotificationChannelAsync(`openbot.sound.${sound}`);
   }
@@ -49,7 +39,6 @@ export async function createAndroidChannels(): Promise<void> {
     await Notifications.setNotificationChannelAsync(androidChannelId(sound), {
       name: t("mobile.settings.notifications.channel", { sound: t(SOUND_LABELS[sound]) }),
       importance: Notifications.AndroidImportance.HIGH,
-      // Without a sound, the channel plays the Android notification sound.
       ...(sound === "default" ? {} : { sound: SOUND_FILES[sound] }),
     });
   }

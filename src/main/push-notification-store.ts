@@ -29,22 +29,14 @@ export type PushTarget =
   | { platform: "android"; value: AndroidPushNotificationRegistration }
   | { platform: "android-unified"; value: AndroidUnifiedPushNotificationRegistration };
 
-/** One phone that gets notifications, with what the host needs to know what its member can see. */
 export type StoredPushRegistration = {
   sessionId: string;
   memberId: string;
-  /** The Team API protocol and capabilities of the phone, which decide the agents it can see. */
   protocol: number;
   capabilities: string[];
-  /**
-   * Whether the phone takes the notifications of side thread turns, as it said through
-   * `push-notification-threads-v1`. Absent for a phone that never said: it takes them. An earlier host
-   * does not read this field.
-   */
   threadReplies?: boolean;
 } & PushTarget;
 
-/** More phones than members can have sessions is a fault. The oldest go first. */
 const REGISTRATION_LIMIT = 500;
 const decodeRegistration = PUSH_NOTIFICATIONS_CODECS.get(PUSH_NOTIFICATIONS_ROUTES.register)?.request;
 const decodeAndroidRegistration = ANDROID_PUSH_NOTIFICATIONS_CODECS.get(
@@ -54,14 +46,6 @@ const decodeAndroidUnifiedRegistration = ANDROID_UNIFIED_PUSH_NOTIFICATIONS_CODE
   ANDROID_UNIFIED_PUSH_NOTIFICATIONS_ROUTES.register,
 )?.request;
 
-/**
- * The phones of this host that get notifications. A phone registers when it connects, but a phone in
- * a pocket does not connect after this computer restarts, so the host keeps the list in a file that
- * only the user can read. Each entry has the push token and the sealing secret of one phone, an
- * iPhone or an Android phone.
- *
- * Writes are chained, as `NotificationPreferenceStore` chains its own.
- */
 export class PushNotificationStore {
   readonly #path: string;
   #registrations: StoredPushRegistration[] = [];
@@ -84,7 +68,6 @@ export class PushNotificationStore {
     return this.#registrations;
   }
 
-  /** Replaces the list. The phone's `away` changes all the time and is not kept: a restart starts away. */
   replace(registrations: readonly StoredPushRegistration[]): Effect.Effect<void, PreferenceFileFailure> {
     const next = registrations.slice(-REGISTRATION_LIMIT).map(startAway);
     return this.#writes.withPermit(
@@ -105,17 +88,12 @@ export class PushNotificationStore {
   }
 }
 
-/** Each platform has its own registration type, so each branch keeps its own. */
 function startAway(registration: StoredPushRegistration): StoredPushRegistration {
   if (registration.platform === "android" || registration.platform === "android-unified")
     return { ...registration, value: { ...registration.value, away: true } };
   return { ...registration, value: { ...registration.value, away: true } };
 }
 
-/**
- * An entry that the current contract does not accept is dropped; the phone registers it again. An
- * earlier host drops the Android entries, because the iPhone contract does not accept them.
- */
 function decodeFile(parsed: unknown): StoredPushRegistration[] {
   if (!isDynamicRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.registrations)) return [];
   return parsed.registrations.flatMap((entry): StoredPushRegistration[] => {
@@ -149,7 +127,6 @@ function decodeFile(parsed: unknown): StoredPushRegistration[] {
   });
 }
 
-/** Reads a registration that the frozen `push-notifications-v1` codec has accepted. */
 export function readPushRegistration(value: unknown): PushNotificationRegistration | null {
   if (!isDynamicRecord(value)) return null;
   const {
@@ -189,7 +166,6 @@ export function readPushRegistration(value: unknown): PushNotificationRegistrati
   };
 }
 
-/** Reads a registration that the frozen `push-notifications-android-v1` codec has accepted. */
 export function readAndroidPushRegistration(value: unknown): AndroidPushNotificationRegistration | null {
   if (!isDynamicRecord(value)) return null;
   const { serverId, token, secret, locale, away, level, mutedUntil, preview, sound } = value;

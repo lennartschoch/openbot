@@ -266,6 +266,8 @@ export const messages = {
     "Deze agent kan maar een beperkt aantal MCP-servers gebruiken. Zet een MCP-server uit die de agent niet nodig heeft om deze server te gebruiken.",
   "error.backend.mcpRegistrationRefused":
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
+  "error.backend.mcpRegistrationUnavailable":
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
@@ -278,6 +280,7 @@ export const messages = {
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
+  "error.backend.mcpSignInRefused": "De inlogpagina weigerde de toegang. Log opnieuw in.",
   "error.backend.mcpSignInResponseTimedOut": "Het antwoord op het inloggen kwam niet op tijd.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot kon de inloggegevens van deze server niet lezen. Controleer het serveradres en probeer het opnieuw.",
@@ -372,10 +375,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
-  "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
-  "error.backend.vaultItemNotAllowed":
-    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot kon de API-sleutel niet lezen. Voer een sleutel van maximaal 8.000 tekens in en kies wie hem mag gebruiken.",
   "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
@@ -421,7 +423,7 @@ export const messages = {
     "De pop-up kon niet laden. Probeer opnieuw in te loggen vanaf de oorspronkelijke pagina.",
   "error.backend.browserTabNotFound": "Browsertabblad niet gevonden.",
   "error.backend.authActive": "Verificatie is al actief.",
-  "error.backend.authHttpsRequired": "Beveiligde verificatie vereist HTTPS.",
+  "error.backend.authWebPageRequired": "Beveiligde verificatie vereist HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Verificatiecodes moeten 4–12 cijfers hebben.",
   "error.backend.authExpired": "Het verificatieverzoek is verlopen.",
   "error.backend.authDigitsRequired": "Voer het gevraagde aantal cijfers in.",

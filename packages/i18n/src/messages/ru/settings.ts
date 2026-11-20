@@ -486,7 +486,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Не удалось скопировать изображение.",
   "settings.profile.share.createFailed": "Не удалось создать изображение.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Мои последние полгода с OpenBot",
   "settings.profile.activity.title": "Активность на этом компьютере",
   "settings.profile.activity.activeDays": {
@@ -498,7 +497,6 @@ export const messages = {
   "settings.profile.activity.empty": "Пока нет активности",
   "settings.profile.activity.loading": "Загрузка активности…",
   "settings.profile.activity.loadFailed": "Не удалось загрузить активность.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Токенов: {tokens}, {count} активный день за последний год",
     few: "Токенов: {tokens}, {count} активных дня за последний год",
@@ -690,7 +688,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Для небольшой команды с ежедневными регулярными задачами.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Для многих агентов и интенсивной работы в браузере.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Диктовка",
   "settings.voice.model.parakeet.description": "Быстрая. Сама определяет язык речи, 25 европейских языков.",
   "settings.voice.model.parakeetUnified.description":
@@ -758,6 +755,13 @@ export const messages = {
   "settings.voice.speech.sample": "Здравствуйте. Так будут звучать ваши ответы.",
   "settings.voice.speech.listenFailed": "Не удалось воспроизвести образец.",
   "settings.voice.live.section": "Живой голос",
+  "settings.voice.talk.section": "Голосовой разговор",
+  "settings.voice.talkKey.title": "Клавиша для разговора",
+  "settings.voice.talkKey.description": "Удерживайте эти клавиши, чтобы говорить в голосовом разговоре.",
+  "settings.voice.talkKey.change": "Изменить клавишу для разговора",
+  "settings.voice.talkKey.recording": "Нажмите клавиши",
+  "settings.voice.talkKey.refused": "Добавьте ещё одну клавишу",
+  "settings.voice.talkKey.reset": "Сбросить",
   "settings.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
   "settings.transfer.title": "Перенос сервера на другой компьютер",
   "settings.transfer.lede": "Ваши агенты, их навыки, регулярные задачи, память и файлы сохраняются в один файл.",
@@ -881,6 +885,10 @@ export const messages = {
     many: "Копировать {count} агентов",
     other: "Копировать {count} агента",
   },
+  "settings.transfer.copy.duplicatesTitle": "Скопировать дубликаты агентов?",
+  "settings.transfer.copy.duplicatesDescription":
+    "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
+  "settings.transfer.copy.duplicatesConfirm": "Копировать дубликаты",
   "settings.transfer.copy.copying": "Копирование…",
   "settings.transfer.copy.done": {
     one: "{count} агент скопирован на {server}.",

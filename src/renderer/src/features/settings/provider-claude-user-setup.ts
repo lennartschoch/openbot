@@ -3,20 +3,17 @@ import type { ProviderClaudeUserSetup } from "@openbot/ui/features/settings/Prov
 import { useText } from "@openbot/ui/text";
 import { createHostSetting } from "./host-setting-state";
 
-/** The "Use my Claude Code setup" calls of one server's host. The desktop reaches them through main. */
 export type HostClaudeUserSetupCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getClaudeUserSetup" | "setClaudeUserSetup"
 >;
 
 export interface HostClaudeUserSetupOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostClaudeUserSetupCalls;
 }
 
 export interface ProviderClaudeUserSetupSource extends HostClaudeUserSetupOptions {
   serverId: string;
-  /** A joined server: the setup is the one of the host's user, on the host. */
   remote: boolean;
 }
 

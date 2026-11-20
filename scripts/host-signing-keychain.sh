@@ -18,11 +18,6 @@ umask 077
 : "${HOST_APPLICATION_CERTIFICATE_SHA1:=5bb823022153892b63908d9c054a9c61319d872c}"
 host_signing_dir="$(mktemp -d "$RUNNER_TEMP/openbot-host-signing.XXXXXX")"
 export HOST_SIGNING_KEYCHAIN="$host_signing_dir/host.keychain-db"
-# `codesign --keychain` restricts which keychain is searched, it does not open one outside the
-# session search list. An electron-builder run replaces that list with its own temporary keychain
-# and deletes it, so this list has to be set here or `codesign` reports "The specified item could
-# not be found in the keychain" for an identity `security find-identity` can see through an
-# explicit path.
 host_previous_keychains=()
 while IFS= read -r line; do
   entry="${line#*\"}"
@@ -56,6 +51,10 @@ test -n "$HOST_APPLICATION_IDENTITY" || { echo "No identity with the pinned cert
 test -n "$HOST_INSTALLER_IDENTITY" || { echo 'Installer identity missing.' >&2; exit 1; }
 # Prove codesign can reach the identity before a caller spends minutes building binaries it cannot
 # sign, and say what the keychain state was when it cannot.
+export HOST_APPLICATION_IDENTITY="$(security find-identity -v -p codesigning "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Application:.*(ZTRDTUL87R)\)".*/\1/p')"
+export HOST_INSTALLER_IDENTITY="$(security find-identity -v -p basic "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Installer:.*(ZTRDTUL87R)\)".*/\1/p')"
+test -n "$HOST_APPLICATION_IDENTITY" || { echo 'Developer ID Application identity missing.' >&2; exit 1; }
+test -n "$HOST_INSTALLER_IDENTITY" || { echo 'Developer ID Installer identity missing.' >&2; exit 1; }
 cp /usr/bin/true "$host_signing_dir/probe"
 if ! /usr/bin/codesign --force --sign "$HOST_APPLICATION_IDENTITY" \
   --keychain "$HOST_SIGNING_KEYCHAIN" --timestamp=none "$host_signing_dir/probe"; then

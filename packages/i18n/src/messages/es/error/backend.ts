@@ -267,6 +267,8 @@ export const messages = {
     "Este agente solo puede usar un número limitado de servidores MCP. Para usar este servidor, desactiva un servidor MCP que el agente no necesite.",
   "error.backend.mcpRegistrationRefused":
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
+  "error.backend.mcpRegistrationUnavailable":
+    "El servidor de inicio de sesión no puede registrar OpenBot como aplicación. Tu cuenta no es la causa. Para conectar, guarda este servidor en Marketplace, Apps, y después añádele una app de inicio de sesión.",
   "error.backend.mcpSignInAbandonedGeneric": "Se abandonó el inicio de sesión.",
   "error.backend.mcpSignInForgotten": "Se olvidó el inicio de sesión de MCP mientras estaba en curso.",
   "error.backend.mcpSignInAbandoned": "Se abandonó el inicio de sesión de MCP.",
@@ -280,6 +282,7 @@ export const messages = {
     "Este servidor pide un inicio de sesión, y OpenBot solo inicia sesión por https. Cambia la URL a {url}.",
   "error.backend.mcpSignInCancelled": "Se canceló el inicio de sesión.",
   "error.backend.mcpSignInTimedOut": "El inicio de sesión no se completó en el navegador.",
+  "error.backend.mcpSignInRefused": "La página de inicio de sesión rechazó el acceso. Inicia sesión de nuevo.",
   "error.backend.mcpSignInResponseTimedOut": "La respuesta del inicio de sesión no llegó a tiempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot no pudo leer la información de inicio de sesión de este servidor. Revisa la dirección del servidor y vuelve a intentarlo.",
@@ -371,9 +374,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
-  "error.backend.apiKeyNotAllowed":
-    "Solo el propietario del servidor o un administrador puede introducir una clave de API.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot no pudo leer la clave de API. Introduce una clave de 8000 caracteres o menos y elige quién puede usarla.",
   "error.backend.authRequestInactive": "Esta solicitud de autenticación segura ya no está activa.",
   "error.backend.secureAuthUnavailable": "La autenticación segura no está disponible.",
   "error.backend.browserUrlRequired": "Se requiere una URL para el navegador.",
@@ -418,7 +421,7 @@ export const messages = {
     "No se pudo cargar la ventana emergente. Intenta iniciar sesión de nuevo desde la página original.",
   "error.backend.browserTabNotFound": "No se encontró la pestaña del navegador.",
   "error.backend.authActive": "La autenticación ya está activa.",
-  "error.backend.authHttpsRequired": "La autenticación segura requiere HTTPS.",
+  "error.backend.authWebPageRequired": "La autenticación segura requiere HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Los códigos de autenticación requieren entre 4 y 12 dígitos.",
   "error.backend.authExpired": "La solicitud de autenticación caducó.",
   "error.backend.authDigitsRequired": "Introduce el número de dígitos solicitado.",

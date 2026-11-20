@@ -712,6 +712,13 @@ export const messages = {
   "settings.voice.speech.sample": "שלום. כך יישמעו התשובות שלך.",
   "settings.voice.speech.listenFailed": "לא ניתן להשמיע את הדוגמה.",
   "settings.voice.live.section": "קול חי",
+  "settings.voice.talk.section": "שיחה קולית",
+  "settings.voice.talkKey.title": "מקש לחיצה לדיבור",
+  "settings.voice.talkKey.description": "החזיקו את המקשים האלה כדי לדבר בשיחה קולית.",
+  "settings.voice.talkKey.change": "שינוי מקש הלחיצה לדיבור",
+  "settings.voice.talkKey.recording": "הקישו על המקשים",
+  "settings.voice.talkKey.refused": "הוסיפו מקש נוסף",
+  "settings.voice.talkKey.reset": "איפוס",
   "settings.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
   "settings.voice.server.section": "שרת קול",
   "settings.voice.server.title": "שרת תואם OpenAI",
@@ -839,6 +846,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "settings.transfer.copy.submit": { one: "העתקת סוכן אחד", two: "העתקת שני סוכנים", other: "העתקת {count} סוכנים" },
+  "settings.transfer.copy.duplicatesTitle": "להעתיק סוכנים כפולים?",
+  "settings.transfer.copy.duplicatesDescription":
+    "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
+  "settings.transfer.copy.duplicatesConfirm": "העתקת כפילויות",
   "settings.transfer.copy.copying": "מעתיק…",
   "settings.transfer.copy.done": {
     one: "סוכן אחד הועתק אל {server}.",

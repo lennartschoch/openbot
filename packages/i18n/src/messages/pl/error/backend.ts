@@ -259,6 +259,8 @@ export const messages = {
     "Ten agent może używać tylko ograniczonej liczby serwerów MCP. Aby użyć tego serwera, wyłącz serwer MCP, którego agent nie potrzebuje.",
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
   "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
   "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",
@@ -271,6 +273,7 @@ export const messages = {
     "Ten serwer wymaga zalogowania, a OpenBot loguje się tylko przez https. Zmień URL na {url}.",
   "error.backend.mcpSignInCancelled": "Logowanie zostało anulowane.",
   "error.backend.mcpSignInTimedOut": "Logowanie nie zostało ukończone w przeglądarce.",
+  "error.backend.mcpSignInRefused": "Strona logowania odmówiła dostępu. Zaloguj się ponownie.",
   "error.backend.mcpSignInResponseTimedOut": "Odpowiedź logowania nie dotarła na czas.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
@@ -363,8 +366,9 @@ export const messages = {
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
-  "error.backend.apiKeyNotAllowed": "Klucz API może wpisać tylko właściciel serwera lub administrator.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot nie mógł odczytać klucza API. Wpisz klucz o długości do 8000 znaków i wybierz, kto może go używać.",
   "error.backend.authRequestInactive": "To żądanie bezpiecznego uwierzytelnienia nie jest już aktywne.",
   "error.backend.secureAuthUnavailable": "Bezpieczne uwierzytelnianie jest niedostępne.",
   "error.backend.browserUrlRequired": "Adres URL przeglądarki jest wymagany.",
@@ -406,7 +410,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Nie udało się wczytać wyskakującego okna. Ponów logowanie na pierwotnej stronie.",
   "error.backend.browserTabNotFound": "Nie znaleziono karty przeglądarki.",
   "error.backend.authActive": "Uwierzytelnianie jest już aktywne.",
-  "error.backend.authHttpsRequired": "Bezpieczne uwierzytelnianie wymaga HTTPS.",
+  "error.backend.authWebPageRequired": "Bezpieczne uwierzytelnianie wymaga HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Kody uwierzytelniające muszą mieć od 4 do 12 cyfr.",
   "error.backend.authExpired": "Żądanie uwierzytelnienia wygasło.",
   "error.backend.authDigitsRequired": "Wpisz wymaganą liczbę cyfr.",

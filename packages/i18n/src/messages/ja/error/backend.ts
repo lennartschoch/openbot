@@ -268,6 +268,8 @@ export const messages = {
     "このエージェントが使える MCP サーバーの数には上限があります。このサーバーを使うには、エージェントに不要な MCP サーバーをオフにしてください。",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
+  "error.backend.mcpRegistrationUnavailable":
+    "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを保存してから、サインインアプリを追加してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
   "error.backend.mcpSignInForgotten": "MCP のサインインは実行中に破棄されました。",
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",
@@ -281,6 +283,7 @@ export const messages = {
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
+  "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",
   "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot はこのサーバーのサインイン情報を読み取れませんでした。サーバーアドレスを確認して再試行してください。",
@@ -373,8 +376,9 @@ export const messages = {
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
-  "error.backend.apiKeyNotAllowed": "API キーを入力できるのはサーバーの所有者か管理者だけです。",
   "error.backend.apiKeySaving": "API キーはすでに保存中です。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot は API キーを読み取れませんでした。8,000 文字以内のキーを入力し、使用できる対象を選択してください。",
   "error.backend.authRequestInactive": "この安全な認証要求はもう有効ではありません。",
   "error.backend.secureAuthUnavailable": "安全な認証を使用できません。",
   "error.backend.browserUrlRequired": "ブラウザーの URL が必要です。",
@@ -417,7 +421,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "ポップアップを読み込めませんでした。元のページからもう一度サインインしてください。",
   "error.backend.browserTabNotFound": "ブラウザーのタブが見つかりません。",
   "error.backend.authActive": "認証はすでに有効です。",
-  "error.backend.authHttpsRequired": "安全な認証には HTTPS が必要です。",
+  "error.backend.authWebPageRequired": "安全な認証には HTTP/HTTPS が必要です。",
   "error.backend.authDigitsRange": "認証コードは 4〜12 桁である必要があります。",
   "error.backend.authExpired": "認証要求の有効期限が切れました。",
   "error.backend.authDigitsRequired": "指定された桁数の数字を入力してください。",

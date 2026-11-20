@@ -1,3 +1,8 @@
+/**
+ * The parts of a notification that do not belong to a transport: the permission, the key file, and the
+ * sound preview. The fork pushes over UnifiedPush only (`unified-push.android.ts`); Firebase Cloud
+ * Messaging is gone from the build (`scripts/fork/strip-google.mjs`), so there is no device token.
+ */
 import {
   androidPermission,
   previewAndroidSound,
@@ -6,11 +11,6 @@ import {
 } from "./android-notification-support";
 import type { PushNotificationsNative } from "./push-notifications-native.types";
 
-/**
- * The parts of a notification that do not belong to a transport: the permission, the key file, and the
- * sound preview. The fork pushes over UnifiedPush only (`unified-push.android.ts`); Firebase Cloud
- * Messaging is gone from the build (`scripts/fork/strip-google.mjs`), so there is no device token.
- */
 export const androidPushNotifications: PushNotificationsNative = {
   permission: androidPermission,
   async deviceToken() {
