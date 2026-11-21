@@ -138,6 +138,7 @@ export interface AppIpcDependencies {
   appVariant: AppVariant;
   analyticsCaptureUrl: string | null;
   analyticsInstallId: string | null;
+  dynamicIslandAvailable: boolean;
   getMainWindow: () => BrowserWindow | null;
   isMainWindow: (sender: WebContents) => boolean;
   openChatWindow: (target: ChatWindowTarget) => void;
@@ -175,6 +176,7 @@ export function appIpcHandlers({
   appVariant,
   analyticsCaptureUrl,
   analyticsInstallId,
+  dynamicIslandAvailable,
   getMainWindow,
   isMainWindow,
   openChatWindow,
@@ -204,6 +206,7 @@ export function appIpcHandlers({
           ...(softwareRendering ? { softwareRendering } : {}),
           ...(hourCycle ? { hourCycle } : {}),
           ...(aboveAppsSupport ? { aboveAppsSupport } : {}),
+          ...(dynamicIslandAvailable ? {} : { dynamicIslandUnavailable: true }),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),

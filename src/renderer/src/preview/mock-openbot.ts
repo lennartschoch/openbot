@@ -161,6 +161,7 @@ import {
   providerEnvironmentProblem,
   type QueueDelivery,
   type QueuedMessageReceipt,
+  type QueueHold,
   type QueueSnapshot,
   type RemoteDesktopSession,
   type RemoteNetworkRouteState,
@@ -168,8 +169,6 @@ import {
   type ReorderQueueInput,
   type RespondToPromptInput,
   type Routine,
-  type RoutineFlowLink,
-  type RoutineFlowStep,
   type RoutineRun,
   type RoutineSchedule,
   type SendMessageInput,
@@ -253,7 +252,6 @@ import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./m
 import { createMockReferral } from "./mock-referral";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
-import { mockRoutineFlows } from "./mock-routine-flows";
 import { type MockRoutineResultsOptions, mockRoutineResults } from "./mock-routine-results";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
@@ -293,8 +291,6 @@ export interface MockOpenBotOptions
   tables?: SharedTable[];
   routines?: Record<string, Routine[]>;
   routineRuns?: Record<string, RoutineRun[]>;
-  routineFlowLinks?: RoutineFlowLink[];
-  routineFlowSteps?: RoutineFlowStep[];
   workflows?: MockWorkflowSeed[];
   crm?: MockCrmSeed;
   customProviders?: CustomProviderSummary[];
@@ -383,7 +379,7 @@ export interface MockOpenBotControls {
   emitConversationDelta: (
     event: Omit<Extract<AgentEvent, { type: "conversation-delta" }>, "type" | "revision">,
   ) => void;
-  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[]) => QueueSnapshot;
+  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null) => QueueSnapshot;
   setRuntimeSnapshot: (snapshot: AgentRuntimeSnapshot) => void;
   onMessageSent: (listener: (message: MockSentMessage) => boolean) => () => void;
   onPromptResponse: (listener: (input: RespondToPromptInput) => void) => () => void;
@@ -1157,8 +1153,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return readStateForMessages(state, getSnapshot(agentId).messages);
   }
 
-  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[]): QueueSnapshot {
-    const snapshot = { agentId, deliveries: clone(deliveries) };
+  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null): QueueSnapshot {
+    const snapshot: QueueSnapshot = { agentId, deliveries: clone(deliveries), ...(hold ? { hold: clone(hold) } : {}) };
     queues.set(agentId, snapshot);
     emitAgentEvent({ type: "queue-changed", snapshot });
     return clone(snapshot);
@@ -1662,10 +1658,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     providerRuntimes: mockProviderRuntimes.providerRuntimes,
     openUrl: async () => undefined,
     voice: mockVoice.voice,
-    routineFlows: mockRoutineFlows(
-      { routines, routineRuns, links: options.routineFlowLinks, steps: options.routineFlowSteps },
-      (agentId) => emitAgentEvent({ type: "routine-flows-changed", agentId }),
-    ),
     workflows: mockWorkflows(options.workflows ?? [], (workflowId) =>
       emitAgentEvent({ type: "workflows-changed", workflowId }),
     ),

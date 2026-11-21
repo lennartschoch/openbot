@@ -503,16 +503,6 @@ import type {
   RemoteSessionReusePreference,
 } from "./ipc-remote-sessions";
 import type {
-  ConnectRoutineFlowInput,
-  DisconnectRoutineFlowInput,
-  RemoveRoutineFlowPositionInput,
-  RoutineFlowCanvas,
-  RoutineFlowLink,
-  SaveRoutineFlowPositionInput,
-  StopRoutineFlowRunInput,
-  UpdateRoutineFlowLinkInput,
-} from "./ipc-routine-flows";
-import type {
   ResendRoutineResultInput,
   RoutineResultConnectionOption,
   RoutineResultDelivery,
@@ -656,6 +646,7 @@ import type {
   WorkflowRunsInput,
   WorkflowSaveResult,
   WorkflowStep,
+  WorkflowStepSettings,
   WorkflowSummary,
   WorkflowTriggerInput,
   WorkflowVersion,
@@ -671,6 +662,7 @@ import type {
 } from "./license";
 import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "./owner-transfer";
 import type { ReferralPageRequest, ReferralState } from "./referral";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
 
@@ -1445,7 +1437,11 @@ export const IPC_ENDPOINTS = {
     removeCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:remove"),
     createCompanySignInScimToken: request<string, CompanySignInScimToken>()("auth:company-sign-in:create-scim-token"),
     revokeCompanySignInScimToken: request<string, CompanySignInSettings>()("auth:company-sign-in:revoke-scim-token"),
+    listOwnerTransfers: request<undefined, OwnerTransfer[]>()("auth:list-owner-transfers"),
+    acceptOwnerTransfer: request<string, AcceptedOwnerTransfer>()("auth:accept-owner-transfer"),
+    declineOwnerTransfer: request<string, void>()("auth:decline-owner-transfer"),
     event: event<CentralAuthState>()("auth:event"),
+    ownerTransfersChanged: event<undefined>()("auth:owner-transfers-changed"),
   },
   update: {
     getStatus: request<undefined, UpdateStatus>()("update:get-status"),
@@ -1619,15 +1615,6 @@ export const IPC_ENDPOINTS = {
       "agent:channel-routines:runs",
     ),
   },
-  routineFlows: {
-    canvas: scopedRequest<string, RoutineFlowCanvas>()("routine-flows:canvas"),
-    savePosition: scopedRequest<SaveRoutineFlowPositionInput, void>()("routine-flows:save-position"),
-    removePosition: scopedRequest<RemoveRoutineFlowPositionInput, void>()("routine-flows:remove-position"),
-    connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
-    disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
-    updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
-    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
-  },
   workflows: {
     list: scopedQuery<WorkflowSummary[]>()("workflows:list"),
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
@@ -1646,6 +1633,7 @@ export const IPC_ENDPOINTS = {
     decide: scopedRequest<DecideWorkflowStepInput, void>()("workflows:decide"),
     runs: scopedRequest<WorkflowRunsInput, WorkflowRunPage>()("workflows:runs"),
     run: scopedRequest<string, WorkflowRunDetail>()("workflows:run"),
+    stepSettings: scopedRequest<string, WorkflowStepSettings>()("workflows:step-settings"),
     rotateWebhookSecret: scopedRequest<WorkflowTriggerInput, WorkflowWebhookSecret>()(
       "workflows:rotate-webhook-secret",
     ),
@@ -1779,6 +1767,9 @@ export const IPC_ENDPOINTS = {
     listInvites: request<string, TeamInviteSummary[]>()("servers:list-invites"),
     revokeInvite: scopedRequest<string, void, "required">()("servers:revoke-invite"),
     createInvite: scopedRequest<CreateTeamInviteInput, InviteSummary, "required">()("servers:create-invite"),
+    getOwnerTransfer: scopedQuery<OwnerTransfer | null, "required">()("servers:get-owner-transfer"),
+    startOwnerTransfer: scopedRequest<string, OwnerTransfer, "required">()("servers:start-owner-transfer"),
+    cancelOwnerTransfer: scopedQuery<void, "required">()("servers:cancel-owner-transfer"),
     setTyping: request<SetTeamTypingInput, void>()("servers:set-typing"),
     scopedPresence: event<ScopedTeamPresenceSnapshot>()("servers:presence"),
     listDirectThreads: request<undefined, DirectThreadSummary[]>()("servers:list-direct-threads"),
@@ -2018,7 +2009,6 @@ export const IPC_GROUP_PATHS = {
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
-  routineFlows: "routineFlows",
   workflows: "workflows",
   crm: "crm",
   routineResults: "routineResults",

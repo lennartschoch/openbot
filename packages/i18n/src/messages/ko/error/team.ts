@@ -126,6 +126,7 @@ export const messages = {
     "이 서버는 프로바이더 CLI를 직접 업데이트해요. 서버에서 OpenBot을 업데이트해 주세요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
+  "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
   "error.team.localServersUnsupported": "이 연결은 이 컴퓨터의 서버를 지원하지 않습니다.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",

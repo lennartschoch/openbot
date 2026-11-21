@@ -132,6 +132,7 @@ export const messages = {
     "Este servidor actualiza sus CLIs de proveedor él mismo. Actualiza OpenBot en el servidor.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
   "error.team.hostRestartUnsupported": "Esta conexión no admite reiniciar el servidor.",
+  "error.team.ownerTransferUnsupported": "Este servidor no admite transferir la propiedad.",
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
   "error.team.localServersUnsupported": "Esta conexión no admite servidores en este ordenador.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",

@@ -62,6 +62,7 @@ export interface AgentTasksHooks {
 export interface AgentTaskCaller {
   agentId: string;
   inExecutionThread: boolean;
+  requesterIds: readonly string[];
 }
 
 export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFailed>()("AgentTaskBranchFailed", {
@@ -484,6 +485,7 @@ export class AgentTasks implements TaskLanes {
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
+        requesterIds: caller.requesterIds,
         taskId: task.taskId,
         recipientAgentIds: [caller.agentId],
         text: input.brief,
@@ -725,6 +727,8 @@ function publicHold(reason: string | null): AgentTaskHold | null {
       return "server-busy";
     case "one-turn":
       return "one-turn";
+    case "sign-in":
+      return "sign-in";
     default:
       return "agent-busy";
   }

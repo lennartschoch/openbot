@@ -108,6 +108,7 @@ import {
   decodeWebhookSecret,
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
+import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -205,6 +206,8 @@ import {
   decodeNotificationPreference,
   decodeNullablePath,
   decodeOnePasswordConnectorStatus,
+  decodeOwnerTransferList,
+  decodeOwnerTransferOrNull,
   decodePendingAgentTemplate,
   decodePendingListing,
   decodePendingMarketplaceListing,
@@ -320,7 +323,6 @@ import {
   decodePasswordManagerResponses,
 } from "./password-manager-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
-import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
   decodeRoutineResultDeliveries,
   decodeRoutineResultDestination,
@@ -387,6 +389,7 @@ import {
   decodeWorkflowRunPage,
   decodeWorkflowSaveResult,
   decodeWorkflowStep,
+  decodeWorkflowStepSettings,
   decodeWorkflowSummaries,
   decodeWorkflowSummary,
   decodeWorkflowVersions,
@@ -724,6 +727,9 @@ const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   listInvites: decodeTeamInvites,
   revokeInvite: decodeVoid,
   createInvite: decodeInviteSummary,
+  getOwnerTransfer: decodeOwnerTransferOrNull,
+  startOwnerTransfer: decodeOwnerTransfer,
+  cancelOwnerTransfer: decodeVoid,
   setTyping: decodeVoid,
   scopedPresence: decodeScopedTeamPresence,
   listDirectThreads: decodeDirectThreads,
@@ -890,15 +896,6 @@ const openbotApi: OpenBotDesktopApi = {
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
   }),
-  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
-    canvas: decodeRoutineFlowCanvas,
-    savePosition: decodeVoid,
-    removePosition: decodeVoid,
-    connect: decodeRoutineFlowLink,
-    disconnect: decodeVoid,
-    updateLink: decodeRoutineFlowLink,
-    stopRun: decodeVoid,
-  }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,
     get: decodeWorkflowDetail,
@@ -917,6 +914,7 @@ const openbotApi: OpenBotDesktopApi = {
     decide: decodeVoid,
     runs: decodeWorkflowRunPage,
     run: decodeWorkflowRunDetail,
+    stepSettings: decodeWorkflowStepSettings,
     rotateWebhookSecret: decodeWorkflowWebhookSecret,
     githubCatalog: decodeWorkflowGitHubCatalog,
     githubOptions: decodeWorkflowGitHubOptions,
@@ -1009,7 +1007,11 @@ const openbotApi: OpenBotDesktopApi = {
     removeCompanySignIn: decodeCompanySignInSettings,
     createCompanySignInScimToken: decodeCompanySignInScimToken,
     revokeCompanySignInScimToken: decodeCompanySignInSettings,
+    listOwnerTransfers: decodeOwnerTransferList,
+    acceptOwnerTransfer: decodeAcceptedOwnerTransfer,
+    declineOwnerTransfer: decodeVoid,
     event: decodeCentralAuthState,
+    ownerTransfersChanged: decodeVoid,
   }),
   skills: bridgeGroup(IPC_ENDPOINTS.skills, {
     localList: decodeSkillDetails,

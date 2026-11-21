@@ -123,6 +123,7 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate": "هذا الخادم يحدّث واجهات CLIs الخاصة بمزوديه بنفسه. حدّث OpenBot على الخادم.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
+  "error.team.ownerTransferUnsupported": "لا يدعم هذا الخادم نقل الملكية.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",
