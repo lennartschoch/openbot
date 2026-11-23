@@ -7,6 +7,7 @@ import {
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
@@ -53,6 +54,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_COLORS_ROUTES,
@@ -111,6 +116,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
@@ -216,8 +222,10 @@ import {
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
+  addChannelFolder,
   bitwardenConnectorRequest,
   browseAgentFolders,
+  browseChannelFolders,
   cancelHostUpdate,
   cancelSignInRelay,
   checkHostForUpdate,
@@ -283,7 +291,9 @@ import {
   publishAgentTemplate,
   readAgentFolders,
   readAgentSessionSettings,
+  readChannelFolders,
   removeAgentFolder,
+  removeChannelFolder,
   removeMcpServer,
   requestHostRestart,
   resetAgentSessionSetting,
@@ -478,6 +488,8 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
+  | "loadAgentBuiltinMemory"
+  | "updateAgentBuiltinMemory"
   | "loadAgentDefaults"
   | "updateAgentDefaults"
   | "setAgentDefaultChoice"
@@ -502,6 +514,10 @@ type HostRequestActions = Pick<
   | "excludeAgentFolder"
   | "includeAgentFolder"
   | "browseAgentFolders"
+  | "loadChannelFolders"
+  | "addChannelFolder"
+  | "removeChannelFolder"
+  | "browseChannelFolders"
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
@@ -761,6 +777,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, AGENT_SESSION_SETTINGS_CAPABILITY, "mobile.agent.session.unsupported");
   const foldersAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_FOLDERS_CAPABILITY, "mobile.agent.folders.unsupported");
+  const channelFoldersAdmin = (serverId: string) =>
+    capabilityApi(serverId, CHANNEL_FOLDERS_CAPABILITY, "error.team.channelFoldersUnsupported");
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
   const queueTaskApi = (serverId: string) =>
@@ -1080,6 +1098,13 @@ export function createHostRequestActions({
     includeAgentFolder: async (input, serverId) => runTeamRequest(includeAgentFolder(foldersAdmin(serverId), input)),
     browseAgentFolders: async (agentId, path, serverId) =>
       runTeamRequest(browseAgentFolders(foldersAdmin(serverId), { agentId, path })),
+    loadChannelFolders: async (channelId, serverId) =>
+      runTeamRequest(readChannelFolders(channelFoldersAdmin(serverId), channelId)),
+    addChannelFolder: async (input, serverId) => runTeamRequest(addChannelFolder(channelFoldersAdmin(serverId), input)),
+    removeChannelFolder: async (input, serverId) =>
+      runTeamRequest(removeChannelFolder(channelFoldersAdmin(serverId), input)),
+    browseChannelFolders: async (channelId, path, serverId) =>
+      runTeamRequest(browseChannelFolders(channelFoldersAdmin(serverId), { channelId, path })),
     setAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(setAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     resetAgentSessionSetting: async (input, serverId) =>
@@ -1428,6 +1453,20 @@ export function createHostRequestActions({
     updateAgentPlanCard: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
+    },
+    loadAgentBuiltinMemory: async (agentId, serverId) =>
+      has(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY)
+        ? request("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, decodeAgentBuiltinMemorySettings, { agentId }, serverId)
+        : null,
+    updateAgentBuiltinMemory: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_BUILTIN_MEMORY_CAPABILITY, "mobile.agent.host.unsupported");
+      return request(
+        "POST",
+        AGENT_BUILTIN_MEMORY_ROUTES.update,
+        decodeAgentBuiltinMemorySettings,
+        { ...input },
+        serverId,
+      );
     },
     loadAgentDefaults: async (serverId) =>
       has(serverId, AGENT_DEFAULTS_CAPABILITY)

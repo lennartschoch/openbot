@@ -37,6 +37,7 @@ import {
   restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
+  type TaskReportState,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import { handoffHasHistory } from "./handoff-history";
@@ -120,6 +121,7 @@ export interface TaskLanes {
   limit(agentId: string): number;
   oneTurnAtATime(agentId: string): boolean;
   isRoutineThread(taskId: string): boolean;
+  taskReport(taskId: string): TaskReportState | null;
 }
 
 interface Lane {
@@ -267,6 +269,18 @@ export class DrainScheduler {
     ];
   }
 
+  #runningChannelTurns(agentId: string, exceptLaneId: string | null): number {
+    return this.#lanesOf(agentId).filter(
+      (other) => other.taskId !== exceptLaneId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
+    ).length;
+  }
+
+  #runningTasks(agentId: string, exceptTaskId: string | null): number {
+    return this.#tasks
+      .openTaskIds(agentId)
+      .filter((other) => other !== exceptTaskId && this.#laneRunning({ agentId, taskId: other })).length;
+  }
+
   #laneRunning(lane: Lane): boolean {
     return (
       this.#drainingLanes.has(laneKey(lane)) ||
@@ -358,20 +372,13 @@ export class DrainScheduler {
     )
       return "one-turn";
     const channelId = laneChannelId(taskId);
-    if (
-      channelId !== null &&
-      this.#lanesOf(agentId).some(
-        (other) => other.taskId !== taskId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
-      )
-    )
+    if (channelId !== null && this.#runningChannelTurns(agentId, taskId) >= this.channelTurnLimit(agentId))
       return "channel-turn";
     const ownTaskId = laneTaskId(lane);
     if (ownTaskId !== null) {
       if (this.#tasks.threadId(ownTaskId) === null) return "task-closed";
-      const running = this.#tasks
-        .openTaskIds(agentId)
-        .filter((other) => other !== ownTaskId && this.#laneRunning({ agentId, taskId: other })).length;
-      if (running >= this.#tasks.limit(agentId)) return "task-limit";
+      const extraChannelTurns = Math.max(0, this.#runningChannelTurns(agentId, null) - 1);
+      if (this.#runningTasks(agentId, ownTaskId) + extraChannelTurns >= this.#tasks.limit(agentId)) return "task-limit";
     }
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (
@@ -436,6 +443,18 @@ export class DrainScheduler {
 
   messagingTurnActive(agentId: string): boolean {
     return this.#ownThreadTurnActive(agentId, true);
+  }
+
+  channelTurnLimit(agentId: string): number {
+    return Math.max(1, this.#tasks.limit(agentId) - this.#runningTasks(agentId, null));
+  }
+
+  channelTurnFull(agentId: string, channelId: string): boolean {
+    const channelLanes = this.#lanesOf(agentId).filter((lane) => laneChannelId(lane.taskId) !== null);
+    return (
+      channelLanes.some((lane) => laneChannelId(lane.taskId) === channelId) ||
+      channelLanes.length >= this.channelTurnLimit(agentId)
+    );
   }
 
   ownChatHold(agentId: string): string | null {
@@ -912,19 +931,24 @@ export class DrainScheduler {
             const { resumeAfterUsageLimit, ...rest } = item;
             const repeated = resumeAfterUsageLimit !== undefined && continued.has(resumeAfterUsageLimit.turnId);
             if (resumeAfterUsageLimit) continued.add(resumeAfterUsageLimit.turnId);
+            const routineRun =
+              item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null;
             return deliveryPromptInput(repeated ? rest : item, {
               agentNames,
               snapshot,
-              routineRun:
-                item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
+              routineRun,
+              skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 item.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              continuesWait: item.delivery.sender.kind === "routine" && this.#routines.continuesWait(item.delivery.id),
               routineTimezone:
                 item.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
+              taskReport: this.taskReport(item),
+              taskReportWaiting: this.taskReportWaiting(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
@@ -1346,6 +1370,35 @@ export class DrainScheduler {
     const taskId = this.#mailbox.taskIdForDelivery(id);
     if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
     return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
+  }
+
+  taskReport(context: DeliveryContext): TaskReportState | null {
+    const { sender, recipientAgentId } = context.delivery;
+    const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
+    return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
+  }
+
+  taskReportWaiting(context: DeliveryContext): string[] {
+    const { sender, recipientAgentId, messageId } = context.delivery;
+    if (!context.senderTaskId || sender.kind !== "agent" || sender.agentId !== recipientAgentId) return [];
+    if (
+      this.#mailbox.taskBusy(recipientAgentId, context.senderTaskId) ||
+      this.#mailbox.taskRunsInProvider(recipientAgentId, context.senderTaskId) ||
+      this.#mailbox.taskAwaitsTeammate(recipientAgentId, context.senderTaskId)
+    )
+      return [];
+    return [
+      ...new Set(
+        this.#mailbox
+          .heldRequestIdsOf(messageId)
+          .filter(
+            (requestId) =>
+              !this.#mailbox.hasReplyFrom(recipientAgentId, requestId) &&
+              !this.#mailbox.heldByTask(recipientAgentId, requestId, new Set([context.senderTaskId ?? ""])),
+          )
+          .flatMap((requestId) => this.#mailbox.requestSenderAgentId(requestId) ?? []),
+      ),
+    ];
   }
 
   answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {

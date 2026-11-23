@@ -71,6 +71,10 @@ function asksForPreview(url: URL): boolean {
   return url.searchParams.get("preview") === "1";
 }
 
+function asksToOpen(url: URL): boolean {
+  return url.searchParams.get("open") === "1";
+}
+
 export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
   const logger = createOpenBotLogger("attachment-protocol");
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
@@ -106,7 +110,13 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachment = await runCauseEffect(
         asksForPreview(url)
           ? remoteServers.downloadAttachmentPreview(attachmentId, serverId)
-          : remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
+          : remoteServers.downloadAttachment(
+              attachmentId,
+              serverId,
+              true,
+              remoteAttachmentPreviewSize(url),
+              !asksToOpen(url),
+            ),
       );
       return bytesResponse(
         attachment.bytes,

@@ -237,7 +237,7 @@ export const messages = {
   "error.backend.agentWaitGone": "この待機は開いていません。エージェントが閉じたか、誰かがキャンセルしました。",
   "error.backend.agentWaitNoRequest": "待機を続行するにはメッセージが必要です。このターンにはメッセージがありません。",
   "error.backend.agentWaitOwnChatOnly":
-    "待機は自分のチャットでのみ開いてください。チャンネルやメッセージングのタスクは待機できません。",
+    "待機は自分のチャットかサイドスレッドで開いてください。チャンネルやメッセージングの会話は待機できません。",
   "error.backend.agentWaitNoteRequired": "待機の目的を示す短いメモを入力してください。",
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
@@ -349,6 +349,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "フォルダーが存在しないか、すでに削除されています。",
   "error.backend.libraryFolderOtherAgent": "ファイルは、そのエージェントのフォルダーにのみ入れられます。",
   "error.backend.libraryFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
+  "error.backend.workflowFolderLimit": "1 つのサーバーに置けるワークフローのフォルダーは {limit} 個までです。",
+  "error.backend.workflowFolderPlacementLimit": "フォルダー内のワークフローが多すぎます。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",
@@ -467,6 +469,7 @@ export const messages = {
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
+  "error.backend.taskControlInvalid": "開始したタスクの taskId を指定してください。メッセージにはテキストも必要です。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
   "error.backend.taskUnfinishedLimit":
@@ -474,5 +477,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.taskMessageFailed": "OpenBot はタスクにメッセージを送信できませんでした。後でもう一度お試しください。",
   "error.backend.taskStartFailed": "OpenBot はタスクを開始できませんでした。代わりにこのターンで作業してください。",
 } as const satisfies PartialTranslation<typeof source>;

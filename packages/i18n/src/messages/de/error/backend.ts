@@ -246,7 +246,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Ein Wartevorgang braucht eine Nachricht, um fortzufahren. Dieser Durchlauf hat keine Nachricht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Öffne einen Wartevorgang nur in deinem eigenen Chat. Eine Kanal- oder Messaging-Aufgabe kann nicht warten.",
+    "Öffne einen Wartevorgang in deinem eigenen Chat oder in einem Nebenthread. Eine Kanal- oder Messaging-Unterhaltung kann nicht warten.",
   "error.backend.agentWaitNoteRequired": "Gib eine kurze Notiz an, wofür der Wartevorgang ist.",
   "error.backend.agentWaitRoutineGone": "Dieser Agent hat keine Routine mit dieser ID.",
   "error.backend.agentWaitNoRoutine":
@@ -360,6 +360,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Der Ordner existiert nicht oder wurde bereits gelöscht.",
   "error.backend.libraryFolderOtherAgent": "Eine Datei kann nur in einen Ordner ihres Agenten verschoben werden.",
   "error.backend.libraryFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.workflowFolderLimit": "Ein Server kann bis zu {limit} Workflow-Ordner haben.",
+  "error.backend.workflowFolderPlacementLimit": "In den Ordnern sind zu viele Workflows.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",
@@ -485,6 +487,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",
   "error.backend.taskToolInvalid":
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
+  "error.backend.taskControlInvalid":
+    "Gib die taskId einer Aufgabe an, die du gestartet hast. Eine Nachricht braucht auch Text.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
   "error.backend.taskUnfinishedLimit":
@@ -492,6 +496,8 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Dieser Agent hat {count} offene Aufgaben. Schließe eine Aufgabe und starte oder öffne dann eine andere.",
   "error.backend.taskRemoteUnsupported": "Aufgaben sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.taskMessageFailed":
+    "OpenBot konnte die Nachricht nicht an die Aufgabe senden. Versuche es später erneut.",
   "error.backend.taskStartFailed":
     "OpenBot konnte die Aufgabe nicht starten. Erledige die Arbeit stattdessen in diesem Durchlauf.",
 } as const satisfies PartialTranslation<typeof source>;

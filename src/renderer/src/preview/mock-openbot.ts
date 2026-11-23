@@ -54,6 +54,7 @@ import {
   agentDefaultChoiceValues,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentTaskLimit,
@@ -64,6 +65,9 @@ import {
   type BusyMessageModePreference,
   browserProxyAddressText,
   type CentralAuthState,
+  CHANNEL_FOLDER_LIMIT,
+  type ChannelFolderChange,
+  type ChannelFolderList,
   type ClaudeCompactWindowSetting,
   type ClaudeUserMcpSetting,
   type ClaudeUserSetupSetting,
@@ -78,6 +82,7 @@ import {
   type ConversationTurnTrace,
   type CustomAgentSummary,
   type CustomProviderSummary,
+  channelFolderCoverage,
   composedCustomModelId,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
@@ -881,6 +886,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return { outcome: "added", path, replaced, list: mockAgentFolders(agentId) };
   }
 
+  const mockChannelFolderPaths = new Map<string, string[]>();
+
+  function mockChannelFolders(channelId: string): ChannelFolderList {
+    return { folders: (mockChannelFolderPaths.get(channelId) ?? []).map((path) => ({ path, found: true })) };
+  }
+
+  function addMockChannelFolder(channelId: string, path: string): ChannelFolderChange {
+    const current = mockChannelFolderPaths.get(channelId) ?? [];
+    const list = mockChannelFolders(channelId);
+    const folder = channelFolderCoverage(path, current);
+    if (folder) return { outcome: "covered", path, folder, list };
+    const kept = current.filter((existing) => !folderInside(path, existing));
+    if (kept.length >= CHANNEL_FOLDER_LIMIT) return { outcome: "refused", path, refusal: "limit", list };
+    mockChannelFolderPaths.set(channelId, [...kept, path]);
+    const replaced = current.filter((existing) => !kept.includes(existing));
+    return { outcome: "added", path, replaced, list: mockChannelFolders(channelId) };
+  }
+
   function allModels() {
     return [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
       (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
@@ -1405,6 +1428,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
       setInputRegion: async () => undefined,
+      setExtent: async () => undefined,
       setXWayland: async () => undefined,
       onCloseChat: () => () => undefined,
       listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
@@ -1607,6 +1631,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       };
       return clone(agentStatus);
     },
+    setLiveVoiceAccount: async ({ accountId }) => {
+      agentStatus = {
+        ...agentStatus,
+        providers: agentStatus.providers?.map((row) => {
+          if (row.id !== "codex") return row;
+          const { liveVoiceAccount: _old, ...rest } = row;
+          return accountId ? { ...rest, liveVoiceAccount: accountId } : rest;
+        }),
+      };
+      return clone(agentStatus);
+    },
     signOutProvider: async (provider) => {
       agentStatus = {
         ...agentStatus,
@@ -1658,8 +1693,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     providerRuntimes: mockProviderRuntimes.providerRuntimes,
     openUrl: async () => undefined,
     voice: mockVoice.voice,
-    workflows: mockWorkflows(options.workflows ?? [], (workflowId) =>
-      emitAgentEvent({ type: "workflows-changed", workflowId }),
+    workflows: mockWorkflows(
+      options.workflows ?? [],
+      (workflowId) => emitAgentEvent({ type: "workflows-changed", workflowId }),
+      () => emitAgentEvent({ type: "workflow-folders-changed" }),
     ),
     crm: mockCrm(options.crm ?? {}, () => emitAgentEvent({ type: "crm-changed" })),
     routineResults: mockRoutineResults(routines, options, (agentId) =>
@@ -1872,6 +1909,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         pools: (agentStatus.providers ?? []).flatMap((row) =>
           row.accounts && row.accountPool ? [{ provider: row.id, pool: clone(row.accountPool) }] : [],
         ),
+        liveVoiceAccount: agentStatus.providers?.find((row) => row.id === "codex")?.liveVoiceAccount ?? null,
         agents: [],
       }),
       accountUsage: async () => ({ limits: [] }),
@@ -1905,6 +1943,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       setAccountPool: async (input) => {
         await api.setProviderAccountPool(input);
+      },
+      setLiveVoiceAccount: async (input) => {
+        await api.setLiveVoiceAccount(input);
       },
       hostDefaultProvider: async () => ({
         preferredProvider: setupState.preferredProvider,
@@ -2279,6 +2320,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           volumes: [],
         };
       },
+      listChannelFolders: async (channelId) => mockChannelFolders(channelId),
+      chooseChannelFolder: async (channelId) => addMockChannelFolder(channelId, "/mock/Projects/Shared work"),
+      addChannelFolder: async ({ channelId, path }) => addMockChannelFolder(channelId, path),
+      removeChannelFolder: async ({ channelId, path }) => {
+        mockChannelFolderPaths.set(
+          channelId,
+          (mockChannelFolderPaths.get(channelId) ?? []).filter((folder) => folder !== path),
+        );
+        return { outcome: "removed", path, list: mockChannelFolders(channelId) };
+      },
+      browseChannelFolders: async ({ path }) => api.agent.browseAgentFolders({ agentId: "", path }),
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
       saveAgentInstructions: async ({ agentId, text, expected }) => {
         const current = mockAgentInstructions(agentId);
@@ -2310,6 +2362,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentPlanCard: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentBuiltinMemory: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { memory: agentMemoryEnabled(agent) };
+      },
+      updateAgentBuiltinMemory: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentBuiltinMemory(input.agentId);
       },
       getAgentFastMode: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -3499,6 +3560,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       respondToApproval: async () => undefined,
       readPendingApproval: async () => null,
+      listPendingPrompts: async () => (runtimeSnapshot ? clone(runtimeSnapshot.pendingPrompts) : []),
       respondToBrowserSecret: async (input) => {
         for (const listener of agentListeners)
           listener({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });
@@ -3562,6 +3624,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       cancelIdleRestart: async () => {
         const { idleRestart: _cancelled, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
+      restartNow: async () => {
+        const { idleRestart: _restarted, ...rest } = updateStatus;
         updateStatus = rest;
         emit(updateListeners, updateStatus);
         return clone(updateStatus);

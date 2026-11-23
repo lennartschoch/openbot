@@ -55,6 +55,7 @@ import type {
 import {
   agentAccessRank,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
   agentQuickAcknowledgementEnabled,
@@ -112,7 +113,13 @@ import {
   setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
-import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
+import {
+  type AppServerRequest,
+  type DynamicToolCallParams,
+  type DynamicToolResult,
+  isRecord,
+  PROVIDER_STOPPED_WAITING,
+} from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import type { VaultItems } from "../vault-items";
@@ -164,6 +171,7 @@ import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from
 import {
   type AgentLibraryFolders,
   libraryFileAgents,
+  libraryFileWorkflows,
   listLibraryFolders,
   listLibraryFoldersToolSchema,
   organizeLibrary,
@@ -218,7 +226,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -268,6 +276,14 @@ function requestAborted(signal: AbortSignal | undefined) {
     return Effect.sync(() => signal?.removeEventListener("abort", abort));
   });
 }
+
+const AGENT_MEMORY_TOOLS: ReadonlySet<string> = new Set([
+  "search_memories",
+  "list_memories",
+  "set_memory_inclusion",
+  "remember",
+  "forget_memory",
+]);
 
 const LISTED_DESCRIPTION_LENGTH = 300;
 
@@ -319,7 +335,7 @@ const FEEDBACK_ERROR_THREADS = 200;
 const ROUTINE_RUN_TURNS = 200;
 
 interface RoutineRunTurn {
-  failed: boolean;
+  ended: "failed" | "quiet" | null;
   paused: { agentId: string; routineId: string; updatedAt: string }[];
 }
 
@@ -609,9 +625,11 @@ export class OpenBotToolRouter {
     request: AppServerRequest,
   ) {
     if (request.signal?.aborted) return;
-    request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
-      once: true,
-    });
+    request.signal?.addEventListener(
+      "abort",
+      () => this.#attention.cancelRequest(client, request.id, request.signal?.reason === PROVIDER_STOPPED_WAITING),
+      { once: true },
+    );
     const reportFailure = (error: unknown) =>
       Effect.sync(() => {
         if (client.running) {
@@ -1659,6 +1677,11 @@ export class OpenBotToolRouter {
     };
   }
 
+  #memoryEnabled(agentId: string): boolean {
+    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agents = this.#hooks.listAgents();
     const agent = agents.find((candidate) => candidate.id === agentId);
@@ -1904,7 +1927,7 @@ export class OpenBotToolRouter {
       return openBotToolResult({
         status: "posted",
         channel: { id: channel.id, name: channel.name },
-        next: "The channel members work on it in the channel. Tell the user to follow it there, and do not do the work here.",
+        next: "The channel members work on it in the channel, and each member that takes it sends its result back here in a later turn. Do not do the work here and do not wait: tell the user where it went, then end your turn.",
       });
     }
 
@@ -1962,8 +1985,16 @@ export class OpenBotToolRouter {
       if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
       const storedFiles = this.#mailbox.listStoredFiles();
       const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
+      const fileWorkflows = yield* libraryFileWorkflows(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+        listLibraryFolders(
+          libraryFolders.getSnapshot(),
+          storedFiles,
+          fileAgents,
+          fileWorkflows,
+          senderAgentId,
+          args.folder,
+        ),
       );
     }
 
@@ -2077,10 +2108,23 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
         );
-      const outcome =
-        channelRun?.part === "owner" && !channelRun.quiet
-          ? "shown"
-          : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
+      const shownToOwner = channelRun?.part === "owner" && !channelRun.quiet;
+      const pausedTurn = this.#routineRunTurns.get(params.turnId);
+      if (!shownToOwner && pausedTurn !== undefined && pausedTurn.paused.length > 0) {
+        const results = pausedTurn.paused.map((pause) => this.#routines.resumeAfterRunPause(pause, params));
+        const stillPaused = pausedTurn.paused.filter((pause) =>
+          this.#routines.listFor(pause.agentId).some((routine) => routine.id === pause.routineId && !routine.active),
+        );
+        this.#noteRoutineRunTurn(params.turnId, { ended: pausedTurn.ended, paused: stillPaused });
+        return openBotToolFailure(
+          stillPaused.length > 0
+            ? "You paused this routine, and it stays paused. Give a short report that says that the routine is paused, and that the user can turn it on again."
+            : `Nothing to report is not a stop condition${results.includes("resumed") ? ", so this routine is on again" : ""}. When the task says to stop this routine now, pause it again and give a short report that says that it stopped and why. Otherwise call this tool again.`,
+        );
+      }
+      const outcome = shownToOwner
+        ? "shown"
+        : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
           "Use this tool only in a routine run, for a teammate's message (an update that wants no answer, or a request after your reply to it), or when your background work wakes you again after your report. Give your answer as usual.",
@@ -2089,6 +2133,13 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
+      if (
+        outcome === "quiet" &&
+        this.#mailbox
+          .findDeliveriesByTurn(senderAgentId, params.turnId)
+          .some(({ delivery }) => delivery.sender.kind === "routine")
+      )
+        this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
           ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
@@ -2110,11 +2161,7 @@ export class OpenBotToolRouter {
         );
       if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
-      const paused = this.#routineRunTurns.get(params.turnId)?.paused ?? [];
-      this.#noteRoutineRunTurn(params.turnId, { failed: true, paused: [] });
-      if (paused.length === 0)
-        return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
-      const results = paused.map((pause) => this.#routines.resumeAfterFailedRun(pause, params));
+      const results = this.#endRoutineRunTurn(params, "failed");
       return openBotToolResult({
         status: "failed",
         note: results.includes("failed")
@@ -2136,9 +2183,11 @@ export class OpenBotToolRouter {
 
     const runPause = this.#runRoutinePause(params, senderAgentId);
     const runTurn = this.#routineRunTurns.get(params.turnId);
-    if (runPause !== null && runTurn?.failed)
+    if (runPause !== null && runTurn?.ended)
       return openBotToolFailure(
-        "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual.",
+        runTurn.ended === "failed"
+          ? "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual."
+          : "This run ended with nothing to report. Nothing to report is not a stop condition, so this routine stays on. This is not a failure: do not report one. End your turn now.",
       );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
       this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
@@ -2150,7 +2199,7 @@ export class OpenBotToolRouter {
     if (runPause !== null && pausedRoutine) {
       const { scheduledFor, ...pause } = runPause;
       this.#noteRoutineRunTurn(params.turnId, {
-        failed: false,
+        ended: null,
         paused: [...(runTurn?.paused ?? []), { ...pause, updatedAt: pausedRoutine.updatedAt }],
       });
       if (!pausedRoutine.active) this.#routines.notePausedByRun(pause.agentId, pause.routineId, scheduledFor);
@@ -2267,6 +2316,10 @@ export class OpenBotToolRouter {
       );
     }
 
+    if (AGENT_MEMORY_TOOLS.has(params.tool) && !this.#memoryEnabled(senderAgentId))
+      return openBotToolFailure(
+        "OpenBot memory is off for you, so this tool does not work. Use a connected memory app instead, or tell the user that they can turn on OpenBot memory in your settings.",
+      );
     const memoryResult = this.#memories.handleTool(
       params,
       senderAgentId,
@@ -2284,7 +2337,11 @@ export class OpenBotToolRouter {
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
       requesterIds: this.#memberRequesters(senderAgentId, params.turnId),
     };
-    const waitResult = this.#waits.handleTool(params, caller);
+    const waitResult = this.#waits.handleTool(params, {
+      agentId: senderAgentId,
+      inExecutionThread:
+        caller.inExecutionThread && !(callerTaskId !== null && this.#tasks.isSideThread(senderAgentId, callerTaskId)),
+    });
     if (waitResult) return waitResult;
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
@@ -2363,13 +2420,15 @@ export class OpenBotToolRouter {
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
-        const found = matches.length > 0 || serverPlaces.length > 0;
+        const chatPlaces = searchChatPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0 || chatPlaces.length > 0;
         const apps =
           "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
           status: found ? "matches" : "not_found",
           matches,
           ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          ...(chatPlaces.length > 0 ? { chatPlaces } : {}),
           next: found
             ? [
                 matches.length > 0
@@ -2377,6 +2436,9 @@ export class OpenBotToolRouter {
                   : "",
                 serverPlaces.length > 0
                   ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                chatPlaces.length > 0
+                  ? "A chat place is a feature of the chat itself, with no id and no card: when it fits, tell the user in words where it is and what it does."
                   : "",
                 apps,
                 "When none fits, try other English words once, then say that you found no setting for it.",
@@ -2859,6 +2921,12 @@ export class OpenBotToolRouter {
       ownRun?.kind === "routine" &&
       this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
     return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
+  }
+
+  #endRoutineRunTurn(params: DynamicToolCallParams, ended: "failed" | "quiet"): ("resumed" | "kept" | "failed")[] {
+    const runTurn = this.#routineRunTurns.get(params.turnId);
+    this.#noteRoutineRunTurn(params.turnId, { ended: runTurn?.ended === "failed" ? "failed" : ended, paused: [] });
+    return (runTurn?.paused ?? []).map((pause) => this.#routines.resumeAfterRunPause(pause, params));
   }
 
   #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {
