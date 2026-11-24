@@ -125,6 +125,8 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "このサーバーはプロバイダー CLI を自分で更新します。サーバー上で OpenBot を更新してください。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostSignalHomeUnsupported": "この接続では Signal サーバーの選択に対応していません。",
+  "error.team.hostVoiceModelUnsupported": "この接続はサーバーの音声認識モデルに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
   "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
@@ -140,6 +142,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
+  "error.team.cacheExpiryCompactionUnsupported": "この接続はキャッシュの期限切れ前の圧縮に対応していません。",
   "error.team.providerEnvironmentUnsupported": "この接続はプロバイダーの変数に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",

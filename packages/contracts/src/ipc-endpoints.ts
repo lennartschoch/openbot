@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CreditActivity, CreditCheckoutRequest, CreditsState, CreditTransferRequest } from "./credits";
 import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
@@ -131,7 +132,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  ArchivedAgentTasksPage,
   BranchAgentTaskInput,
+  ListArchivedAgentTasksInput,
   MarkAgentTaskReadInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -257,6 +260,7 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
 import type {
   BrowseChannelFoldersInput,
   ChannelFolderChange,
@@ -381,6 +385,7 @@ import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-age
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
+import type { HostSignalHomeSettings } from "./ipc-host-signal-home";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
@@ -457,6 +462,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
@@ -610,6 +616,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  HostVoiceModel,
+  HostVoiceModelChange,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -633,6 +641,7 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type { WorkflowFileSaveResult } from "./ipc-workflow-file";
 import type { WorkflowFolderAction, WorkflowFoldersSnapshot } from "./ipc-workflow-folders";
 import type {
   WorkflowGitHubCatalog,
@@ -648,6 +657,7 @@ import type {
   RetryWorkflowStepInput,
   RunWorkflowStepInput,
   SaveWorkflowGraphInput,
+  SetWorkflowPausedInput,
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
@@ -1163,6 +1173,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
       "messaging:set-whatsapp-status-reactions",
     ),
+    setWhatsAppSenderReadOnly: request<SetWhatsAppSenderReadOnlyInput, void>()(
+      "messaging:set-whatsapp-sender-read-only",
+    ),
     hostOverview: scopedRequest<HostMessagingPlatformInput, MessagingOverview, "required">()("messaging:host-overview"),
     hostConnect: scopedRequest<HostMessagingConnectInput, void, "required">()("messaging:host-connect"),
     hostDisconnect: scopedRequest<HostMessagingWorkspaceInput, void, "required">()("messaging:host-disconnect"),
@@ -1217,6 +1230,9 @@ export const IPC_ENDPOINTS = {
     hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
       "messaging:host-set-whatsapp-status-reactions",
     ),
+    hostSetWhatsAppSenderReadOnly: scopedRequest<SetWhatsAppSenderReadOnlyInput, void, "required">()(
+      "messaging:host-set-whatsapp-sender-read-only",
+    ),
   },
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
@@ -1233,6 +1249,12 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getSignalHome: scopedQuery<HostSignalHomeSettings, "required">()("host-admin:get-signal-home"),
+    setSignalHome: scopedRequest<string | null, HostSignalHomeSettings, "required">()("host-admin:set-signal-home"),
+    getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
+    changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
+      "host-admin:change-voice-model",
+    ),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1252,6 +1274,12 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    getCacheExpiryCompaction: scopedQuery<CacheExpiryCompactionSetting, "required">()(
+      "host-admin:get-cache-expiry-compaction",
+    ),
+    setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
+      "host-admin:set-cache-expiry-compaction",
     ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
@@ -1387,6 +1415,12 @@ export const IPC_ENDPOINTS = {
   },
   referral: {
     getState: request<ReferralPageRequest, ReferralState>()("referral:get-state"),
+  },
+  credits: {
+    getState: request<undefined, CreditsState>()("credits:get-state"),
+    getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
+    openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
+    transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
   },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
@@ -1566,6 +1600,9 @@ export const IPC_ENDPOINTS = {
     listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listArchivedTasks: scopedRequest<ListArchivedAgentTasksInput, ArchivedAgentTasksPage>()(
+      "agent:tasks:list-archived",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
@@ -1652,6 +1689,8 @@ export const IPC_ENDPOINTS = {
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
     create: scopedRequest<CreateWorkflowInput, WorkflowDetail>()("workflows:create"),
     rename: scopedRequest<RenameWorkflowInput, WorkflowSummary>()("workflows:rename"),
+    setPaused: scopedRequest<SetWorkflowPausedInput, WorkflowSummary>()("workflows:setPaused"),
+    exportFile: scopedRequest<string, WorkflowFileSaveResult>()("workflows:export-file"),
     delete: scopedRequest<string, void>()("workflows:delete"),
     saveGraph: scopedRequest<SaveWorkflowGraphInput, WorkflowSaveResult>()("workflows:save-graph"),
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),
@@ -2061,6 +2100,7 @@ export const IPC_GROUP_PATHS = {
   routineResults: "routineResults",
   billing: "billing",
   referral: "referral",
+  credits: "credits",
   license: "license",
   hostedServers: "hostedServers",
   localServers: "localServers",

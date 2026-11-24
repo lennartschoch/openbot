@@ -127,6 +127,8 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "Bu sunucu, sağlayıcı CLI’larını kendisi günceller. Sunucuda OpenBot’u güncelle.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostSignalHomeUnsupported": "Bu bağlantı Signal sunucusu seçimini desteklemiyor.",
+  "error.team.hostVoiceModelUnsupported": "Bu bağlantı sunucunun konuşma tanıma modelini desteklemiyor.",
   "error.team.hostRestartUnsupported": "Bu bağlantı sunucuyu yeniden başlatmayı desteklemiyor.",
   "error.team.ownerTransferUnsupported": "Bu sunucu sahiplik devrini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
@@ -142,6 +144,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.claudeCompactWindowUnsupported": "Bu bağlantı Claude sıkıştırma boyutunu desteklemiyor.",
+  "error.team.cacheExpiryCompactionUnsupported": "Bu bağlantı önbelleğin süresi dolmadan sıkıştırmayı desteklemiyor.",
   "error.team.providerEnvironmentUnsupported": "Bu bağlantı sağlayıcı değişkenlerini desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",

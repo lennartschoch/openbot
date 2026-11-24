@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
 import { promisify } from "node:util";
 import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
@@ -38,6 +39,7 @@ export interface AcpConnectionOptions {
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
+  peek?: ((message: unknown) => void) | undefined;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
   exit(error: Error): void;
   client(): Client;
@@ -114,12 +116,26 @@ export class AcpConnection {
         return error;
       }),
     );
-    const stream = ndJsonStream(
+    const lines = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
+    const peek = this.options.peek;
+    const stream = peek
+      ? {
+          writable: lines.writable,
+          readable: lines.readable.pipeThrough(
+            new TransformStream({
+              transform(message, controller) {
+                peek(message);
+                controller.enqueue(message);
+              },
+            }),
+          ),
+        }
+      : lines;
     this.#connection = new ClientSideConnection(() => this.options.client(), stream);
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;
@@ -206,9 +222,7 @@ export class AcpConnection {
     ended: Deferred.Deferred<ProcessEnd> | null,
     serverLost = false,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
-    if (!ended || this.#stopping) return yield* providerSync(() => error);
-    const message = error instanceof Error ? error.message : "";
-    if (!serverLost && message !== "ACP connection closed" && message !== "ACP client is not running.")
+    if (!ended || this.#stopping || (!serverLost && !isClosedConnection(error)))
       return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),
@@ -226,11 +240,25 @@ export class AcpConnection {
     );
   });
 
+  explainClose(error: unknown): unknown {
+    if (!this.#ended || this.#stopping || !isClosedConnection(error)) return error;
+    return new AgentProcessExitError(
+      sourceText("error.provider.acpProcessStopped", { provider: this.options.label() }),
+      null,
+      { cause: error },
+    );
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
     this.#process = null;
     if (!this.#stopping) this.options.exit(error);
   }
+}
+
+function isClosedConnection(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return message === "ACP connection closed" || message === "ACP client is not running.";
 }
 
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {

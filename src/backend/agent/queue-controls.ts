@@ -264,7 +264,8 @@ export class QueueControls {
           throw new Error(sourceText("error.backend.steerQueuedOnly"));
         const turnId = snapshot.activeTurnId;
         const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
-        if (!this.#endpoints.serves(turnModel, client.provider)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        if (!this.#endpoints.servesClient(turnModel, client.provider, this.#providers.configRevision(client)))
+          throw new Error(REMOVED_ENDPOINT_MESSAGE);
         return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
       },
     );
@@ -306,7 +307,7 @@ export class QueueControls {
             ...deliveryPromptInput(context, {
               agentNames: agentNamesById(this.#store.list()),
               snapshot,
-              routineRun,
+              routineRun: routineRun ?? this.#routines.linkedRunForDelivery(input.deliveryId),
               skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
@@ -344,10 +345,13 @@ export class QueueControls {
           ),
         ),
       );
-    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
+    const joinedTurn = steering?.status === "starting" && steering.turnId === turnId;
+    if (joinedTurn) yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
       if (
+        joinedTurn &&
         this.#conversation.isExecutionThread(current.threadId) &&
         !current.messages.some((message) => message.id === input.deliveryId)
       ) {
@@ -356,7 +360,9 @@ export class QueueControls {
       }
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      if (joinedTurn)
+        this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      else this.#conversation.emitConversation(current);
     });
   }, Effect.uninterruptible);
 }

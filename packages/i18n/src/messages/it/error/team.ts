@@ -140,6 +140,9 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "Questo server aggiorna le sue CLI dei provider da solo. Aggiorna OpenBot sul server.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostSignalHomeUnsupported": "Questa connessione non supporta la scelta del server Signal.",
+  "error.team.hostVoiceModelUnsupported":
+    "Questa connessione non supporta il modello di riconoscimento vocale del server.",
   "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
   "error.team.ownerTransferUnsupported": "Questo server non supporta il trasferimento della proprietà.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
@@ -157,6 +160,8 @@ export const messages = {
     "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Questa connessione non supporta la dimensione di compattazione di Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Questa connessione non supporta la compattazione prima della scadenza della cache.",
   "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",

@@ -7,6 +7,7 @@ import {
   type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
@@ -30,10 +31,17 @@ interface AcpRetryUpdate {
   readonly cause: AcpRetryCause;
 }
 
+export interface AcpReplyEvent {
+  readonly sessionId: string;
+  readonly reply: string;
+  readonly failure: string | null;
+}
+
 export interface AcpCustomEndpoint {
   readonly name: string;
   readonly hasCredentials: boolean;
   readonly stallMs?: number;
+  readonly contextWindow?: number;
 }
 
 export interface AcpMcpServerFailure {
@@ -69,6 +77,7 @@ export interface AcpFlavor {
     refusalStatus: () => number | null,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
+  unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
   failureReport?: RegExp;
   emptyAnswerFailure?(
     turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
@@ -79,6 +88,7 @@ export interface AcpFlavor {
     error: unknown,
     method: "load" | "resume",
   ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   refusesUntilRestart?(error: unknown): boolean;
   lostServerUntilRestart?(error: unknown): boolean;
@@ -93,8 +103,11 @@ export interface AcpFlavor {
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
+  sessionFiles?(argv: readonly string[], sessionId: string): readonly string[];
   effortCategories?: readonly string[];
+  promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
+  modelsLoadWithSession?: true;
   sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;
@@ -103,12 +116,14 @@ export interface AcpFlavor {
     emptyOutputFailure?: RegExp;
     textToolCall?: { starts: readonly string[]; whole: RegExp };
     turnFailure(text: string): string;
-    fallbackCause?(text: string): CauseCode | null;
+    fallbackCause?(text: string, reachedModel: boolean): CauseCode | null;
     accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
     accountVerification?: RegExp;
     quota(text: string): string | null;
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
+    loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
+    silentFailure?(argv: readonly string[], sessionId: string, since: number): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;
@@ -119,6 +134,7 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
+  silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
   wakesAfterPromptEnds?: true;
   selfWakeTools?: RegExp;
@@ -126,6 +142,8 @@ export interface AcpFlavor {
   resendsAnswer?: true;
   childSessionUpdates?: true;
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  clientMeta?: DynamicRecord;
+  replyEvent?: (method: string, params: DynamicRecord) => AcpReplyEvent | null;
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
@@ -152,18 +170,24 @@ export interface AcpFlavor {
   planUsedUpChunk?: RegExp;
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
+  bridgeToolsWithoutCard?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   promptUsage?(response: PromptResponse): DynamicRecord | null;
   promptRun?(response: PromptResponse): string | undefined;
-  userQuestions?: {
-    method: string;
-    reply(
-      questions: readonly { id: string; question: string }[],
-      answers: Readonly<Record<string, readonly string[]>>,
-    ): DynamicRecord;
-  };
+  userQuestions?: AcpUserRequest;
+  planApproval?: AcpUserRequest;
+}
+
+interface AcpUserRequest {
+  method: string;
+  questions?(params: DynamicRecord): DynamicRecord[];
+  reply(
+    questions: readonly { id: string; question: string }[],
+    answers: Readonly<Record<string, readonly string[]>>,
+  ): DynamicRecord;
 }
 
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
@@ -178,17 +202,32 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = {
     error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
 };
 
+const COPILOT_SESSION_EVENT = "github.com/copilot/sessionEvent";
+
 export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   relayStdioMcpServers: true,
   turnFailure: copilotTurnFailure,
   planUsedUpChunk: COPILOT_PLAN_USED_UP,
   failureCause: (error) => (COPILOT_PLAN_USED_UP_TEXT.test(errorText(error)) ? "usage_limit" : null),
   compactsItself: true,
+  clientMeta: { "github.com/copilot": { events: ["session.error", "session.info"] } },
+  replyEvent: copilotReplyEvent,
 };
+
+function copilotReplyEvent(method: string, params: DynamicRecord): AcpReplyEvent | null {
+  const { sessionId, type, data, agentId } = params;
+  if (method.replace(/^_/u, "") !== COPILOT_SESSION_EVENT || agentId !== undefined) return null;
+  if (typeof sessionId !== "string" || !isRecord(data) || typeof data.message !== "string") return null;
+  if (type === "session.error") return { sessionId, reply: `Error: ${data.message}`, failure: data.message };
+  if (type === "session.info" && data.infoType === "model_retry")
+    return { sessionId, reply: `Info: ${data.message}`, failure: null };
+  return null;
+}
 
 function copilotTurnFailure(_error: unknown, detail: string): string {
   if (COPILOT_PLAN_USED_UP_TEXT.test(detail))
     return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
+  if (/\bmissing_finish_reason\b/u.test(detail)) return sourceText("error.provider.copilotAnswerIncomplete");
   return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
     ? sourceText("error.provider.copilotThinkingRejected")
     : detail;
@@ -240,10 +279,45 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
         : { outcome: "cancelled" };
     },
   },
+  planApproval: {
+    method: "x.ai/exit_plan_mode",
+    questions: (params) => [grokPlanQuestion(params)],
+    reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
+  },
   retryNotice: grokRetryNotice,
   turnStallMs: 12 * 60_000,
   turnFailure: grokTurnFailure,
 };
+
+const GROK_PLAN_APPROVE = sourceText("status.messaging.approve");
+const GROK_PLAN_STOP = sourceText("status.agent.planStop");
+const GROK_PLAN_UNANSWERED =
+  "The user did not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
+
+function grokPlanQuestion(params: DynamicRecord): DynamicRecord {
+  const plan = typeof params.planContent === "string" ? params.planContent.trim() : "";
+  const limit = INPUT_LIMITS.promptQuestion;
+  return {
+    header: sourceText("status.agent.planApprovalHeader"),
+    question: !plan
+      ? sourceText("status.agent.planApprovalEmpty")
+      : plan.length > limit
+        ? `${plan.slice(0, limit - 1)}…`
+        : plan,
+    detail: sourceText("status.agent.planApprovalDetail"),
+    options: [
+      { label: GROK_PLAN_APPROVE, description: sourceText("status.agent.planApproveDetail") },
+      { label: GROK_PLAN_STOP, description: sourceText("status.agent.planStopDetail") },
+    ],
+  };
+}
+
+function grokPlanReply(answer: string | undefined): DynamicRecord {
+  if (!answer) return { outcome: "abandoned", feedback: GROK_PLAN_UNANSWERED };
+  if (answer === GROK_PLAN_APPROVE) return { outcome: "approved" };
+  if (answer === GROK_PLAN_STOP) return { outcome: "abandoned" };
+  return { outcome: "request_changes", feedback: answer };
+}
 
 function grokTurnFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
@@ -416,6 +490,7 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
   steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  emptyAnswerError: /\bThe model ended its turn without a response\b/u,
   promptRun: (response) => {
     const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
     return typeof run === "string" ? run : undefined;

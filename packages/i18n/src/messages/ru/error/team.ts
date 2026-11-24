@@ -128,6 +128,8 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "Этот сервер обновляет свои CLI провайдеров сам. Обновите OpenBot на сервере.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
+  "error.team.hostSignalHomeUnsupported": "Это подключение не поддерживает выбор сервера Signal.",
+  "error.team.hostVoiceModelUnsupported": "Это подключение не поддерживает модель распознавания речи сервера.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
   "error.team.ownerTransferUnsupported": "Этот сервер не поддерживает передачу владения.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
@@ -143,6 +145,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Это подключение не поддерживает размер сжатия Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "Это подключение не поддерживает сжатие до истечения кэша.",
   "error.team.providerEnvironmentUnsupported": "Это подключение не поддерживает переменные провайдера.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",

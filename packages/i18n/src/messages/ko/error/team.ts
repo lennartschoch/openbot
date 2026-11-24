@@ -126,6 +126,8 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "이 서버는 프로바이더 CLI를 직접 업데이트해요. 서버에서 OpenBot을 업데이트해 주세요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
+  "error.team.hostSignalHomeUnsupported": "이 연결에서는 Signal 서버 선택을 지원하지 않아요.",
+  "error.team.hostVoiceModelUnsupported": "이 연결은 서버의 음성 인식 모델을 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
   "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
@@ -140,6 +142,7 @@ export const messages = {
   "error.team.browsingMemoryUnsupported": "이 연결은 브라우징 학습을 지원하지 않습니다.",
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.claudeCompactWindowUnsupported": "이 연결은 Claude 압축 크기를 지원하지 않아요.",
+  "error.team.cacheExpiryCompactionUnsupported": "이 연결은 캐시가 만료되기 전 압축을 지원하지 않아요.",
   "error.team.providerEnvironmentUnsupported": "이 연결은 공급자 변수를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",

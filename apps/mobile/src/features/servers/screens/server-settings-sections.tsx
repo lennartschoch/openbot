@@ -12,6 +12,7 @@ import Earth from "lucide-react-native/icons/earth";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
+import RadioTower from "lucide-react-native/icons/radio-tower";
 import RefreshCcw from "lucide-react-native/icons/refresh-ccw";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
@@ -34,6 +35,7 @@ import {
   ServerPersonalityRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
+import { ServerVoiceModelRow } from "@/features/servers/components/server-voice-model-row";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
@@ -41,6 +43,7 @@ import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
+import { signalLatencyTone, useServerSignalHome } from "@/features/servers/model/use-server-signal-home";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
@@ -319,7 +322,8 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
     checks.canManageAgentMemoryLimit(serverId) ||
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
-    checks.canManageBrowsingMemory(serverId)
+    checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageServerVoiceModel(serverId)
   );
 }
 
@@ -328,15 +332,20 @@ export function useAgentSettingsAvailable(serverId: string): boolean {
 }
 
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, format } = useText();
   const timezone = useServerTimezone(serverId);
+  const signalHome = useServerSignalHome(serverId);
   const update = useServerUpdate(serverId, { poll: false });
   const row = useServerRows(serverId);
   const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
   const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
   const agentsRow = row((checks) => permitsAgentSettings(checks, serverId));
+  const signalHomeAccess = row((checks) => checks.servesServerSignalHome(serverId));
+  const signalHomes = signalHome.query.data;
+  const signalHomeRow = signalHome.query.isError || (signalHomes?.homes.length ?? 0) > 1 ? signalHomeAccess : "hidden";
+  const signalHomeInUse = signalHomes?.homes.find((home) => home.id === signalHomes.current);
   const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
-  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden") return null;
+  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden" && signalHomeRow === "hidden") return null;
   const zone = timezone.query.data;
   return (
     <SettingsSection
@@ -366,6 +375,29 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
         </SettingsRow>
       )}
+      {signalHomeRow === "hidden" ? null : (
+        <SettingsRow
+          leading={<RowIcon icon={RadioTower} />}
+          trailing={
+            signalHomeInUse ? (
+              <TrailingValue
+                tone={signalLatencyTone(signalHomeInUse.latencyMs)}
+                value={
+                  signalHomeInUse.latencyMs === null
+                    ? t("mobile.server.settings.signalHomeNoAnswer")
+                    : t("mobile.server.settings.signalHomeLatency", {
+                        latency: format.number(signalHomeInUse.latencyMs),
+                      })
+                }
+              />
+            ) : undefined
+          }
+          disabled={signalHomeRow === "disabled" || !signalHome.available}
+          onPress={() => router.push({ pathname: "/server-settings/signal-home", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.route.signalHome")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
       {agentsRow === "hidden" ? null : (
         <SettingsRow
           leading={<RowIcon icon={Bot} />}
@@ -386,6 +418,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageServerVoiceModel,
   } = useMobileWorkspace();
   return (
     <>
@@ -394,6 +427,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );
 }

@@ -132,6 +132,9 @@ export const messages = {
   "error.team.providerRuntimeClientUpdate":
     "Este servidor atualiza seus CLIs de provedor sozinho. Atualize o OpenBot no servidor.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.hostSignalHomeUnsupported": "Esta conexão não oferece suporte à escolha do servidor do Signal.",
+  "error.team.hostVoiceModelUnsupported":
+    "Esta conexão não oferece suporte ao modelo de reconhecimento de fala do servidor.",
   "error.team.hostRestartUnsupported": "Esta conexão não oferece suporte à reinicialização do servidor.",
   "error.team.ownerTransferUnsupported": "Este servidor não permite transferir a propriedade.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
@@ -147,6 +150,8 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Esta conexão não oferece suporte à compactação antes de o cache expirar.",
   "error.team.providerEnvironmentUnsupported": "Esta conexão não oferece suporte a variáveis de provedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",

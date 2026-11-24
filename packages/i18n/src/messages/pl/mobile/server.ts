@@ -120,13 +120,16 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Serwer w chmurze uruchamia agentów i rutyny, gdy komputer jest wyłączony. OpenBot go konfiguruje i utrzymuje.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Na komputerze",
+  "mobile.server.hosted.steps.title": "Dodaj go na komputerze",
+  "mobile.server.hosted.steps.open": "Otwórz OpenBot na komputerze.",
+  "mobile.server.hosted.steps.settings": "Przejdź do Ustawienia → Hostowane serwery.",
+  "mobile.server.hosted.steps.add": "Wybierz „Dodaj serwer” i plan.",
+  "mobile.server.hosted.plansToggle": "Co zawiera każdy plan",
   "mobile.server.hosted.computer.add": "Dodaj serwer w chmurze",
   "mobile.server.hosted.computer.addHint": "W OpenBot otwórz Ustawienia → Hostowane serwery i wybierz „Dodaj serwer”.",
   "mobile.server.hosted.computer.change": "Zmień plan",
   "mobile.server.hosted.computer.changeHint": "W OpenBot otwórz Ustawienia → Rozliczenia.",
   "mobile.server.hosted.yourServers": "Twoje serwery",
-  "mobile.server.hosted.plans": "Plany",
   "mobile.server.hosted.currentPlan": "Twój plan",
   "mobile.server.hosted.soldOut": "Wyprzedany",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -380,8 +383,10 @@ export const messages = {
   "mobile.server.route.invite": "Zaproś osoby",
   "mobile.server.route.member": "Członek",
   "mobile.server.route.timezone": "Strefa czasowa",
+  "mobile.server.route.signalHome": "Serwer Signal",
   "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.route.agents": "Agenci",
+  "mobile.server.route.voiceModel": "Rozpoznawanie mowy",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -517,6 +522,42 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.signalHomeAutomatic": "Automatycznie",
+  "mobile.server.settings.signalHomeNearest": "Najbliższy serwer Signal",
+  "mobile.server.settings.signalHomeInUse": "W użyciu: {name}",
+  "mobile.server.settings.signalHomeLoading": "Mierzenie serwerów Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "Nie udało się zmienić serwera Signal. Spróbuj ponownie.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego serwer Signal.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego serwer Signal.",
+  "mobile.server.settings.signalHomeDescription":
+    "Członkowie łączą się z tym serwerem przez ten serwer Signal. Serwer Signal z mniejszym opóźnieniem daje szybsze połączenia.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} nie odpowiada. Serwer używa {name}, dopóki {chosen} znowu nie odpowie.",
+  "mobile.server.settings.signalHomeMoving":
+    "Serwer przechodzi na {name}. Członkowie połączą się ponownie za kilka sekund.",
+  "mobile.server.settings.signalHomeLoadFailed": "Nie udało się wczytać serwerów Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Brak odpowiedzi",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapur",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
+  "mobile.server.settings.voiceModelLoading": "Wczytywanie rozpoznawania mowy…",
+  "mobile.server.settings.voiceModelLoadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "mobile.server.settings.voiceModelSaveFailed": "Nie udało się zmienić modelu rozpoznawania mowy. Spróbuj ponownie.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego rozpoznawanie mowy.",
+  "mobile.server.settings.voiceModelReady": "Gotowy",
+  "mobile.server.settings.voiceModelDownloading": "Pobieranie: {percent}",
+  "mobile.server.settings.voiceModelSize": "Pobieranie {size}",
+  "mobile.server.settings.voiceModelDownload": "Pobierz",
+  "mobile.server.settings.voiceModelCancel": "Zatrzymaj",
+  "mobile.server.settings.voiceModelRemove": "Usuń",
   "mobile.server.settings.keySection": "Klucz serwera",
   "mobile.server.settings.keyChanged": "Ostatnia zmiana",
   "mobile.server.settings.keyChange": "Zmień klucz",
@@ -1007,7 +1048,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Do OpenBot trafiają wiadomości od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
+    "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1084,6 +1125,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Numer może dopuścić maksymalnie {count} kontaktów i grup.",
   "mobile.server.connectors.whatsapp.senderGroup": "Grupa",
   "mobile.server.connectors.whatsapp.removeSender": "Usuń",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Tylko odczyt",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Ustaw tylko odczyt",
+  "mobile.server.connectors.whatsapp.allowWork": "Pozwól zlecać pracę",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Tylko odczyt: agenci mogą czytać ten czat, a OpenBot nigdy w nim nie pisze.",
   "mobile.server.connectors.whatsapp.addContact": "Dodaj kontakt",
   "mobile.server.connectors.whatsapp.addGroup": "Dodaj grupę",
   "mobile.server.connectors.whatsapp.contactTitle": "Dodaj kontakt",
@@ -1248,11 +1294,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Nie udało się zmienić modeli. Spróbuj ponownie.",
   "mobile.server.providers.promptCache": "Pamięć podręczna promptów",
   "mobile.server.providers.promptCacheHint":
-    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu Claude.",
-  "mobile.server.providers.promptCacheDefault": "Domyślne Claude Code",
+    "Jak długo Claude i Pi trzymają kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu dostawcy.",
+  "mobile.server.providers.promptCacheDefault": "Domyślne ustawienie dostawcy",
   "mobile.server.providers.promptCacheHour": "1 godzina",
   "mobile.server.providers.promptCacheLoadFailed":
     "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.cacheExpiryCompaction": "Kompaktuj przed wygaśnięciem pamięci podręcznej",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Gdy czat z kontekstem 200K lub więcej tokenów jest nieaktywny z pamięcią podręczną na 1 godzinę, agent kompaktuje kontekst przed jej wygaśnięciem. Wtedy następna wiadomość nie czyta całego kontekstu ponownie bez pamięci podręcznej.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Nie udało się wczytać ustawienia kompaktowania tego serwera.",
   "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
   "mobile.server.providers.compactWindowHint":
     "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
@@ -1307,6 +1358,8 @@ export const messages = {
     "ChatGPT używa tego klucza, a nie Twojego planu ChatGPT. OpenAI nalicza opłatę za każde żądanie na klucz. Użycie planu nie jest pokazywane.",
   "mobile.server.providers.codexKeyAlternative":
     "Lub zaloguj się kluczem API OpenAI. OpenAI nalicza opłatę za każde żądanie na klucz.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "mobile.server.providers.sectionUse": "Użycie",
   "mobile.server.providers.unused": "Żaden agent go nie używa",
   "mobile.server.providers.usedByCount": {
@@ -1497,7 +1550,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Oczekiwanie na: {reasons}.",
   "mobile.server.update.disabledTitle": "Zdalne aktualizacje są wyłączone",
   "mobile.server.update.disabledDescription":
-    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub włączenie tego ustawienia.",
+    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub o otwarcie sekcji Ustawienia > Aktualizacje na jego komputerze i włączenie „Zezwalaj członkom serwera na aktualizacje”.",
   "mobile.server.update.managedTitle": "Aktualizacjami zarządza Host Manager",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager aktualizuje serwer {name}. Skontaktuj się z administratorem hosta.",

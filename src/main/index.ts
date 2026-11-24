@@ -51,9 +51,9 @@ import {
 } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
+import { guardConsoleOutput } from "./console-output";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
 import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
-import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
   developmentWorktreeColor,
@@ -89,6 +89,7 @@ import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { creditsIpcHandlers } from "./ipc/credits-handlers";
 import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
@@ -194,6 +195,9 @@ import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance"
 import { placeWindowButtons } from "./window-buttons";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
+guardConsoleOutput([process.stdout, process.stderr], () => {
+  if (!app.isPackaged) app.quit();
+});
 const logger = createOpenBotLogger("main");
 
 let crashTrace: TraceFile | null = null;
@@ -420,7 +424,6 @@ configureLinuxGpu({
   server: hostedServer !== null || serverMode !== null,
 });
 const appVariant = readAppVariant(process.env.OPENBOT_APP_VARIANT, app.isPackaged);
-if (!app.isPackaged) guardDevelopmentOutput([process.stdout, process.stderr], () => app.quit());
 const appIconPath = resolveAppIconPath({
   variant: appVariant,
   platform: process.platform,
@@ -754,6 +757,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
   claudeCompactWindow,
   claudeUserMcp,
   providerEnvironment,
@@ -784,6 +788,7 @@ function registerIpcHandlers({
   billing,
   referral,
   license,
+  credits,
   hostedServers,
   localServers,
   routineFeed,
@@ -799,6 +804,8 @@ function registerIpcHandlers({
   hermesImport,
   instanceTransfer,
   voice,
+  hostVoiceModel,
+  hostSignalHome,
   speech,
   voiceServer,
   dynamicIsland,
@@ -808,6 +815,7 @@ function registerIpcHandlers({
   storageUsage,
   libraryFoldersService,
   workflowFoldersService,
+  workflowFiles,
   machineAlerts,
   trace,
   resourceMonitor,
@@ -928,6 +936,7 @@ function registerIpcHandlers({
     ...billingIpcHandlers({ billing }),
     ...referralIpcHandlers({ referral }),
     ...licenseIpcHandlers({ license }),
+    ...creditsIpcHandlers({ credits }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
@@ -998,6 +1007,9 @@ function registerIpcHandlers({
       github: workflowGitHub,
       workflowFolders: workflowFoldersService,
       remoteServers,
+      workflowFiles,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
     }),
     ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
@@ -1017,6 +1029,8 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      voiceModel: hostVoiceModel,
+      signalHome: hostSignalHome,
       hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
@@ -1026,6 +1040,7 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
+      cacheExpiryCompaction,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,

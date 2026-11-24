@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.loadingHint": "Puoi selezionare un altro server mentre questo si carica.",
   "server.connection.cachedHint":
     "I contenuti caricati e le bozze vengono conservati. Le azioni sul server riprenderanno dopo la riconnessione.",
+  "server.connection.computerOffline":
+    "{name} è offline. Verifica che il suo computer sia acceso, che OpenBot sia aperto e che Pubblica questo server sia attivo in Impostazioni server > Membri.",
   "server.connection.conversationFailed": "Impossibile caricare la conversazione. Riprova.",
   "server.connection.panelsFailed": "Impossibile caricare alcuni pannelli del workspace. Riprova.",
   "server.connection.retry": "Riprova",
@@ -388,6 +390,30 @@ export const messages = {
     "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente. Su un server, anche il browser lo usa dopo il prossimo riavvio.",
   "server.settings.timezoneAutomatic": "Automatico ({zone})",
   "server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
+  "server.settings.connectionTitle": "Connessione",
+  "server.settings.signalHome": "Server Signal",
+  "server.settings.signalHomeDescription":
+    "I membri si connettono a questo server tramite questo server Signal. Un server Signal con latenza più bassa dà connessioni più veloci.",
+  "server.settings.signalHomeFallback":
+    "{chosen} non risponde. Il server usa {name} finché {chosen} non risponde di nuovo.",
+  "server.settings.signalHomeMoving": "Il server passa a {name}. I membri si riconnettono in pochi secondi.",
+  "server.settings.signalHomeLoadFailed": "Impossibile caricare i server Signal.",
+  "server.settings.signalHomeAutomatic": "Automatico (il più vicino)",
+  "server.settings.signalHomeAutomaticUsing": "Automatico ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Nessuna risposta",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San Jose",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapore",
+  "server.settings.voiceModel.section": "Riconoscimento vocale",
+  "server.settings.voiceModel.description":
+    "Gli agenti su questo server usano questo modello per trascrivere l’audio dei video senza sottotitoli.",
+  "server.settings.voiceModel.loadFailed": "Impossibile caricare il modello di riconoscimento vocale del server.",
+  "server.settings.voiceModel.group": "Su questo server",
+  "server.settings.voiceModel.removeLabel": "Rimuovi {name} da questo server",
   "server.settings.turnLimit": "Thread contemporanei",
   "server.settings.turnLimitDescription":
     "Quanti thread degli agenti possono essere eseguiti contemporaneamente su questo server. Più thread usano più memoria.",
@@ -543,6 +569,7 @@ export const messages = {
     "Non c'è una password separata per il desktop remoto. Le impostazioni qui sotto scelgono chi può controllare questo computer.",
   "server.desktop.componentInstalled": "Componente dell'host installato",
   "server.desktop.componentNotInstalled": "Componente dell'host non installato",
+  "server.desktop.needsX11Session": "Serve una sessione X11",
   "server.desktop.sessions": "Non presidiato: {unattended} · Sessioni attive: {active}/{max}",
   "server.desktop.unattendedEnabled": "attivo",
   "server.desktop.unattendedUnavailable": "non disponibile",
@@ -626,7 +653,7 @@ export const messages = {
   "server.update.waitingFor": "In attesa di {reasons}.",
   "server.update.disabledTitle": "Gli aggiornamenti remoti sono disattivati",
   "server.update.disabledDescription":
-    "L'utente di {name} ha disattivato gli aggiornamenti dai membri del server. Chiedigli di aggiornare OpenBot o di riattivare l'impostazione.",
+    "L'utente di {name} ha disattivato gli aggiornamenti dai membri del server. Chiedigli di aggiornare OpenBot o di aprire Impostazioni > Aggiornamenti sul suo computer e attivare «Consenti aggiornamenti dai membri del server».",
   "server.update.managedTitle": "Gli aggiornamenti sono controllati da un Host Manager",
   "server.update.managedDescription": "OpenBot Host Manager aggiorna {name}. Contatta l'amministratore dell'host.",
   "server.update.unsupportedTitle": "{name} non può aggiornarsi da solo",

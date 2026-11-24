@@ -348,7 +348,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "番号をリンク",
   "connector.whatsapp.ownNumberNote": "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "connector.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp がこのコンピューターをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpLoggedOutHost":
@@ -453,6 +453,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
   "connector.whatsapp.senderGroup": "グループ",
   "connector.whatsapp.removeSender": "削除",
+  "connector.whatsapp.senderAccess": "{name} のアクセス",
+  "connector.whatsapp.senderReplies": "仕事を頼める",
+  "connector.whatsapp.senderReadOnly": "読み取り専用",
   "connector.whatsapp.addContact": "連絡先を追加",
   "connector.whatsapp.addGroup": "グループを追加",
   "connector.whatsapp.contactTitle": "連絡先を追加",

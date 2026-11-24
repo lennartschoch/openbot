@@ -66,6 +66,7 @@ export interface ProviderHistoryImportInput {
   agentId: string;
   publicThreadId: string;
   cwd?: string;
+  retired?: boolean;
   findDelivery(deliveryId: string): DeliveryContext | null;
   findMessageDelivery(messageId: string): DeliveryContext | null;
   quietRoutineDelivery(deliveryId: string): boolean;
@@ -171,7 +172,7 @@ export function importProviderHistory(
           }),
         ),
       );
-    if (providerCovered || current.state === "complete")
+    if (providerCovered || input.retired === true || current.state === "complete")
       yield* providerSync(() =>
         input.database.markProviderHistoryImportState(input.sessionId, turnWaits ? "active" : "complete"),
       );
@@ -379,7 +380,7 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
-    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
+    if (requestsOnly) return imageGenerated || reported || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
 }

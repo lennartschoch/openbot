@@ -58,6 +58,8 @@ export const messages = {
     "Este computador anfitrião remoto não oferece suporte para assumir o controle de uma aba do navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto não pode receber um início de sessão deste computador.",
   "error.backend.browserSignInOpenFailed": "O OpenBot não conseguiu abrir a janela de login.",
+  "error.backend.browserSignInLoadFailed":
+    "O OpenBot não conseguiu carregar a página na janela de login. Verifique a conexão com a internet e abra a janela de login novamente.",
   "error.backend.browserSignInReadFailed": "O OpenBot não conseguiu ler o login da janela.",
   "error.backend.browserStopUnsupported":
     "Este computador anfitrião remoto não consegue parar o carregamento de uma página.",
@@ -96,6 +98,8 @@ export const messages = {
     "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
   "error.backend.channelCompactNotSupported":
     "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
+  "error.backend.channelCompactProviderUnavailable":
+    "O provedor dos membros do canal não está funcionando agora. Atualize os provedores e compacte o canal de novo.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelArchiveRunning": "Pare o trabalho em andamento neste canal e depois exclua-o.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
@@ -134,6 +138,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "A execução parou com um erro, mas nenhum motivo foi informado. Abra a execução para ver o que o agente fez.",
   "error.backend.turnNotStarted": "O provedor não iniciou este turno.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} não confirmou a tempo que iniciou esta mensagem. O OpenBot não a envia de novo, para que o trabalho não seja executado duas vezes. O OpenBot espera até 5 minutos para o agente começar.",
+  "error.backend.turnStartAbandoned": "O agente não iniciou esta mensagem em 5 minutos. Envie a mensagem de novo.",
   "error.backend.routineResultConnectionOff":
     "Esta conexão de mensagens está desativada ou foi removida. Escolha outro lugar.",
   "error.backend.routineResultNoDelivery": "Esta execução não tem uma resposta para enviar de novo.",
@@ -255,8 +262,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
   "error.backend.mcpServerInvalid": "O OpenBot não pode salvar esta configuração de servidor MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Os nomes de cabeçalho não podem ter espaços nem símbolos como : ( ) /. Use um nome como Authorization e coloque a chave ou o token em Valor.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou esse login.",
+  "error.backend.mcpSignInGrantRefused":
+    "O servidor não aceitou o login. Entre novamente. Se o problema continuar, verifique se sua conta está no mesmo site ou região que este app.",
   "error.backend.mcpSignInAccountRefused":
     "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
@@ -280,6 +291,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Este servidor pede login. Entre nele pelo OpenBot no computador anfitrião.",
   "error.backend.mcpSignInNeedsHttps":
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Este servidor só faz login em {url}. Altere a URL para este endereço e depois entre de novo.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
   "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",
@@ -299,6 +312,8 @@ export const messages = {
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra {name} na Loja, Apps, e escolha Entrar.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede uma chave. Abra {name} na Loja, Apps, escolha Editar e digite a chave correta em Cabeçalhos.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}. Abra {name} na Loja, Apps, e escolha Testar conexão para ver a causa.",
   "error.backend.mcpServerFailedInProvider":
@@ -388,6 +403,7 @@ export const messages = {
     "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
+  "error.backend.apiKeyListFailed": "O OpenBot não conseguiu ler as chaves de API salvas.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
   "error.backend.apiKeyAnswerUnreadable":

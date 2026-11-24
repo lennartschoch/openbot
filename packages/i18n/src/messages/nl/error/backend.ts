@@ -57,6 +57,8 @@ export const messages = {
     "Deze externe host ondersteunt het overnemen van een browsertabblad niet.",
   "error.backend.browserSignInUnsupported": "Deze externe host kan geen inlog van deze computer overnemen.",
   "error.backend.browserSignInOpenFailed": "OpenBot kon het inlogvenster niet openen.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot kon de pagina in het inlogvenster niet laden. Controleer de internetverbinding en open het inlogvenster daarna opnieuw.",
   "error.backend.browserSignInReadFailed": "OpenBot kon de inlog niet uit het venster lezen.",
   "error.backend.browserStopUnsupported": "Deze externe host kan het laden van een pagina niet stoppen.",
   "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
@@ -92,6 +94,8 @@ export const messages = {
     "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
   "error.backend.channelCompactNotSupported":
     "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
+  "error.backend.channelCompactProviderUnavailable":
+    "De aanbieder van de kanaalleden werkt nu niet. Vernieuw de aanbieders en comprimeer het kanaal daarna opnieuw.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelArchiveRunning": "Stop het lopende werk in dit kanaal en verwijder het daarna.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
@@ -130,6 +134,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "De run is gestopt met een fout, maar zonder reden. Open de run om te zien wat de agent deed.",
   "error.backend.turnNotStarted": "De aanbieder heeft deze beurt niet gestart.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} heeft niet op tijd bevestigd dat dit bericht is gestart. OpenBot stuurt het niet opnieuw, zodat het werk niet twee keer wordt uitgevoerd. OpenBot wacht tot 5 minuten tot de agent begint.",
+  "error.backend.turnStartAbandoned":
+    "De agent heeft dit bericht niet binnen 5 minuten gestart. Stuur het bericht opnieuw.",
   "error.backend.routineResultConnectionOff":
     "Deze berichtenverbinding staat uit of is verwijderd. Kies een andere plek.",
   "error.backend.routineResultNoDelivery": "Deze run heeft geen antwoord om opnieuw te sturen.",
@@ -253,8 +261,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Headernamen mogen geen spaties of tekens zoals : ( ) / bevatten. Gebruik een naam zoals Authorization en zet de sleutel of het token bij Waarde.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInGrantRefused":
+    "De server heeft de aanmelding niet geaccepteerd. Meld je opnieuw aan. Als het probleem blijft, controleer dan of je account op dezelfde site of in dezelfde regio staat als deze app.",
   "error.backend.mcpSignInAccountRefused":
     "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
@@ -278,6 +290,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Deze server vraagt om in te loggen. Log in via OpenBot op de hostcomputer.",
   "error.backend.mcpSignInNeedsHttps":
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Deze server meldt alleen aan op {url}. Wijzig de URL in dit adres en meld je daarna opnieuw aan.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
   "error.backend.mcpSignInRefused": "De inlogpagina weigerde de toegang. Log opnieuw in.",
@@ -297,6 +311,8 @@ export const messages = {
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om een sleutel vraagt. Open {name} in Marktplaats, Apps, kies Bewerken en vul bij Headers de juiste sleutel in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
   "error.backend.mcpServerFailedInProvider":
@@ -382,6 +398,7 @@ export const messages = {
     "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeyListFailed": "OpenBot kon de opgeslagen API-sleutels niet lezen.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
   "error.backend.apiKeyAnswerUnreadable":

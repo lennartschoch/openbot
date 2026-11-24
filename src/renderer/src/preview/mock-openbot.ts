@@ -1,11 +1,13 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AcpRegistryEntry,
   AgentProviderRef,
   AgentSessionSettings,
   CreateAgentInput,
   HiddenAgentsSnapshot,
+  ListArchivedAgentTasksInput,
   McpSignInApp,
   McpSignInAppState,
   ServerNotificationLevel,
@@ -44,6 +46,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type ArchivedAgentTasksPage,
   type AttachmentImportEvent,
   type AvatarHue,
   agentAccessAuditChanges,
@@ -64,6 +67,7 @@ import {
   type BrowsingMemoryPreference,
   type BusyMessageModePreference,
   browserProxyAddressText,
+  type CacheExpiryCompactionSetting,
   type CentralAuthState,
   CHANNEL_FOLDER_LIMIT,
   type ChannelFolderChange,
@@ -83,7 +87,6 @@ import {
   type CustomAgentSummary,
   type CustomProviderSummary,
   channelFolderCoverage,
-  composedCustomModelId,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
   DEFAULT_AGENT_DEFAULTS,
@@ -94,6 +97,7 @@ import {
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_BROWSING_MEMORY_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
+  DEFAULT_CACHE_EXPIRY_COMPACTION,
   DEFAULT_CLAUDE_COMPACT_WINDOW,
   DEFAULT_CLAUDE_USER_MCP,
   DEFAULT_CLAUDE_USER_SETUP,
@@ -188,6 +192,7 @@ import {
   type SkillLearningPreference,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
+  savedCustomModelId,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
   type UpdatePreference,
@@ -240,13 +245,16 @@ import { createMockBilling, previewBillingServers } from "./mock-billing";
 import { createMockBitwardenConnector } from "./mock-bitwarden-connector";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels, type MockChannelSeed } from "./mock-channels";
+import { createMockCredits } from "./mock-credits";
 import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
+import { createMockHostSignalHome } from "./mock-host-signal-home";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
+import { createMockHostVoiceModel } from "./mock-host-voice-model";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
@@ -347,6 +355,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
       { id: `${turnId}:answer`, kind: "message", startedAt: at(5_560), endedAt: at(6_400) },
     ],
     tokens: 18_342,
+    cachedInput: 14_120,
     costUsd: 0.0427,
   };
 }
@@ -357,7 +366,7 @@ function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentM
     const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
     return {
       provider: harness,
-      id: composedCustomModelId(provider.id, model.id),
+      id: savedCustomModelId(provider.id, harness, model.id),
       name: `${provider.name}/${model.name}`,
       description: `Served by ${provider.baseUrl}.`,
       defaultReasoningEffort: efforts.includes("medium") ? "medium" : (efforts[0] ?? "medium"),
@@ -506,6 +515,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
+  let cacheExpiryCompaction: CacheExpiryCompactionSetting = { ...DEFAULT_CACHE_EXPIRY_COMPACTION };
   let claudeUserMcp: ClaudeUserMcpSetting = { ...DEFAULT_CLAUDE_USER_MCP };
   let claudeCompactWindow: ClaudeCompactWindowSetting = { ...DEFAULT_CLAUDE_COMPACT_WINDOW };
   const providerVariables = new Map<
@@ -932,12 +942,33 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskUnread = new Map<string, number>(Object.entries(options.taskUnread ?? {}));
   const branches = new Map<string, AgentTask>();
 
+  const newestTaskFirst = (left: AgentTask, right: AgentTask) =>
+    right.updatedAt.localeCompare(left.updatedAt) || left.threadId.localeCompare(right.threadId);
+
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
+    const archived = list.filter((task) => task.closedAt).sort(newestTaskFirst);
     return {
       agentId,
-      tasks: clone([...list.filter((task) => !task.closedAt), ...list.filter((task) => task.closedAt)]),
+      tasks: clone([...list.filter((task) => !task.closedAt), ...archived].slice(0, INPUT_LIMITS.agentTasks)),
       limit: agentTaskLimitOf(agentId),
+    };
+  }
+
+  function archivedTaskPage(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    const { before } = input;
+    const archived = (tasks.get(input.agentId) ?? [])
+      .filter((task) => task.closedAt)
+      .sort(newestTaskFirst)
+      .filter(
+        (task) =>
+          !before ||
+          task.updatedAt < before.updatedAt ||
+          (task.updatedAt === before.updatedAt && task.threadId > before.threadId),
+      );
+    return {
+      tasks: clone(archived.slice(0, INPUT_LIMITS.agentTasks)),
+      hasMore: archived.length > INPUT_LIMITS.agentTasks,
     };
   }
 
@@ -1755,6 +1786,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     billing: createMockBilling(billingPlans),
     referral: createMockReferral(),
     license: createMockLicense(),
+    credits: createMockCredits(),
     routineFeed: createMockRoutineFeed(),
     hostedServers: createMockHostedServers(billingPlans),
     customProviders: {
@@ -3302,6 +3334,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
       listTasks: async (agentId) => taskList(agentId),
+      listArchivedTasks: async (input) => archivedTaskPage(input),
       readTask: async (input) => {
         const conversation = taskConversation(findTask(input.agentId, input.taskId));
         return clone({ ...conversation, messages: conversation.messages.slice(-100) });
@@ -3686,6 +3719,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostSignalHome(),
+      ...createMockHostVoiceModel(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
@@ -3722,6 +3757,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isPromptCacheTtl(ttl)) throw new Error("Prompt cache time is required.");
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
+      },
+      getCacheExpiryCompaction: async () => clone(cacheExpiryCompaction),
+      setCacheExpiryCompaction: async (enabled) => {
+        if (typeof enabled !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
+        cacheExpiryCompaction = { enabled };
+        return clone(cacheExpiryCompaction);
       },
       getClaudeUserSetup: async () => clone(claudeUserSetup),
       setClaudeUserSetup: async (enabled) => {

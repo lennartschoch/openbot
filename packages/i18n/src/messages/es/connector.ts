@@ -363,7 +363,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
+    "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp quitó este equipo de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -468,6 +468,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Un número puede permitir hasta {count} contactos y grupos.",
   "connector.whatsapp.senderGroup": "Grupo",
   "connector.whatsapp.removeSender": "Quitar",
+  "connector.whatsapp.senderAccess": "Acceso de {name}",
+  "connector.whatsapp.senderReplies": "Puede dar tareas",
+  "connector.whatsapp.senderReadOnly": "Solo lectura",
   "connector.whatsapp.addContact": "Añadir contacto",
   "connector.whatsapp.addGroup": "Añadir grupo",
   "connector.whatsapp.contactTitle": "Añadir un contacto",

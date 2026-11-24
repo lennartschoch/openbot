@@ -386,6 +386,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Impossible de lire ce fichier audio.",
   "mobile.chat.browserSecret.password": "Mot de passe",
   "mobile.chat.browserSecret.authenticatorCode": "Code d’authentification",
+  "mobile.chat.browserSecret.ended": "Cette demande de connexion est terminée. Demandez à l’agent de réessayer.",
   "mobile.chat.browserSecret.oneTimeCode": "Code à usage unique",
   "mobile.chat.browserSecret.takeoverTitle": "Prise de contrôle du navigateur",
   "mobile.chat.browserSecret.takeoverBody":
@@ -668,4 +669,18 @@ export const messages = {
   "mobile.chat.context.noAuto": "Cet agent ne compacte pas son contexte.",
   "mobile.chat.context.lastCompaction": "Dernier compactage : {before} → {after} jetons",
   "mobile.chat.context.unavailable": "Ce chat ne signale pas son contexte pour le moment.",
+  "mobile.chat.locationRequest.share": "Partager une fois",
+  "mobile.chat.locationRequest.decline": "Ne pas partager",
+  "mobile.chat.locationRequest.alwaysAllow": "Toujours autoriser",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Cet agent reçoit votre position sans demander pendant que vous utilisez l’app.",
+  "mobile.chat.locationRequest.askEveryTime": "Demander à chaque fois",
+  "mobile.chat.locationRequest.locating": "Recherche de votre position…",
+  "mobile.chat.locationRequest.private": "La position actuelle de votre téléphone est envoyée une fois à cet agent.",
+  "mobile.chat.locationRequest.shared": "Position partagée",
+  "mobile.chat.locationRequest.declined": "Non partagée",
+  "mobile.chat.locationRequest.unavailable": "Votre téléphone n’a pas trouvé votre position. Réessayez.",
+  "mobile.chat.locationRequest.deniedTitle": "L’accès à la position est désactivé",
+  "mobile.chat.locationRequest.denied": "Pour partager votre position, autorisez OpenBot à l’utiliser dans Réglages.",
+  "mobile.chat.locationRequest.openSettings": "Ouvrir Réglages",
 } as const satisfies PartialTranslation<typeof source>;

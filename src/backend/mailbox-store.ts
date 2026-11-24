@@ -65,6 +65,7 @@ const FAILED_REQUEST_REASON_LIMIT = 2_000;
 const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
 export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
 const RESTARTED_RESULT_KEY_PREFIX = "restarted-result:";
+const RESTARTED_TURN_KEY_PREFIX = "restarted-turn:";
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 export interface MessagingOrigin {
   linkId: string;
@@ -228,6 +229,7 @@ export interface DeliveryContext {
   channelId?: string;
   senderTaskId?: string;
   restartedResult?: true;
+  restartedTurnId?: string;
 }
 
 const EMPTY_STATE: StoredState = {
@@ -1125,7 +1127,7 @@ export class MailboxStore {
     });
   }
 
-  awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string>): boolean {
+  awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string> | null): boolean {
     const messages = this.#messagesById();
     const sourceTurnIds = this.#sourceTurnIds();
     return this.#state.deliveries.some((delivery) => {
@@ -1137,7 +1139,7 @@ export class MailboxStore {
         request.sender.agentId === agentId &&
         request.expectsReply !== false &&
         (request.senderTaskId ?? null) === taskId &&
-        turnIds.has(sourceTurnIds.get(request.id) ?? "") &&
+        (turnIds === null || turnIds.has(sourceTurnIds.get(request.id) ?? "")) &&
         (!held || this.heldByTask(delivery.recipientAgentId, request.id))
       );
     });
@@ -2096,11 +2098,11 @@ export class MailboxStore {
       .map((delivery) => delivery.recipientAgentId);
   }
 
-  joinsChatTurn(deliveryId: string): boolean {
+  joinsRunningTurn(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (delivery?.status !== "queued") return false;
     const message = this.#requireMessage(delivery.messageId);
-    if (message.channelId || message.messaging || message.taskId) return false;
+    if (message.channelId || message.messaging) return false;
     if (message.replyToMessageId !== null && message.expectsReply !== false) return false;
     return (
       !isAnswer(message) ||
@@ -3210,6 +3212,8 @@ export class MailboxStore {
     )
       return false;
     this.#state.idempotency[key] = message.id;
+    if (delivery.status === "running" && delivery.turnId)
+      this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${deliveryId}:${delivery.turnId}`] = message.id;
     yield* this.requeueRefused(deliveryId);
     return true;
   }, Effect.uninterruptible).bind(this);
@@ -3662,17 +3666,24 @@ export class MailboxStore {
     messages?: ReadonlyMap<string, StoredMessage>,
   ): DeliveryContext {
     const message = this.#requireMessage(delivery.messageId, messages);
+    const restarted =
+      this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
+      !delivery.resumeAfterUsageLimit &&
+      !delivery.planContinuation;
+    const turnKeyPrefix = `${RESTARTED_TURN_KEY_PREFIX}${delivery.id}:`;
+    const restartedTurnId = restarted
+      ? Object.keys(this.#state.idempotency)
+          .find((key) => key.startsWith(turnKeyPrefix))
+          ?.slice(turnKeyPrefix.length)
+      : undefined;
     return {
       delivery: this.#publicDelivery(delivery, positions, message),
       ...(delivery.resumeAfterUsageLimit ? { resumeAfterUsageLimit: delivery.resumeAfterUsageLimit } : {}),
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
-      ...(this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
-      !delivery.resumeAfterUsageLimit &&
-      !delivery.planContinuation
-        ? { restartedResult: true as const }
-        : {}),
+      ...(restarted ? { restartedResult: true as const } : {}),
+      ...(restartedTurnId ? { restartedTurnId } : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
         path: attachment.path,
