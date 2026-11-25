@@ -94,6 +94,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
@@ -147,6 +148,7 @@ export interface AcpFlavor {
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
+  openToolStallMs?: number;
   subagentTools?: readonly string[];
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
@@ -394,6 +396,15 @@ function hermesSessionBusy(error: unknown): boolean {
   );
 }
 
+function hermesRevisionConflict(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "revision_conflict"
+  );
+}
+
 const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
   auth: "authentication",
   auth_permanent: "authentication",
@@ -432,6 +443,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   refusesUntilRestart: hermesRefusal,
   lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
+  configConflict: hermesRevisionConflict,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
   setsConfigOnlyOnChange: true,
@@ -570,6 +582,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     refusesUntilRestart: hermesRefusal,
     lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
+    configConflict: hermesRevisionConflict,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
     setsConfigOnlyOnChange: true,

@@ -194,7 +194,7 @@ function openCodeRequestFailure(
   const errorName = isRecord(error.data) ? error.data.errorName : undefined;
   const key =
     OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0] ??
-    (errorName === "provider.internal"
+    (errorName === "provider.internal" || errorName === "provider.unknown"
       ? "error.provider.opencodeProviderFailed"
       : errorName === "provider.no-route"
         ? "error.provider.opencodeModelUnavailable"
@@ -280,6 +280,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   messagePerId: true,
   mcpServersPerDirectory: true,
   mcpConnectLimitMs: 30_000,
+  openToolStallMs: 30 * 60_000,
   relayStdioMcpServers: true,
   childSessionUpdates: true,
   promptMediaBase64Bytes: OPENCODE_PROMPT_MEDIA_BASE64_BYTES,

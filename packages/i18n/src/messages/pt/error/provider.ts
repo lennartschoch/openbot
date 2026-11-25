@@ -434,6 +434,8 @@ export const messages = {
     "O {provider} bloqueou esta mensagem por causa das regras de segurança dele: {reason} Se o {provider} também bloquear suas próximas mensagens, inicie um novo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo não consegue ouvir áudio, por isso não aceitou o som deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Para continuar, envie sua solicitação de novo e peça ao agente para trabalhar sem o som. Para verificar o som, selecione no menu de modelos do agente um modelo que consiga ouvir áudio.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "O Codex não conseguiu carregar as configurações da sua conta do ChatGPT, por isso o agente parou. Tente novamente. Se ele parar de novo, selecione Reconectar para o ChatGPT em Configurações do servidor → Provedores.",
   "error.provider.imageTooSmall":
     "O modelo não aceitou uma imagem deste chat porque a imagem é pequena demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooLarge":
@@ -569,6 +571,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
   "error.provider.acpSessionBusy":
     "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
+  "error.provider.acpSettingsConflict":
+    "{provider} alterou este chat enquanto o OpenBot aplicava as configurações. Tente novamente.",
   "error.provider.acpSessionStale":
     "{provider} não conseguiu carregar a versão mais recente desta conversa. Envie sua mensagem novamente.",
   "error.provider.acpModelNotOffered":
