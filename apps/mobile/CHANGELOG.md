@@ -7,6 +7,12 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.79.0-fork.34] - 2026-11-26
+
+### Changed
+
+- The app ships the upstream OpenBot 0.79.0 release.
+
 ## [0.78.0-fork.33] - 2026-11-25
 
 ### Changed
