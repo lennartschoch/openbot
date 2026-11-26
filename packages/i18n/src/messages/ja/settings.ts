@@ -121,7 +121,8 @@ export const messages = {
   "settings.quitGuard.always": "常に",
   "settings.quitGuard.never": "しない",
   "settings.externalLinks.title": "外部リンクの開き方",
-  "settings.externalLinks.description": "チャット、サインインページ、請求ページのリンクをここで開きます。",
+  "settings.externalLinks.description":
+    "チャット、サインインページ、請求ページのリンクをここで開きます。OpenBot を選ぶと、OpenBot で開くのはメインウィンドウで、このコンピューターのエージェントとのチャットにあるリンクだけです。その他のリンクは既定のブラウザーで開きます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザー",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "既定のブラウザー（{name}）",
@@ -286,6 +287,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "XWayland のない Wayland では、ドックをほかのアプリの上に表示できません。OpenBot のウィンドウ内に表示されます。",
   "settings.agentDock.xwayland.restart": "再起動",
+  "settings.agentDock.noCompositor.title": "OpenBot のウィンドウ内に表示",
+  "settings.agentDock.noCompositor.description":
+    "お使いのデスクトップは透明なウィンドウを表示できないため、ドックは OpenBot のウィンドウ内に表示されます。ほかのアプリの上に表示するには、システム設定でデスクトップ効果（コンポジター）をオンにして、OpenBot を再起動してください。",
   "settings.agentDock.display.title": "ディスプレイ",
   "settings.agentDock.display.description":
     "そのディスプレイが接続されていない場合、ドックは OpenBot ウィンドウのディスプレイに表示されます。",

@@ -121,7 +121,8 @@ export const messages = {
   "settings.quitGuard.always": "Altijd",
   "settings.quitGuard.never": "Nooit",
   "settings.externalLinks.title": "Open externe links in",
-  "settings.externalLinks.description": "Links in chats, inlogpagina’s en betaalpagina’s openen hier.",
+  "settings.externalLinks.description":
+    "Links in chats, inlogpagina’s en betaalpagina’s openen hier. Met OpenBot openen alleen links in chats van het hoofdvenster met agents op deze computer in OpenBot. Andere links openen in de standaardbrowser.",
   "settings.externalLinks.defaultBrowser": "Standaardbrowser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Standaard ({name})",
@@ -288,6 +289,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "Onder Wayland zonder XWayland kan het dock niet boven andere apps staan. Het staat in het OpenBot-venster.",
   "settings.agentDock.xwayland.restart": "Herstarten",
+  "settings.agentDock.noCompositor.title": "In het OpenBot-venster",
+  "settings.agentDock.noCompositor.description":
+    "Je bureaublad kan geen doorzichtige vensters tonen, dus het dock staat in het OpenBot-venster. Zet bureaubladeffecten (een compositor) aan in je systeeminstellingen en start OpenBot opnieuw om het boven andere apps te tonen.",
   "settings.agentDock.display.title": "Scherm",
   "settings.agentDock.display.description":
     "Als dat scherm niet is aangesloten, gaat het dock naar het scherm van het OpenBot-venster.",

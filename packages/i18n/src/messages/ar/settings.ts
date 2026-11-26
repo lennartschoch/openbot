@@ -115,7 +115,8 @@ export const messages = {
   "settings.quitGuard.always": "دائمًا",
   "settings.quitGuard.never": "أبدًا",
   "settings.externalLinks.title": "فتح الروابط الخارجية في",
-  "settings.externalLinks.description": "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة.",
+  "settings.externalLinks.description":
+    "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة. مع OpenBot، تُفتح في OpenBot فقط روابط دردشات النافذة الرئيسية مع الوكلاء على هذا الكمبيوتر. وتُفتح الروابط الأخرى في المتصفح الافتراضي.",
   "settings.externalLinks.defaultBrowser": "المتصفح الافتراضي",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "المتصفح الافتراضي ({name})",
@@ -285,6 +286,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "على Wayland بدون XWayland، لا يمكن أن يظهر الشريط فوق التطبيقات الأخرى. يظهر في نافذة OpenBot.",
   "settings.agentDock.xwayland.restart": "إعادة التشغيل",
+  "settings.agentDock.noCompositor.title": "معروض في نافذة OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "لا يمكن لسطح المكتب عرض نوافذ شفافة، لذلك يظهر الشريط في نافذة OpenBot. لعرضه فوق التطبيقات الأخرى، فعّل تأثيرات سطح المكتب (مُركِّب) في إعدادات النظام، ثم أعد تشغيل OpenBot.",
   "settings.agentDock.display.title": "الشاشة",
   "settings.agentDock.display.description": "إذا لم تكن تلك الشاشة متصلة، فسينتقل الشريط إلى شاشة نافذة OpenBot.",
   "settings.agentDock.display.window": "مع نافذة OpenBot",

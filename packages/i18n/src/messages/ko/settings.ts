@@ -117,7 +117,8 @@ export const messages = {
   "settings.quitGuard.always": "항상",
   "settings.quitGuard.never": "안 함",
   "settings.externalLinks.title": "외부 링크 열기",
-  "settings.externalLinks.description": "채팅, 로그인 페이지, 결제 페이지의 링크가 여기에서 열려요.",
+  "settings.externalLinks.description":
+    "채팅, 로그인 페이지, 결제 페이지의 링크가 여기에서 열려요. OpenBot을 선택하면 메인 창에서 이 컴퓨터의 에이전트와 나눈 채팅 링크만 OpenBot에서 열려요. 다른 링크는 기본 브라우저에서 열려요.",
   "settings.externalLinks.defaultBrowser": "기본 브라우저",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "기본 브라우저({name})",
@@ -281,6 +282,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
   "settings.agentDock.xwayland.restart": "다시 시작",
+  "settings.agentDock.noCompositor.title": "OpenBot 창 안에 표시",
+  "settings.agentDock.noCompositor.description":
+    "데스크톱에서 투명한 창을 표시할 수 없어 독이 OpenBot 창 안에 표시됩니다. 다른 앱 위에 표시하려면 시스템 설정에서 데스크톱 효과(컴포지터)를 켜고 OpenBot을 다시 시작하세요.",
   "settings.agentDock.display.title": "디스플레이",
   "settings.agentDock.display.description":
     "해당 디스플레이가 연결되어 있지 않으면 독이 OpenBot 창의 디스플레이로 이동합니다.",

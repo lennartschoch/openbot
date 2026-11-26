@@ -70,7 +70,12 @@ import {
 } from "./cli";
 import { clineFreeModels } from "./cline-free-models";
 import { checkCursorApiKey, readCursorUsage } from "./cursor-usage";
-import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
+import {
+  CustomAcpAgentsClient,
+  type CustomAgentConfig,
+  type CustomAgentSource,
+  isDeniedWriteLine,
+} from "./custom-acp-agents-client";
 import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
@@ -85,14 +90,21 @@ import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
+  clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
+  OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { hasOpenCodeProviderKey, readOpenCodeGoUsage, readOpenCodeRefusalStatus } from "./opencode-usage";
+import {
+  hasOpenCodeProviderKey,
+  readOpenCodeGoUsage,
+  readOpenCodeRefusalStatus,
+  readOpenCodeStoredKey,
+} from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -123,6 +135,7 @@ import {
   piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
+import type { ProcessLaunch } from "./process-launch";
 import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
@@ -145,6 +158,11 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
   readonly pipedInput?: true;
 }
 
+interface ProviderAccountCodeCommand extends Omit<ProviderCliCommand, "argv"> {
+  readonly argv: AcpArgv;
+  readonly pipedInput?: true;
+}
+
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
 const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
@@ -152,10 +170,11 @@ const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
 export interface ProviderHomeAccountSupport {
   readonly homeVariable: string;
   readonly signIn: ProviderCliCommand | AcpAuthenticateSignIn;
-  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderCliCommand };
+  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderAccountCodeCommand };
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
   readonly usageLeavesSession?: boolean;
+  readonly readOwnEmail?: () => Effect.Effect<string | null>;
 }
 
 export interface ProviderKeyAccountSupport {
@@ -331,6 +350,13 @@ const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   pipedInput: true,
 };
 
+const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
+  argv: (env) => [...antigravityArgv(env), "--login"],
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
+};
+
 const CLINE_ARGV: readonly string[] = ["--acp"];
 
 const CLINE_ENV: Readonly<Record<string, string>> = {
@@ -427,7 +453,10 @@ export interface ProviderClientContext {
   readonly providerStateDirectory?: string;
   readonly providerTempDirectory?: string;
   readonly availableDiskBytes?: (path: string) => number;
-  readonly agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
+  readonly agentEnvironment?: (
+    inherited?: NodeJS.ProcessEnv,
+    gitConfig?: AgentGitConfigForm,
+  ) => Readonly<Record<string, string>>;
   readonly serverEnvironment?: Readonly<Record<string, string>>;
   readonly accountEnvironment?: Readonly<Record<string, string>>;
   readonly customAgents?: CustomAgentSource;
@@ -443,12 +472,15 @@ export interface ProviderClientContext {
    * The size in tokens at which Claude Code compacts a chat, read at each spawn. `null` and absent
    * leave Claude Code's own size for each model.
    */
+  readonly launchProcess?: ProcessLaunch;
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
   readonly fitImage?: ImageFitter | null;
 }
+
+export type AgentGitConfigForm = "parameters" | "count";
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
 
@@ -464,12 +496,10 @@ function codexVariableOverrides(variables: Readonly<Record<string, string>>): st
   ];
 }
 
-function withAccountEnvironment(
-  context: ProviderClientContext,
-): ((inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>) | undefined {
+function withAccountEnvironment(context: ProviderClientContext): ProviderClientContext["agentEnvironment"] {
   const { agentEnvironment, accountEnvironment } = context;
   if (!accountEnvironment) return agentEnvironment;
-  return (inherited) => ({ ...agentEnvironment?.(inherited), ...accountEnvironment });
+  return (inherited, gitConfig) => ({ ...agentEnvironment?.(inherited, gitConfig), ...accountEnvironment });
 }
 
 function claudeAgentEnvironment(
@@ -483,7 +513,7 @@ function claudeAgentEnvironment(
         ? { ENABLE_PROMPT_CACHING_1H: "1" }
         : {}),
       ...(compactWindow === null ? {} : { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(compactWindow) }),
-      ...environment?.(inherited),
+      ...environment?.(inherited, "count"),
       ...context.providerEnvironment?.("claude"),
     };
   };
@@ -764,6 +794,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
         context.claudeUserMcp,
+        context.launchProcess,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -867,8 +898,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },
               cli.version,
+              confinement ? "confined" : "provider-asks",
             ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -894,6 +927,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
         providerRefusalStatus: (sessionId) =>
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
+        savedKeyShadowed: () => {
+          const ownKey = Effect.runSync(
+            readOpenCodeStoredKey(OPENCODE_GO_PROVIDER, { ...process.env, ...context.agentEnvironment?.() }),
+          );
+          return ownKey !== null && ownKey !== context.apiKey("opencode");
+        },
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         fitImage: context.fitImage,
@@ -918,6 +957,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...opencodeEnv(cli),
           ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
@@ -933,8 +973,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
+      codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
       usageLeavesSession: true,
+      readOwnEmail: () => readAntigravityEmail(join(antigravityAppDataDir(process.env), ANTIGRAVITY_TOKEN_FILE)),
     },
     signOut: {
       argv: antigravityArgv(process.env),
@@ -1452,7 +1494,12 @@ function customAgentChild(
     env,
     ...(profileGeneration ? { profileGeneration: true } : {}),
     history: profileGeneration ? undefined : history,
-    ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
+    ...(confinement
+      ? {
+          confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()),
+          causeLine: isDeniedWriteLine,
+        }
+      : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
     steer: steerAcpSession,

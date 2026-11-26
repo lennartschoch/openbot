@@ -122,7 +122,8 @@ export const messages = {
   "settings.quitGuard.always": "Sempre",
   "settings.quitGuard.never": "Nunca",
   "settings.externalLinks.title": "Abrir links externos em",
-  "settings.externalLinks.description": "Links de chats, páginas de login e páginas de cobrança abrem aqui.",
+  "settings.externalLinks.description":
+    "Links de chats, páginas de login e páginas de cobrança abrem aqui. Com o OpenBot, só os links dos chats da janela principal com agentes deste computador abrem no OpenBot. Os outros links abrem no navegador padrão.",
   "settings.externalLinks.defaultBrowser": "Navegador padrão",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navegador padrão ({name})",
@@ -287,6 +288,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "No Wayland sem XWayland, o dock não pode aparecer acima de outros apps. Ele aparece na janela do OpenBot.",
   "settings.agentDock.xwayland.restart": "Reiniciar",
+  "settings.agentDock.noCompositor.title": "Na janela do OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Sua área de trabalho não consegue mostrar janelas transparentes, então o dock aparece na janela do OpenBot. Para mostrá-lo sobre outros apps, ative os efeitos da área de trabalho (um compositor) nas configurações do sistema e reinicie o OpenBot.",
   "settings.agentDock.display.title": "Tela",
   "settings.agentDock.display.description":
     "Se essa tela não estiver conectada, o dock vai para a tela da janela do OpenBot.",

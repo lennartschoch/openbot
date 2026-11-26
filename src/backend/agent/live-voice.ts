@@ -80,20 +80,23 @@ const summaryPrompt = (answer: string) =>
   `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
-const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+const RELAY_DELEGATION = /<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/g;
 
 function relayRequest(text: string): string {
-  const input = RELAY_DELEGATION.exec(text)?.[1]
-    ?.replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .trim();
-  return input || text;
+  const inputs = [...text.matchAll(RELAY_DELEGATION)]
+    .map((match) => (match[1] ?? "").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&").trim())
+    .filter(Boolean);
+  return inputs.at(-1) || text;
 }
 
 const HEARD_LINE_LIMIT = 20;
 const USER_LINE_WAIT_MS = 2_000;
 const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
+const requestWords = (text: string) =>
+  text
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -168,6 +171,8 @@ interface LiveSession {
   readonly heard: LiveVoiceLine[];
   userLine: OpenUserLine | null;
   userLineGiven: boolean;
+  userLines: number;
+  lastAsk: SentAsk | null;
   readonly asking: Semaphore.Semaphore;
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
@@ -176,6 +181,12 @@ interface LiveSession {
   readonly speech: Semaphore.Semaphore;
   readonly answeredTurns: Set<string>;
   readonly speaking: Set<Fiber.Fiber<void>>;
+}
+
+interface SentAsk {
+  readonly words: string;
+  readonly userLines: number;
+  readonly deliveryId: string;
 }
 
 interface PendingAsk {
@@ -224,6 +235,8 @@ export class LiveVoice {
       heard: [],
       userLine: null,
       userLineGiven: false,
+      userLines: 0,
+      lastAsk: null,
       asking: Semaphore.makeUnsafe(1),
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
@@ -410,7 +423,18 @@ export class LiveVoice {
       const settled = pending
         ? Deferred.await(pending.done).pipe(Effect.timeoutOption(USER_LINE_WAIT_MS), Effect.asVoid)
         : Effect.void;
-      return settled.pipe(Effect.andThen(Effect.suspend(() => this.#send(session, request, text, pending))));
+      return settled.pipe(
+        Effect.andThen(
+          Effect.suspend(() => {
+            const repeated = this.#repeatedAsk(session, text);
+            if (!repeated) return this.#send(session, request, text, pending);
+            return Effect.sync(() => {
+              if (!repeated.reply) this.#wait(session, request, repeated.deliveryId);
+              else if (!request.signal?.aborted) this.#respond(session, request.id, repeated.reply);
+            });
+          }),
+        ),
+      );
     });
     Effect.runFork(session.asking.withPermit(ask));
   }
@@ -440,21 +464,37 @@ export class LiveVoice {
         },
         onSuccess: (deliveryId) => {
           if (!this.#sessions.has(session.id)) return;
-          const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
-          this.#asks.add(ask);
-          request.signal?.addEventListener(
-            "abort",
-            () => {
-              if (!this.#asks.delete(ask)) return;
-              this.#asks.add({ session, requestId: null, deliveryId });
-            },
-            { once: true },
-          );
-          this.#answerSettled();
-          if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
+          session.lastAsk = { words: requestWords(text), userLines: session.userLines, deliveryId };
+          const ask = this.#wait(session, request, deliveryId);
+          if (waits && ask && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
         },
       }),
     );
+  }
+
+  #repeatedAsk(session: LiveSession, text: string): { deliveryId: string; reply: LiveVoiceReply | null } | null {
+    const last = session.lastAsk;
+    if (!last || last.userLines !== session.userLines || last.words !== requestWords(text)) return null;
+    const reply = this.#hooks.reply(session.agentId, last.deliveryId);
+    if (reply && !reply.success) return null;
+    logger.info("Live voice gave the same request again without new speech. It is not sent again.");
+    return { deliveryId: last.deliveryId, reply };
+  }
+
+  #wait(session: LiveSession, request: AppServerRequest, deliveryId: string): PendingAsk | null {
+    if (!this.#sessions.has(session.id)) return null;
+    const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
+    this.#asks.add(ask);
+    request.signal?.addEventListener(
+      "abort",
+      () => {
+        if (!this.#asks.delete(ask)) return;
+        this.#asks.add({ session, requestId: null, deliveryId });
+      },
+      { once: true },
+    );
+    this.#answerSettled();
+    return ask;
   }
 
   #answerSettled(): void {
@@ -577,11 +617,13 @@ export class LiveVoice {
 
 function trackUserLine(session: LiveSession, final: boolean, text: string): void {
   if (!final) {
+    if (!session.userLine) session.userLines += 1;
     session.userLine ??= { text: "", done: Deferred.makeUnsafe<void>() };
     session.userLine.text += text;
     return;
   }
   if (session.userLine) Deferred.doneUnsafe(session.userLine.done, Effect.void);
+  else if (!session.userLineGiven) session.userLines += 1;
   session.userLine = null;
   session.userLineGiven = false;
 }

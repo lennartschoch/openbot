@@ -119,7 +119,8 @@ export const messages = defineMessages("settings", {
   "settings.quitGuard.always": "Always",
   "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
-  "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
+  "settings.externalLinks.description":
+    "Links in chats, sign-in pages and billing pages open here. With OpenBot, only links in the main window's chats with agents on this computer open in OpenBot. Other links open in the default browser.",
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Default browser ({name})",
@@ -283,6 +284,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.xwayland.unsupported":
     "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
   "settings.agentDock.xwayland.restart": "Restart",
+  "settings.agentDock.noCompositor.title": "Shown in the OpenBot window",
+  "settings.agentDock.noCompositor.description":
+    "Your desktop cannot show see-through windows, so the dock shows in the OpenBot window. To show it above other apps, turn on desktop effects (a compositor) in your system settings, then restart OpenBot.",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "If that display is not connected, the dock goes to the display of the OpenBot window.",

@@ -49,6 +49,8 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
+  BrowserHttpSignInInput,
+  BrowserPermissionAnswer,
   BrowserProfileList,
   BrowserProfileSummary,
   BrowserProxyList,
@@ -107,6 +109,8 @@ import type {
   McpServerConfig,
   McpSignInState,
   McpTestResult,
+  MediaApprovalCreditsSetting,
+  MediaApprovalCreditsUpdate,
   MessagingOverview,
   MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
@@ -316,6 +320,8 @@ export interface MobileBrowserViewSupport {
   contextMenu: boolean;
   viewport: boolean;
   navigation: boolean;
+  permissions: boolean;
+  httpSignIn: boolean;
 }
 
 type MobileBrowserTabAction =
@@ -333,6 +339,8 @@ export interface MobileWorkspaceContextValue {
     listener: (event: BrowserViewBridgeEvent) => void,
   ) => RemoteBrowserViewSession | null;
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
+  answerBrowserPermission: (serverId: string, answer: BrowserPermissionAnswer) => Promise<void>;
+  answerBrowserHttpSignIn: (serverId: string, input: BrowserHttpSignInInput) => Promise<void>;
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   readsWholeApprovals: (serverId: string) => boolean;
   readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
@@ -393,6 +401,7 @@ export interface MobileWorkspaceContextValue {
   setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  reconnectServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;
   knownServerChecks: (serverId: string) => ServerChecks | null;
   canEditServerIdentity: (serverId: string) => boolean;
@@ -440,6 +449,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  canManageMediaApprovalCredits: (serverId: string) => boolean;
+  loadMediaApprovalCredits: (serverId: string) => Promise<MediaApprovalCreditsSetting>;
+  setMediaApprovalCredits: (
+    update: MediaApprovalCreditsUpdate,
+    serverId: string,
+  ) => Promise<MediaApprovalCreditsSetting>;
   canManageMemoryReview: (serverId: string) => boolean;
   loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
   setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
@@ -892,6 +907,7 @@ type ServerCheckKey =
   | "servesServerSignalHome"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMediaApprovalCredits"
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"

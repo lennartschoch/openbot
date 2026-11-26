@@ -363,6 +363,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -378,7 +379,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-team-api-"));
@@ -480,7 +483,7 @@ async function startHost(): Promise<Host> {
   await runCauseEffect(libraryFolderStore.initialize());
   const libraryFolders = new LibraryFoldersService({
     store: libraryFolderStore,
-    storage: { usage: scan, invalidate: () => undefined },
+    storage: { hostFiles: scan, invalidate: () => undefined },
     agents: () => agents.listAgents(),
   });
   const workflows = await Effect.runPromise(
