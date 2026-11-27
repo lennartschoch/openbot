@@ -3,14 +3,14 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "0.79.0-fork.34",
+    "version": "0.80.0-fork.35",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.lennartschoch.openbot",
-      "buildNumber": "790000034",
+      "buildNumber": "800000035",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.lennartschoch.openbot",
-      "versionCode": 790000034,
+      "versionCode": 800000035,
       "icon": "./assets/icons/app-icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/android-adaptive-eyes.png",
