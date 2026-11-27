@@ -15,4 +15,6 @@ export const messages = {
     "アカウントサービスの URL は https: アドレスか、このコンピューター上では http: アドレスでなければなりません。",
   "error.app.serverUrlSignalInvalid":
     "Signal URL は、ユーザー名とパスワードを含まない wss: アドレスでなければなりません。",
+  "error.app.windowBlockedBySecuritySoftware":
+    "このコンピューターのセキュリティソフトが OpenBot のウィンドウを停止した可能性があります。セキュリティソフト（Kaspersky など）で OpenBot.exe を信頼するアプリケーションに追加してから、OpenBot をもう一度起動してください。",
 } as const satisfies PartialTranslation<typeof source>;

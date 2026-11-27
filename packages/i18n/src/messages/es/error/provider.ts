@@ -366,6 +366,8 @@ export const messages = {
     "Gemini no pudo leer el historial guardado de este chat. OpenBot inició una nueva sesión de Gemini con el historial del chat. Vuelve a enviar tu mensaje.",
   "error.provider.acpTurnStuck":
     "{provider} no terminó su turno anterior, por lo que no aceptó este mensaje. OpenBot inició una nueva sesión de {provider} con el historial del chat. Vuelve a enviar tu mensaje.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indica que tu cuenta no tiene licencia para usar este modelo. Elige otro modelo y vuelve a enviar tu mensaje.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google no permite que Gemini funcione desde la ubicación de red del equipo que ejecuta este agente. Usa Gemini en otro equipo o elige otro proveedor para este agente.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -457,6 +459,8 @@ export const messages = {
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado grande. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageCountLimit":
     "El modelo no aceptó este chat porque tiene demasiadas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
+  "error.provider.imageCountLimitRepeated":
+    "El modelo otra vez no aceptó este chat: tiene demasiadas imágenes. Una tarea abre más imágenes de las que este modelo acepta, así que una nueva sesión no ayuda. Selecciona Nuevo chat y pide al agente que abra menos imágenes en cada paso, o selecciona un modelo que acepte más imágenes.",
   "error.provider.imageUnreadable":
     "El modelo no pudo leer una imagen de este chat. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo. Si enviaste una imagen, envía otra.",
   "error.provider.requestTooLarge":

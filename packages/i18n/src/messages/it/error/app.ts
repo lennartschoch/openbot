@@ -15,4 +15,6 @@ export const messages = {
     "L’URL del servizio di account deve essere un indirizzo https:, o un indirizzo http: su questo computer.",
   "error.app.serverUrlSignalInvalid":
     "L'URL di Signal deve essere un indirizzo wss: senza nome utente e senza password.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Probabilmente un software di sicurezza su questo computer ha fermato la finestra di OpenBot. Nel tuo software di sicurezza, ad esempio Kaspersky, aggiungi OpenBot.exe come applicazione attendibile. Poi avvia di nuovo OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

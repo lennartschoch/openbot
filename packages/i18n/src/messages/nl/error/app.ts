@@ -15,4 +15,6 @@ export const messages = {
     "De URL van de accountservice moet een https:-adres zijn, of een http:-adres op deze computer.",
   "error.app.serverUrlSignalInvalid":
     "De Signal-URL moet een wss:-adres zijn zonder gebruikersnaam en zonder wachtwoord.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Beveiligingssoftware op deze computer heeft het OpenBot-venster waarschijnlijk gestopt. Voeg OpenBot.exe in je beveiligingssoftware, bijvoorbeeld Kaspersky, toe als vertrouwde toepassing. Start OpenBot daarna opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

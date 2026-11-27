@@ -255,6 +255,7 @@
         }
       ],
       "./plugins/with-shortcuts",
+      "./plugins/with-watch-targets",
       "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {

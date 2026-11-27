@@ -100,6 +100,7 @@ export type CreditModelMaker =
   | "openai"
   | "pixverse"
   | "recraft"
+  | "sandai"
   | "sync"
   | "tencent"
   | "topaz"
@@ -122,6 +123,7 @@ export const CREDIT_MODEL_MAKERS: Readonly<Record<CreditModelMaker, string>> = {
   openai: "OpenAI",
   pixverse: "PixVerse",
   recraft: "Recraft",
+  sandai: "Sand AI",
   sync: "Sync Labs",
   tencent: "Tencent",
   topaz: "Topaz Labs",
@@ -197,6 +199,7 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     unit: "clip",
     credits: 20.5,
   },
+  { modelId: "magi-2", name: "MAGI-2", maker: "sandai", kind: "video", unit: "clip", credits: 20 },
   { modelId: "kling-3.0-omni", name: "Kling 3.0 Omni", maker: "kling", kind: "video", unit: "clip", credits: 18 },
   { modelId: "kling-3.0-turbo", name: "Kling 3.0 Turbo", maker: "kling", kind: "video", unit: "clip", credits: 19 },
   {
@@ -508,6 +511,10 @@ export function creditsFromTenths(tenths: number): number {
   return tenths / CREDIT_TENTHS;
 }
 
+export function creditsMovable(credits: Pick<CreditsState, "balance" | "welcome">): number {
+  return creditsFromTenths(Math.max(0, creditTenths(credits.balance) - creditTenths(credits.welcome ?? 0)));
+}
+
 export function creditCharge(credits: number): number {
   return creditsFromTenths(Math.ceil(Math.round(credits * CREDIT_TENTHS * 100) / 100));
 }
@@ -537,6 +544,7 @@ interface CreditEstimateSpec {
 const CREDIT_ESTIMATE_SPECS: Readonly<Record<string, CreditEstimateSpec>> = {
   "nano-banana-pro": { resolution: "1K", credits: 4.5 },
   "seedance-2.5": { resolution: "480p", credits: 17.5 },
+  "magi-2": { resolution: "1080p", credits: 20 },
 };
 
 export function creditEstimates(): CreditEstimate[] {

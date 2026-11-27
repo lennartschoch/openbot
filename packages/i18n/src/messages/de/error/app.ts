@@ -14,4 +14,6 @@ export const messages = {
   "error.app.serverUrlInvalid":
     "Die URL des Account-Dienstes muss eine https:-Adresse sein, oder eine http:-Adresse auf diesem Computer.",
   "error.app.serverUrlSignalInvalid": "Die Signal-URL muss eine wss:-Adresse ohne Benutzername und ohne Passwort sein.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Sicherheitssoftware auf diesem Computer hat wahrscheinlich das OpenBot-Fenster gestoppt. Füge OpenBot.exe in deiner Sicherheitssoftware, zum Beispiel Kaspersky, als vertrauenswürdige Anwendung hinzu. Starte OpenBot dann erneut.",
 } as const satisfies PartialTranslation<typeof source>;

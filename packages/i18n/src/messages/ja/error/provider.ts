@@ -370,6 +370,8 @@ export const messages = {
     "Gemini はこのチャットの保存済みの履歴を読み取れませんでした。OpenBot はチャット履歴を引き継いで新しい Gemini セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.acpTurnStuck":
     "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
+  "error.provider.antigravityLicenseRefused":
+    "Google によると、このアカウントにはこのモデルを使用するライセンスがありません。別のモデルを選んでから、メッセージをもう一度送信してください。\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -466,6 +468,8 @@ export const messages = {
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageCountLimitRepeated":
+    "画像が多すぎるため、モデルはこのチャットをまた受け付けませんでした。1 つのタスクがこのモデルの上限より多くの画像を開くため、新しいセッションでは解決しません。「新しいチャット」を選択し、各ステップで開く画像を減らすようエージェントに頼むか、より多くの画像を受け付けるモデルを選択してください。",
   "error.provider.imageUnreadable":
     "モデルはこのチャット内の画像を読み取れませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。画像を送った場合は、別の画像を送ってください。",
   "error.provider.requestTooLarge":

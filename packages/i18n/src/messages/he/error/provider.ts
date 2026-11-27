@@ -335,6 +335,8 @@ export const messages = {
     "Gemini לא הצליח לקרוא את ההיסטוריה השמורה של הצ'אט הזה. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.acpTurnStuck":
     "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
+  "error.provider.antigravityLicenseRefused":
+    "Google מציינת שלחשבון שלך אין רישיון להשתמש במודל הזה. יש לבחור מודל אחר ולשלוח את ההודעה שוב.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -424,6 +426,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageCountLimit":
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageCountLimitRepeated":
+    "המודל שוב לא קיבל את הצ'אט הזה: יש בו יותר מדי תמונות. משימה אחת פותחת יותר תמונות ממה שהמודל הזה מקבל, ולכן סשן חדש לא עוזר. בחר צ'אט חדש ובקש מהסוכן לפתוח פחות תמונות בכל שלב, או בחר מודל שמקבל יותר תמונות.",
   "error.provider.imageUnreadable":
     "המודל לא הצליח לקרוא תמונה בצ'אט הזה. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב. אם שלחת תמונה, שלח תמונה אחרת.",
   "error.provider.requestTooLarge":

@@ -21,6 +21,7 @@ Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/openbot-bus/bus
 # the update request units when an older release moved this one into place; openbot-hosted-update
 # says why.
 ExecStartPre=-+/opt/OpenBot/hosted/openbot-hosted-update trigger
+ExecStartPre=-+/opt/OpenBot/hosted/openbot-hosted-keyring start
 ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
 ExecStop=/opt/OpenBot/hosted/openbot-hosted-server --stop
 Restart=always

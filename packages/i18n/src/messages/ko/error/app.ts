@@ -13,4 +13,6 @@ export const messages = {
   "error.app.finishLocalTest": "디스플레이를 전환하기 전에 로컬 테스트를 끝내 주세요.",
   "error.app.serverUrlInvalid": "계정 서비스 URL은 https: 주소이거나, 이 컴퓨터에서는 http: 주소여야 해요.",
   "error.app.serverUrlSignalInvalid": "Signal URL은 사용자 이름과 비밀번호가 없는 wss: 주소여야 해요.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "이 컴퓨터의 보안 소프트웨어가 OpenBot 창을 멈춘 것 같아요. 보안 소프트웨어(예: Kaspersky)에서 OpenBot.exe를 신뢰할 수 있는 애플리케이션으로 추가한 다음 OpenBot을 다시 시작해 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

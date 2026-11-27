@@ -333,6 +333,8 @@ export const messages = {
     "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpTurnStuck":
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.antigravityLicenseRefused":
+    "تقول Google إن حسابك لا يملك ترخيصًا لاستخدام هذا النموذج. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -422,6 +424,8 @@ export const messages = {
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة كبيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageCountLimit":
     "لم يقبل النموذج هذه الدردشة لأن فيها صورًا كثيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageCountLimitRepeated":
+    "لم يقبل النموذج هذه الدردشة مرة أخرى: فيها صور كثيرة جدًا. تفتح مهمة واحدة صورًا أكثر مما يقبله هذا النموذج، لذلك لا تساعد جلسة جديدة. اختر دردشة جديدة واطلب من الوكيل أن يفتح صورًا أقل في كل خطوة، أو اختر نموذجًا يقبل صورًا أكثر.",
   "error.provider.imageUnreadable":
     "لم يتمكن النموذج من قراءة صورة في هذه الدردشة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى. إذا أرسلت صورة، فأرسل صورة أخرى.",
   "error.provider.requestTooLarge":

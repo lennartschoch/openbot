@@ -13,4 +13,6 @@ export const messages = {
   "error.app.finishLocalTest": "Zakończ test lokalny przed przełączeniem ekranów.",
   "error.app.serverUrlInvalid": "Adres URL usługi kont musi być adresem https:, lub adresem http: na tym komputerze.",
   "error.app.serverUrlSignalInvalid": "Adres URL Signal musi być adresem wss: bez nazwy użytkownika i bez hasła.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Oprogramowanie zabezpieczające na tym komputerze prawdopodobnie zatrzymało okno OpenBot. W oprogramowaniu zabezpieczającym, na przykład Kaspersky, dodaj OpenBot.exe jako zaufaną aplikację. Następnie uruchom OpenBot ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

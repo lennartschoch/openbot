@@ -14,4 +14,6 @@ export const messages = {
   "error.app.serverUrlInvalid":
     "Hesap hizmeti URL’si bir https: adresi, ya da bu bilgisayarda bir http: adresi olmalı.",
   "error.app.serverUrlSignalInvalid": "Signal URL’si kullanıcı adı ve parola içermeyen bir wss: adresi olmalı.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Bu bilgisayardaki güvenlik yazılımı muhtemelen OpenBot penceresini durdurdu. Güvenlik yazılımınızda, örneğin Kaspersky'de, OpenBot.exe dosyasını güvenilir uygulama olarak ekleyin. Ardından OpenBot'u yeniden başlatın.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -13,4 +13,6 @@ export const messages = {
   "error.app.finishLocalTest": "أكمل الاختبار المحلي قبل تبديل الشاشات.",
   "error.app.serverUrlInvalid": "يجب أن يكون عنوان URL لخدمة الحسابات https: أو http: على هذا الحاسوب.",
   "error.app.serverUrlSignalInvalid": "يجب أن يكون عنوان Signal عنوان wss: بدون اسم مستخدم أو كلمة مرور.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "من المحتمل أن برنامج الحماية على هذا الكمبيوتر أوقف نافذة OpenBot. في برنامج الحماية، مثل Kaspersky، أضف OpenBot.exe كتطبيق موثوق. ثم شغّل OpenBot مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

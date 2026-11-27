@@ -14,4 +14,6 @@ export const messages = {
   "error.app.serverUrlInvalid":
     "URL службы учётных записей должен быть адресом https: или, на этом компьютере, адресом http:.",
   "error.app.serverUrlSignalInvalid": "URL Signal должен быть адресом wss: без имени пользователя и без пароля.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Вероятно, защитная программа на этом компьютере остановила окно OpenBot. Добавьте OpenBot.exe в доверенные программы в защитной программе, например в Kaspersky. Затем снова запустите OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

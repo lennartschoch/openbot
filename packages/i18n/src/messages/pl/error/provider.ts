@@ -353,6 +353,8 @@ export const messages = {
     "Gemini nie mógł odczytać zapisanej historii tego czatu. OpenBot uruchomił nową sesję Gemini z historią czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpTurnStuck":
     "{provider} nie zakończył poprzedniej tury, więc nie przyjął tej wiadomości. OpenBot rozpoczął nową sesję {provider} z historią czatu. Wyślij wiadomość ponownie.",
+  "error.provider.antigravityLicenseRefused":
+    "Google informuje, że Twoje konto nie ma licencji na ten model. Wybierz inny model i wyślij wiadomość ponownie.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -444,6 +446,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageCountLimit":
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.imageCountLimitRepeated":
+    "Model znowu nie przyjął tego czatu: czat zawiera za dużo obrazów. Zadanie otwiera więcej obrazów, niż ten model przyjmuje, więc nowa sesja nie pomoże. Wybierz Nowy czat i poproś agenta, aby w każdym kroku otwierał mniej obrazów, albo wybierz model, który przyjmuje więcej obrazów.",
   "error.provider.imageUnreadable":
     "Model nie mógł odczytać obrazu w tym czacie. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie. Jeśli wysłano obraz, wyślij inny.",
   "error.provider.requestTooLarge":

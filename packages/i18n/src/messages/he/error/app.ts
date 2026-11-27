@@ -13,4 +13,6 @@ export const messages = {
   "error.app.finishLocalTest": "יש לסיים את הבדיקה המקומית לפני החלפת תצוגות.",
   "error.app.serverUrlInvalid": "כתובת שירות החשבונות חייבת להיות כתובת https:, או כתובת http: במחשב זה.",
   "error.app.serverUrlSignalInvalid": "כתובת ה-Signal חייבת להיות כתובת wss: ללא שם משתמש וללא סיסמה.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "כנראה שתוכנת אבטחה במחשב הזה עצרה את החלון של OpenBot. בתוכנת האבטחה, למשל Kaspersky, יש להוסיף את OpenBot.exe כאפליקציה מהימנה. לאחר מכן יש להפעיל את OpenBot שוב.",
 } as const satisfies PartialTranslation<typeof source>;
