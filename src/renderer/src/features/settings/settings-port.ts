@@ -27,7 +27,12 @@ export interface SettingsPort {
   setRemoteSessionReusePreference: OpenBotDesktopApi["setRemoteSessionReusePreference"];
   agent: Pick<
     OpenBotDesktopApi["agent"],
-    "listAgents" | "updateAgent" | "listAgentNotificationLevels" | "setAgentNotificationLevel" | "onScopedEvent"
+    | "listAgents"
+    | "updateAgent"
+    | "listAgentNotificationLevels"
+    | "setAgentNotificationLevel"
+    | "onScopedEvent"
+    | "onSyncChanged"
   >;
   dynamicIsland: Pick<
     OpenBotDesktopApi["dynamicIsland"],

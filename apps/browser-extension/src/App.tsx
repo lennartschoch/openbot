@@ -5,6 +5,7 @@ import {
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import { sourceText } from "@openbot/i18n";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
+import { REMOTE_RETRY_COOLDOWN_MS, REMOTE_RETRY_DELAYS_MS } from "@openbot/team-client/remote-recovery";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, Match, onSettled, Show, Switch } from "solid-js";
 import { AgentSettingsScreen } from "./AgentSettingsScreen";
@@ -21,6 +22,7 @@ import { identify, type SignInMethod, track } from "./analytics";
 import { BrowserAsks } from "./BrowserSharing";
 import { ChannelScreen } from "./ChannelScreen";
 import { ChatScreen } from "./ChatScreen";
+import { ConnectingScreen } from "./ConnectingScreen";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
 import {
   clearSession,
@@ -32,9 +34,10 @@ import {
   takeChatToOpen,
 } from "./extension-storage";
 import { HomeScreen } from "./HomeScreen";
-import { createHostConnection, type HostConnection } from "./host-connection";
+import { canRetryConnection, createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
+import { NoServersScreen } from "./NoServersScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { createWorkspace, type Workspace } from "./workspace";
@@ -50,12 +53,26 @@ import {
 } from "./x-messages";
 
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
+const SLOW_STEP_MS = 400;
+
+function createSlowStep() {
+  const [slow, setSlow] = createSignal(false);
+  let timer: number | undefined;
+  return {
+    slow,
+    start() {
+      if (slow() || timer !== undefined) return;
+      timer = window.setTimeout(() => setSlow(true), SLOW_STEP_MS);
+    },
+  };
+}
 
 export function App() {
   const [session, setSession] = createSignal<ExtensionSession | null>(null);
   const [login, setLogin] = createSignal<CentralAuthState>({ status: "loading" });
   let emailStart: { email: string; key: string; at: number } | null = null;
   let openTracked = false;
+  const sessionCheck = createSlowStep();
 
   function trackOpened(signedIn: boolean) {
     if (openTracked) return;
@@ -72,6 +89,7 @@ export function App() {
 
   async function checkSession() {
     setLogin({ status: "loading" });
+    sessionCheck.start();
     const saved = await readSession();
     if (!saved) {
       setLogin({ status: "signed_out" });
@@ -155,19 +173,21 @@ export function App() {
         when={session()}
         keyed
         fallback={
-          <div class="ext-login">
-            <SignInScreen
-              login={login()}
-              onRetry={checkSession}
-              onRequestEmailCode={requestCode}
-              onVerifyEmailCode={verify}
-              onReset={async () => {
-                emailStart = null;
-                setLogin({ status: "signed_out" });
-              }}
-              onSignedIn={(next) => signedIn(next, "web")}
-            />
-          </div>
+          <Show when={login().status !== "loading" || sessionCheck.slow()}>
+            <div class="ext-login">
+              <SignInScreen
+                login={login()}
+                onRetry={checkSession}
+                onRequestEmailCode={requestCode}
+                onVerifyEmailCode={verify}
+                onReset={async () => {
+                  emailStart = null;
+                  setLogin({ status: "signed_out" });
+                }}
+                onSignedIn={(next) => signedIn(next, "web")}
+              />
+            </div>
+          </Show>
         }
       >
         {(current) => (
@@ -209,14 +229,25 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   let connection: HostConnection | null = null;
   let capabilities: readonly string[] = [];
   let attempt = 0;
+  let reconnecting = false;
+  let reconnectTries = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let browserLink: ClientBrowserLink | null = null;
   const [presence, setPresence] = createSignal<ClientBrowserPresence>({ sharing: false, tabs: [] });
   const [canShare, setCanShare] = createSignal(false);
+  const connectStep = createSlowStep();
 
   const host = () => view.hosts.find((entry) => entry.hostId === view.hostId) ?? null;
 
+  function stopReconnect() {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+    reconnectTries = 0;
+  }
+
   async function open(hostId: string) {
     const current = ++attempt;
+    stopReconnect();
     const target = view.hosts.find((entry) => entry.hostId === hostId);
     if (!target || !connection) return;
     workspace()?.dispose();
@@ -231,6 +262,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       draft.offline = false;
     });
     void saveServerId(hostId);
+    connectStep.start();
     try {
       const granted = await connection.connect(target);
       if (current !== attempt) return;
@@ -241,7 +273,10 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
         capabilities: granted,
         onPresence: setPresence,
       });
-      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe);
+      const next = createWorkspace(connection.request, granted, connection.download, connection.transcribe, {
+        role: target.role,
+        send: connection.sendSync,
+      });
       setWorkspace(() => next);
       setView((draft) => {
         draft.status = "ready";
@@ -260,6 +295,49 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     }
   }
 
+  function reconnectLater(hostId: string) {
+    const delay = REMOTE_RETRY_DELAYS_MS[reconnectTries] ?? REMOTE_RETRY_COOLDOWN_MS;
+    reconnectTries += 1;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
+      void reconnect(hostId);
+    }, delay);
+  }
+
+  async function reconnect(hostId: string) {
+    const target = view.hosts.find((entry) => entry.hostId === hostId);
+    if (!target || !connection || reconnecting || reconnectTimer) return;
+    reconnecting = true;
+    const current = attempt;
+    try {
+      const granted = await connection.connect(target);
+      if (current !== attempt) return;
+      reconnectTries = 0;
+      if (granted.length !== capabilities.length || granted.some((entry) => !capabilities.includes(entry))) {
+        await open(hostId);
+        return;
+      }
+      const opened = workspace();
+      if (!opened || opened.syncAvailable()) return;
+      await opened.load();
+      await opened.reloadChannel();
+    } catch (error) {
+      if (current !== attempt) return;
+      if (canRetryConnection(error)) {
+        reconnectLater(hostId);
+        return;
+      }
+      setView((draft) => {
+        draft.status = "failed";
+        draft.message =
+          error instanceof Error ? error.message : t("extension.connection.offline", { server: target.name });
+      });
+    } finally {
+      reconnecting = false;
+    }
+  }
+
   async function start() {
     try {
       connection = await createHostConnection(props.session, {
@@ -267,31 +345,43 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           browserLink?.handleEvent(event);
           workspace()?.handleEvent(event);
         },
+        sync: (message) => workspace()?.receiveSync(message),
         state: (update) => {
           if (update.hostId !== view.hostId) return;
+          workspace()?.connection(update);
           setView((draft) => {
             draft.offline = update.state === "offline";
           });
+          if (update.state === "offline" && !update.code && view.status === "ready") void reconnect(update.hostId);
           if (update.state !== "online") return;
+          stopReconnect();
           void workspace()?.reloadChat();
           browserLink?.refresh();
         },
         sessionEnded: props.onSessionEnded,
       });
-      const hosts = await connection.listHosts();
-      setView((draft) => {
-        draft.hosts = hosts;
-        draft.status = hosts.length ? "connecting" : "empty";
-      });
-      if (!hosts.length) return;
-      const saved = await readServerId();
-      await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+      await listServers(connection);
     } catch (error) {
       setView((draft) => {
         draft.status = "failed";
         draft.message = error instanceof Error ? error.message : t("extension.connection.requestFailed");
       });
     }
+  }
+
+  async function listServers(current: HostConnection) {
+    const hosts = await current.listHosts();
+    setView((draft) => {
+      draft.hosts = hosts;
+      draft.status = hosts.length ? "connecting" : "empty";
+    });
+    if (!hosts.length) return;
+    const saved = await readServerId();
+    await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+  }
+
+  function listServersAgain() {
+    return connection ? listServers(connection) : start();
   }
 
   async function openChatFromX() {
@@ -302,7 +392,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
 
   function xTarget(): XTarget | null {
     if (view.status !== "ready" || !connection || !view.hostId) return null;
-    return { hostId: view.hostId, request: connection.request, capabilities };
+    return {
+      hostId: view.hostId,
+      request: workspace()?.request ?? connection.request,
+      capabilities,
+      syncedAgents: () => workspace()?.syncedAgents() ?? null,
+    };
   }
 
   onSettled(() => {
@@ -351,6 +446,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       closed = true;
       port?.disconnect();
       window.removeEventListener("pagehide", leave);
+      stopReconnect();
       browserLink?.dispose();
       workspace()?.dispose();
       void connection?.dispose();
@@ -385,7 +481,20 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     <>
       <Switch>
         <Match when={view.status === "empty"}>
-          <p class="ext-state">{t("extension.connection.noServers")}</p>
+          <NoServersScreen user={props.session.user} onRetry={listServersAgain} onSignOut={() => props.onSignOut()} />
+        </Match>
+        <Match when={(view.status === "failed" || (view.status !== "ready" && connectStep.slow())) && host()}>
+          {(target) => (
+            <ConnectingScreen
+              hosts={view.hosts}
+              host={target()}
+              user={props.session.user}
+              failure={view.status === "failed" ? view.message : null}
+              onSelectHost={(hostId) => void open(hostId)}
+              onRetry={() => void open(target().hostId)}
+              onSignOut={() => props.onSignOut()}
+            />
+          )}
         </Match>
         <Match when={view.status === "failed"}>
           <div class="ext-state">
@@ -476,11 +585,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
               </section>
             </div>
           )}
-        </Match>
-        <Match when={true}>
-          <p class="ext-state" aria-live="polite">
-            {host() ? t("extension.connection.connecting", { server: host()?.name ?? "" }) : null}
-          </p>
         </Match>
       </Switch>
       <BrowserAsks />

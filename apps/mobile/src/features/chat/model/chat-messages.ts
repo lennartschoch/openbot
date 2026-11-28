@@ -42,13 +42,18 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { MOBILE_PLUGINS } from "@/features/marketplace/model/plugin-catalog.generated";
-import { isMobileConnectorId } from "@/features/servers/model/connectors";
+import { MOBILE_PLUGINS } from "../../marketplace/model/plugin-catalog.generated";
+import { isMobileConnectorId } from "../../servers/model/connectors";
 import { thinkingRowId } from "./turn-thinking";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
 
 export type ChatPlanStepState = "pending" | "active" | "done";
+
+interface RoutineQuietAnswer {
+  id: string;
+  body: string;
+}
 
 export type ChatMessage =
   | {
@@ -79,6 +84,7 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
+      quietAnswers?: readonly RoutineQuietAnswer[];
     }
   | {
       id: string;
@@ -98,14 +104,14 @@ export type ChatMessage =
       body: string;
       streaming: boolean;
       status?: ConversationMessage["status"];
-      replyToMessageId?: string | null;
-      attachments?: AttachmentSummary[];
+      replyToMessageId?: string | null | undefined;
+      attachments?: AttachmentSummary[] | undefined;
       visual?: { height?: number };
-      imageGeneration?: ImageGenerationInfo;
-      videoGeneration?: VideoGenerationInfo;
+      imageGeneration?: ImageGenerationInfo | undefined;
+      videoGeneration?: VideoGenerationInfo | undefined;
       failureReason?: string;
       createdAt?: string;
-      reactions?: readonly ConversationReaction[];
+      reactions?: readonly ConversationReaction[] | undefined;
       progress?: true;
     }
   | {
@@ -179,21 +185,45 @@ export function presentChatMessages(
   const visible = baseline ? messages.filter((message) => baseline.has(message.id)) : messages;
   const received = new Map<string, PendingChatMessage["message"]>();
   for (const item of pending) if (item.serverId) received.set(item.serverId, item.message);
-  const result = visible.map((message) => {
-    const local = received.get(message.id);
-    if (local) return local;
-    const alias = aliases.get(message.id);
-    if (alias === undefined) return message;
-    let aliased = aliasedMessages.get(message);
-    if (aliased?.id !== alias) {
-      aliased = { ...message, id: alias };
-      aliasedMessages.set(message, aliased);
-    }
-    return aliased;
-  });
   const drawn = new Set(visible.map((message) => message.id));
-  for (const item of pending) if (!item.serverId || !drawn.has(item.serverId)) result.push(item.message);
+  const placed = new Map<number, ChatMessage[]>();
+  const tail: ChatMessage[] = [];
+  for (const item of pending) {
+    if (item.serverId && drawn.has(item.serverId)) continue;
+    const at = item.serverId && item.baseline ? afterBaseline(visible, item.baseline) : -1;
+    if (at < 0) tail.push(item.message);
+    else placed.set(at, [...(placed.get(at) ?? []), item.message]);
+  }
+  const result: ChatMessage[] = [];
+  for (const [index, message] of visible.entries()) {
+    const before = placed.get(index);
+    if (before) result.push(...before);
+    result.push(presentedMessage(message, received, aliases));
+  }
+  result.push(...tail);
   return result;
+}
+
+function afterBaseline(messages: readonly ChatMessage[], baseline: ReadonlySet<string>): number {
+  const last = messages.findLastIndex((message) => baseline.has(message.id));
+  return last + 1 < messages.length ? last + 1 : -1;
+}
+
+function presentedMessage(
+  message: ChatMessage,
+  received: ReadonlyMap<string, ChatMessage>,
+  aliases: ReadonlyMap<string, string>,
+): ChatMessage {
+  const local = received.get(message.id);
+  if (local) return local;
+  const alias = aliases.get(message.id);
+  if (alias === undefined) return message;
+  let aliased = aliasedMessages.get(message);
+  if (aliased?.id !== alias) {
+    aliased = { ...message, id: alias };
+    aliasedMessages.set(message, aliased);
+  }
+  return aliased;
 }
 
 const projectedBubbles = new WeakMap<
@@ -204,6 +234,7 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedQuietRoutines = new WeakMap<ConversationMessage, { key: string; item: ChatMessage }>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedNoAnswers = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedUpdates = new WeakMap<ConversationMessage, ChatMessage>();
@@ -329,17 +360,63 @@ function latestRoutineRunMessages(messages: readonly ConversationMessage[]) {
   return new Set(latest.values());
 }
 
-function projectRoutineMarker(message: ConversationMessage, latestRuns: ReadonlySet<string>): ChatMessage | null {
+function quietAnswersByRun(messages: readonly ConversationMessage[]): ReadonlyMap<string, RoutineQuietAnswer[]> {
+  const runByTurn = new Map<string, string>();
+  const sharedTurns = new Set<string>();
+  for (const message of messages) {
+    if (!message.turnId) continue;
+    const runId = message.routine?.runId;
+    if (runId) {
+      const known = runByTurn.get(message.turnId);
+      if (known !== undefined && known !== runId) sharedTurns.add(message.turnId);
+      runByTurn.set(message.turnId, runId);
+    } else if (
+      message.author === "user" ||
+      (message.senderAgentId !== undefined && message.exchange?.direction !== "outgoing")
+    )
+      sharedTurns.add(message.turnId);
+  }
+  const answers = new Map<string, RoutineQuietAnswer[]>();
+  for (const message of messages) {
+    if (message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE || !message.turnId || sharedTurns.has(message.turnId))
+      continue;
+    const runId = runByTurn.get(message.turnId);
+    if (!runId || !message.text.trim()) continue;
+    const run = answers.get(runId) ?? [];
+    run.push({ id: message.id, body: message.text });
+    answers.set(runId, run);
+  }
+  return answers;
+}
+
+function quietAnswersKey(answers: readonly RoutineQuietAnswer[]): string {
+  return answers.map(({ id, body }) => `${id}\n${body}`).join("\u0000");
+}
+
+function projectRoutineMarker(
+  message: ConversationMessage,
+  latestRuns: ReadonlySet<string>,
+  quietAnswers: ReadonlyMap<string, RoutineQuietAnswer[]>,
+): ChatMessage | null {
   const marker = routineMarker(message);
   if (!marker || (marker.runId && !latestRuns.has(message.id))) return null;
-  return projectedMarker(projectedRoutines, message, () => ({
+  const answers = marker.runId ? quietAnswers.get(marker.runId) : undefined;
+  const project = (): ChatMessage => ({
     id: `routine:${message.id}`,
     kind: "routine",
     event: marker.event,
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
-  }));
+    ...(answers ? { quietAnswers: answers } : {}),
+  });
+  if (!answers) return projectedMarker(projectedRoutines, message, project);
+  const key = quietAnswersKey(answers);
+  const cached = projectedQuietRoutines.get(message);
+  if (cached?.key === key) return cached.item;
+  const item = project();
+  projectedQuietRoutines.set(message, { key, item });
+  return item;
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 
@@ -429,13 +506,16 @@ export function projectChatMessages(
   accountUserId: string | null = null,
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
-  const reader = memberId || null;
-  const readerAccount = accountUserId ? `local-user:${accountUserId}` : null;
-  const readerKey = `${reader ?? ""}\n${readerAccount ?? ""}`;
+  const member = memberId || null;
+  const account = accountUserId ? `local-user:${accountUserId}` : null;
+  const reader: Reader = { key: `${member ?? ""}\n${account ?? ""}`, member, account };
+  const streamed = streamedProjection(messages, reader, progressUpdates);
+  if (streamed) return streamed;
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
+  const quietAnswers = quietAnswersByRun(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
   const shownNotes = turnShownNotes();
   const replacedIds = replacedConversationPlans(
@@ -448,7 +528,7 @@ export function projectChatMessages(
     })),
   );
   for (const message of sorted) {
-    const routine = projectRoutineMarker(message, latestRuns);
+    const routine = projectRoutineMarker(message, latestRuns, quietAnswers);
     if (routine) result.push(routine);
     if (message.routine) continue;
     if (isContextResetMarker(message)) {
@@ -547,37 +627,174 @@ export function projectChatMessages(
       });
       if (update) result.push(projectedMarker(projectedUpdates, message, () => progressBubble(message.id, message)));
     } else {
-      const cached = projectedBubbles.get(message);
-      const replaced = replacedIds.has(message.id);
-      let bubble = cached?.readerKey === readerKey && cached.replaced === replaced ? cached.bubble : undefined;
-      if (!bubble) {
-        const sender = message.author === "user" ? message.senderMember : undefined;
-        const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
-        const otherMember = sender !== undefined && reader !== null && !ownSender;
-        bubble = projectPlan(message, replaced) ??
-          projectSubagents(message) ?? {
-            id: message.id,
-            kind: "message",
-            author: message.author === "user" ? "user" : "agent",
-            ...(otherMember ? { sender } : {}),
-            ...(ownSender ? { mine: true } : {}),
-            body: message.exchange ? "" : message.text,
-            streaming: message.status === "streaming",
-            status: message.status,
-            attachments: message.attachments,
-            ...visualReply(message),
-            imageGeneration: message.imageGeneration,
-            videoGeneration: message.videoGeneration,
-            replyToMessageId: message.replyToMessageId,
-            createdAt: message.createdAt,
-            reactions: messageReactions(message),
-          };
-        projectedBubbles.set(message, { readerKey, replaced, bubble });
-      }
-      result.push(bubble);
+      result.push(projectBubble(message, reader, replacedIds.has(message.id)));
     }
   }
-  return progressUpdates ? withStepsAfterUpdates(result, thinkingByTurn) : result;
+  const keptRows = keptThinkingRows(thinkingByTurn);
+  for (let index = 0; index < result.length; index += 1) {
+    const row = result[index];
+    const kept = row?.kind === "thinking" ? keptRows.get(row) : undefined;
+    if (kept) result[index] = kept;
+  }
+  const projected = progressUpdates ? withStepsAfterUpdates(result, thinkingByTurn) : result;
+  rememberProjection({ messages, readerKey: reader.key, progressUpdates, replacedIds, result: projected });
+  return projected;
+}
+
+interface Reader {
+  key: string;
+  member: string | null;
+  account: string | null;
+}
+
+function projectBubble(message: ConversationMessage, reader: Reader, replaced: boolean): ChatMessage {
+  const cached = projectedBubbles.get(message);
+  if (cached?.readerKey === reader.key && cached.replaced === replaced) return cached.bubble;
+  const sender = message.author === "user" ? message.senderMember : undefined;
+  const ownSender = sender !== undefined && (sender.id === reader.member || sender.id === reader.account);
+  const otherMember = sender !== undefined && reader.member !== null && !ownSender;
+  const bubble: ChatMessage = projectPlan(message, replaced) ??
+    projectSubagents(message) ?? {
+      id: message.id,
+      kind: "message",
+      author: message.author === "user" ? "user" : "agent",
+      ...(otherMember ? { sender } : {}),
+      ...(ownSender ? { mine: true } : {}),
+      body: message.exchange ? "" : message.text,
+      streaming: message.status === "streaming",
+      status: message.status,
+      attachments: message.attachments,
+      ...visualReply(message),
+      imageGeneration: message.imageGeneration,
+      videoGeneration: message.videoGeneration,
+      replyToMessageId: message.replyToMessageId,
+      createdAt: message.createdAt,
+      reactions: messageReactions(message),
+    };
+  projectedBubbles.set(message, { readerKey: reader.key, replaced, bubble });
+  return bubble;
+}
+
+type ThinkingRow = Extract<ChatMessage, { kind: "thinking" }>;
+
+const KNOWN_THINKING_LIMIT = 4000;
+const knownThinkingRows = new Map<string, ThinkingRow>();
+
+function sameThinking(before: ThinkingRow, after: ThinkingRow): boolean {
+  return (
+    before.turnId === after.turnId &&
+    before.steps.length === after.steps.length &&
+    before.steps.every((step, index) => {
+      const next = after.steps[index];
+      return (
+        next !== undefined &&
+        step.id === next.id &&
+        step.text === next.text &&
+        step.createdAt === next.createdAt &&
+        step.progress === next.progress
+      );
+    })
+  );
+}
+
+function keptThinkingRows(thinkingByTurn: Map<string, ThinkingRow>): ReadonlyMap<ThinkingRow, ThinkingRow> {
+  const replaced = new Map<ThinkingRow, ThinkingRow>();
+  for (const [key, thinking] of thinkingByTurn) {
+    const kept = knownThinkingRows.get(thinking.id);
+    if (kept && sameThinking(kept, thinking)) {
+      replaced.set(thinking, kept);
+      thinkingByTurn.set(key, kept);
+      continue;
+    }
+    if (knownThinkingRows.size >= KNOWN_THINKING_LIMIT) knownThinkingRows.clear();
+    knownThinkingRows.set(thinking.id, thinking);
+  }
+  return replaced;
+}
+
+interface ProjectionEntry {
+  messages: readonly ConversationMessage[];
+  readerKey: string;
+  progressUpdates: ProgressUpdates | undefined;
+  replacedIds: ReadonlySet<string>;
+  result: ChatMessage[];
+}
+
+const RECENT_PROJECTIONS = 4;
+const recentProjections: ProjectionEntry[] = [];
+
+function rememberProjection(entry: ProjectionEntry) {
+  const known = recentProjections.findIndex((item) => item.messages === entry.messages);
+  if (known >= 0) recentProjections.splice(known, 1);
+  recentProjections.unshift(entry);
+  recentProjections.length = Math.min(recentProjections.length, RECENT_PROJECTIONS);
+}
+
+export const NO_CHANGED_INDEX = -1;
+
+export function oneChangedIndex<T>(before: readonly T[], after: readonly T[]): number | null {
+  if (before.length !== after.length) return null;
+  let changed = NO_CHANGED_INDEX;
+  for (let index = 0; index < after.length; index += 1) {
+    if (before[index] === after[index]) continue;
+    if (changed !== NO_CHANGED_INDEX) return null;
+    changed = index;
+  }
+  return changed;
+}
+
+function standaloneBubble(message: ConversationMessage): boolean {
+  return (
+    message.author !== "system" &&
+    !message.routine &&
+    !message.exchange &&
+    !message.questionPrompt &&
+    message.itemType !== "commentary" &&
+    message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
+    message.delivery?.status !== "queued" &&
+    message.delivery?.status !== "cancelled" &&
+    Boolean(message.text.trim() || message.attachments?.length || message.imageGeneration || message.videoGeneration) &&
+    routineMarker(message) === null &&
+    !isContextResetMarker(message) &&
+    !isNoAnswerNotice(message) &&
+    !marketplaceSuggestionEvent(message) &&
+    !mcpSignInEvent(message)
+  );
+}
+
+function sameBubbleContext(before: ConversationMessage, after: ConversationMessage): boolean {
+  return (
+    sameSortFields(before, after) &&
+    before.senderAgentId === after.senderAgentId &&
+    isAgentAnswer(before) === isAgentAnswer(after) &&
+    standaloneBubble(before) &&
+    standaloneBubble(after)
+  );
+}
+
+function streamedProjection(
+  messages: readonly ConversationMessage[],
+  reader: Reader,
+  progressUpdates: ProgressUpdates | undefined,
+): ChatMessage[] | null {
+  for (const entry of recentProjections) {
+    if (entry.readerKey !== reader.key || entry.progressUpdates !== progressUpdates) continue;
+    const index = oneChangedIndex(entry.messages, messages);
+    if (index === null) continue;
+    if (index === NO_CHANGED_INDEX) return entry.result;
+    const before = entry.messages[index];
+    const after = messages[index];
+    if (!before || !after || !sameBubbleContext(before, after)) return null;
+    const replaced = entry.replacedIds.has(after.id);
+    const previous = projectBubble(before, reader, replaced);
+    const position = entry.result.indexOf(previous);
+    if (position < 0) return null;
+    const result = entry.result.slice();
+    result[position] = projectBubble(after, reader, replaced);
+    rememberProjection({ ...entry, messages, result });
+    return result;
+  }
+  return null;
 }
 
 function withStepsAfterUpdates(

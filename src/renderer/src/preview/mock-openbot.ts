@@ -110,6 +110,7 @@ import {
   DEFAULT_PROMPT_CACHE_TTL,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
+  DEFAULT_REMOTE_CHAT_CONTENT_PREFERENCE,
   DEFAULT_REMOTE_NETWORK_ROUTE,
   DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE,
   DEFAULT_SKILL_LEARNING_MODE,
@@ -130,6 +131,7 @@ import {
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
+  hostRemoteChatContent,
   hostSkillLearning,
   isAgentMemoryLimit,
   isAgentSummary,
@@ -175,6 +177,8 @@ import {
   type QueuedMessageReceipt,
   type QueueHold,
   type QueueSnapshot,
+  type RemoteChatContentChange,
+  type RemoteChatContentPreference,
   type RemoteDesktopSession,
   type RemoteNetworkRouteState,
   type RemoteSessionReusePreference,
@@ -516,6 +520,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
   let browsingMemory: BrowsingMemoryPreference = { ...DEFAULT_BROWSING_MEMORY_PREFERENCE };
+  let remoteChatContent: RemoteChatContentPreference = { ...DEFAULT_REMOTE_CHAT_CONTENT_PREFERENCE };
+  const remoteChatContentListeners = new Set<(change: RemoteChatContentChange) => void>();
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
@@ -3620,6 +3626,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         agentListeners.add(scopedListener);
         return () => agentListeners.delete(scopedListener);
       },
+      onSyncChanged: () => () => undefined,
     },
     browser: mockBrowser.browser,
     update: {
@@ -3758,6 +3765,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       setBrowsingMemory: async (enabled) => {
         browsingMemory = { enabled };
         return hostBrowsingMemory(browsingMemory);
+      },
+      getRemoteChatContent: async () => hostRemoteChatContent(remoteChatContent),
+      setRemoteChatContent: async (enabled, serverId) => {
+        remoteChatContent = { enabled };
+        for (const listener of remoteChatContentListeners) listener({ serverId: serverId ?? LOCAL_SERVER_ID, enabled });
+        return hostRemoteChatContent(remoteChatContent);
+      },
+      onRemoteChatContent: (listener) => {
+        remoteChatContentListeners.add(listener);
+        return () => remoteChatContentListeners.delete(listener);
       },
       getMachineAlerts: async () => clone(machineAlerts),
       setMachineAlerts: async (settings) => {

@@ -26,16 +26,19 @@ final class WatchSession: NSObject, ObservableObject {
   static let answerTimeout: TimeInterval = 25
   static let offlineGrace: TimeInterval = 4
   static let backgroundLimit: TimeInterval = 10
+  static let avatarBatch = WatchMerge.agentLimit
+  static let avatarLoadLimit: TimeInterval = 10
   static let backgroundRefreshInterval: TimeInterval = 15 * 60
   static let backgroundRefreshIdentifier = "run.openbot.mobile.watch.refresh"
   static let pairMargin: TimeInterval = 7 * 24 * 60 * 60
   static let pairRetry: TimeInterval = 60 * 60
   static let pairFailureRetry: TimeInterval = 30
   static let urlScheme = "openbot-watch"
-  static let serverKey = "openbot.watch.server"
+  nonisolated static let serverKey = "openbot.watch.server"
+  static let themeKey = "openbot.watch.theme"
   static let shared = WatchSession()
 
-  private static let snapshotKey = "openbot.watch.snapshot"
+  private static let snapshotKey = WidgetSource.snapshotKey
 
   @Published private(set) var snapshot: WatchSnapshot?
   @Published private(set) var activated = false
@@ -53,9 +56,11 @@ final class WatchSession: NSObject, ObservableObject {
   private let session: WCSession? = WCSession.isSupported() ? WCSession.default : nil
   private let defaults = UserDefaults(suiteName: watchAppGroup) ?? .standard
   private var refreshing = false
+  private var registeringWidgetPush = false
   private var feedbackTask: Task<Void, Never>?
   private var offlineTask: Task<Void, Never>?
   private var pictures: [String: UIImage] = [:]
+  private var pictureTints: [String: Color?] = [:]
   private let direct = WatchDirect()
   private var credentials: WatchDirectCredentials?
   private var nextPairAttempt = Date.distantPast
@@ -160,13 +165,33 @@ final class WatchSession: NSObject, ObservableObject {
 
   private var missingAvatars: [String] {
     guard case .ready(let ready) = snapshot else { return [] }
-    let names = Set(ready.agents.flatMap(\.pictureNames))
-    return names.filter { Self.avatarURL($0) != nil && !Self.hasPicture($0) }.sorted()
+    let ordered =
+      ready.agents.compactMap(\.avatar)
+      + ready.agents.flatMap { [$0.faces?.waiting, $0.faces?.working].compactMap { $0 } }
+      + ready.servers.compactMap(\.picture)
+    var seen = Set<String>()
+    return ordered.filter { WatchAvatarFiles.url($0) != nil && !WatchAvatarFiles.has($0) && seen.insert($0).inserted }
   }
 
   var language: String {
     if case .ready(let ready) = snapshot { return ready.language }
     return Locale.current.identifier
+  }
+
+  func picture(_ server: WatchServer) -> UIImage? {
+    server.picture.flatMap(picture(named:))
+  }
+
+  func tint(_ server: WatchServer, accent: String) -> Color {
+    pictureTint(server) ?? server.tint(accent: accent)
+  }
+
+  private func pictureTint(_ server: WatchServer) -> Color? {
+    guard let name = server.picture, let image = picture(named: name) else { return nil }
+    if let known = pictureTints[name] { return known }
+    let found = image.dominantColor
+    pictureTints.updateValue(found, forKey: name)
+    return found
   }
 
   func picture(_ agent: WatchAgent) -> UIImage? {
@@ -176,7 +201,7 @@ final class WatchSession: NSObject, ObservableObject {
 
   private func picture(named name: String) -> UIImage? {
     _ = avatarRevision
-    guard let url = Self.avatarURL(name) else { return nil }
+    guard let url = WatchAvatarFiles.url(name) else { return nil }
     if let image = pictures[name] { return image }
     guard let image = UIImage(contentsOfFile: url.path) else { return nil }
     pictures[name] = image
@@ -198,6 +223,7 @@ final class WatchSession: NSObject, ObservableObject {
       try? await Task.sleep(nanoseconds: 200_000_000)
     }
     await Task.yield()
+    WidgetReload.flush()
   }
 
   func runWhileActive() async {
@@ -225,7 +251,10 @@ final class WatchSession: NSObject, ObservableObject {
   }
 
   func backgroundRefresh() async {
-    defer { scheduleBackgroundRefresh() }
+    defer {
+      WidgetReload.flush()
+      scheduleBackgroundRefresh()
+    }
     guard usableCredentials != nil, snapshot != nil else { return }
     await refresh(phoneAllowed: false)
   }
@@ -254,6 +283,7 @@ final class WatchSession: NSObject, ObservableObject {
       refreshError = result.message ?? text(TextKey.error(result.error ?? .failed))
     }
     if result.ok { await loadMissingAvatars(phoneAllowed: phoneReady) }
+    registerWidgetPush()
   }
 
   private func pairIfNeeded() async {
@@ -351,7 +381,7 @@ final class WatchSession: NSObject, ObservableObject {
       if let phone, let phoneResult { apply(.ready(phone), fresh: phoneResult.ok, origin: .phone) }
       return phoneResult ?? WatchResult(ok: false, error: .offline)
     }
-    guard let merged = WatchMerge.merge(parts: parts, phone: phone, previous: previous, hasPicture: Self.hasPicture) else {
+    guard let merged = WatchMerge.merge(parts: parts, phone: phone, previous: previous, hasPicture: WatchAvatarFiles.has) else {
       return WatchResult(ok: false, error: .failed)
     }
     apply(.ready(merged), fresh: true, origin: .merged)
@@ -388,7 +418,7 @@ final class WatchSession: NSObject, ObservableObject {
   private func applyHostResult(_ result: WatchResult, serverId: String) {
     guard let json = result.snapshot, case .ready(let ready)? = WatchSnapshot.decode(json: json),
       let merged = WatchMerge.merge(
-        parts: [serverId: ready], phone: nil, previous: readySnapshot, hasPicture: Self.hasPicture)
+        parts: [serverId: ready], phone: nil, previous: readySnapshot, hasPicture: WatchAvatarFiles.has)
     else { return }
     apply(.ready(merged), fresh: true, origin: .merged)
   }
@@ -421,38 +451,56 @@ final class WatchSession: NSObject, ObservableObject {
   private func loadMissingAvatars(phoneAllowed: Bool) async {
     let names = missingAvatars
     guard !names.isEmpty, let ready = readySnapshot else { return }
+    let deadline = Date().addingTimeInterval(Self.avatarLoadLimit)
     var byServer: [String: [String]] = [:]
-    for agent in ready.agents {
-      for name in agent.pictureNames where names.contains(name) && !(byServer[agent.serverId]?.contains(name) ?? false) {
-        byServer[agent.serverId, default: []].append(name)
+    for name in names {
+      for serverId in Set(ready.agents.filter { $0.pictureNames.contains(name) }.map(\.serverId)) {
+        byServer[serverId, default: []].append(name)
       }
     }
-    var received: [String: String] = [:]
     var remaining = Set(names)
     for (serverId, serverNames) in byServer {
-      guard let server = directServer(serverId),
-        let result = await runDirect(.avatars(names: serverNames), on: server), result.ok,
-        let avatars = result.avatars
-      else { continue }
-      for (name, data) in avatars where serverNames.contains(name) {
-        received[name] = data
-        remaining.remove(name)
+      guard let server = directServer(serverId) else { continue }
+      let saved = await loadAvatars(serverNames.filter(remaining.contains), until: deadline) { batch in
+        guard let result = await self.runDirect(.avatars(names: batch), on: server), result.ok else { return nil }
+        return result.avatars
       }
+      remaining.subtract(saved)
     }
-    if !remaining.isEmpty, phoneAllowed {
-      let result = await exchange(.avatars(names: remaining.sorted()))
-      if result.ok, let avatars = result.avatars {
-        for (name, data) in avatars where remaining.contains(name) { received[name] = data }
-      }
+    guard phoneAllowed else { return }
+    _ = await loadAvatars(names.filter(remaining.contains), until: deadline) { batch in
+      let result = await self.exchange(.avatars(names: batch))
+      return result.ok ? result.avatars : nil
     }
-    guard !received.isEmpty, let folder = Self.avatarFolder else { return }
-    guard case .ready = snapshot else { return }
+  }
+
+  private func loadAvatars(
+    _ names: [String], until deadline: Date, request: ([String]) async -> [String: String]?
+  ) async -> Set<String> {
+    var pending = names
+    var saved = Set<String>()
+    while !pending.isEmpty, Date() < deadline {
+      let batch = Array(pending.prefix(Self.avatarBatch))
+      guard let avatars = await request(batch), let arrived = saveAvatars(avatars, wanted: Set(batch)) else { break }
+      saved.formUnion(arrived)
+      let done = arrived.isEmpty ? Set(batch) : arrived
+      pending.removeAll { done.contains($0) }
+    }
+    return saved
+  }
+
+  private func saveAvatars(_ avatars: [String: String], wanted: Set<String>) -> Set<String>? {
+    guard case .ready = snapshot, let folder = WatchAvatarFiles.folder else { return nil }
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    for (name, base64) in received where names.contains(name) {
-      guard let url = Self.avatarURL(name), let data = Data(base64Encoded: base64) else { continue }
-      try? data.write(to: url, options: .atomic)
+    var saved = Set<String>()
+    for (name, base64) in avatars where wanted.contains(name) {
+      guard let url = WatchAvatarFiles.url(name), let data = Data(base64Encoded: base64),
+        (try? data.write(to: url, options: .atomic)) != nil
+      else { continue }
+      saved.insert(name)
     }
-    pictureArrived()
+    if !saved.isEmpty { pictureArrived() }
+    return saved
   }
 
   @discardableResult
@@ -552,18 +600,20 @@ final class WatchSession: NSObject, ObservableObject {
       lastFresh = nil
       return
     case .locked:
-      Self.removeAvatars(keeping: [])
+      WatchAvatarFiles.remove(keeping: [])
       pictures = [:]
+      pictureTints = [:]
       ComplicationData.write(.locked)
     case .ready(let ready):
       if origin == .phone {
         forgetCredentials(ifAccountIsNot: ready.account)
         learnDirectServers(from: ready)
       }
-      let kept = Set(ready.agents.flatMap(\.pictureNames))
-      Self.removeAvatars(keeping: kept)
+      let kept = Set(ready.agents.flatMap(\.pictureNames) + ready.servers.compactMap(\.picture))
+      WatchAvatarFiles.remove(keeping: kept)
       pictures = pictures.filter { name, _ in kept.contains(name) }
-      ComplicationData.write(.ready(ready))
+      pictureTints = pictureTints.filter { name, _ in kept.contains(name) }
+      ComplicationData.update(ready, previous: readySnapshot, chosen: chosenServerId)
     }
     defaults.set(json, forKey: Self.snapshotKey)
     snapshot = next
@@ -587,9 +637,11 @@ final class WatchSession: NSObject, ObservableObject {
     Task { await direct.reset() }
     defaults.removeObject(forKey: Self.snapshotKey)
     UserDefaults.standard.removeObject(forKey: Self.serverKey)
-    if let folder = Self.avatarFolder { try? FileManager.default.removeItem(at: folder) }
+    if let folder = WatchAvatarFiles.folder { try? FileManager.default.removeItem(at: folder) }
     pictures = [:]
+    pictureTints = [:]
     avatarRevision += 1
+    WidgetPushRegistry.forget()
     ComplicationData.remove()
   }
 
@@ -600,37 +652,30 @@ final class WatchSession: NSObject, ObservableObject {
 
   private func pictureArrived() {
     if case .locked = snapshot {
-      Self.removeAvatars(keeping: [])
+      WatchAvatarFiles.remove(keeping: [])
       return
     }
     pictures = [:]
+    pictureTints = [:]
     avatarRevision += 1
+    refreshComplication()
   }
 
-  nonisolated static var avatarFolder: URL? {
-    let base =
-      FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: watchAppGroup)
-      ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-    return base?.appendingPathComponent("watch-avatars", isDirectory: true)
-  }
-
-  nonisolated static func avatarURL(_ name: String) -> URL? {
-    guard !name.isEmpty, name.count <= 200, !name.contains("/"), !name.hasPrefix(".") else { return nil }
-    return avatarFolder?.appendingPathComponent(name, isDirectory: false)
-  }
-
-  nonisolated static func hasPicture(_ name: String) -> Bool {
-    guard let url = avatarURL(name) else { return false }
-    return FileManager.default.fileExists(atPath: url.path)
-  }
-
-  nonisolated static func removeAvatars(keeping names: Set<String>) {
-    guard let folder = avatarFolder,
-      let files = try? FileManager.default.contentsOfDirectory(atPath: folder.path)
-    else { return }
-    for file in files where !names.contains(file) {
-      try? FileManager.default.removeItem(at: folder.appendingPathComponent(file))
+  private func registerWidgetPush() {
+    guard !registeringWidgetPush, let credentials = usableCredentials else { return }
+    registeringWidgetPush = true
+    Task {
+      await WidgetPushRegistry.register(credentials: credentials, direct: direct)
+      registeringWidgetPush = false
     }
+  }
+
+  private var chosenServerId: String {
+    UserDefaults.standard.string(forKey: Self.serverKey) ?? ""
+  }
+
+  func refreshComplication() {
+    if let readySnapshot { ComplicationData.update(readySnapshot, previous: nil, chosen: chosenServerId) }
   }
 }
 

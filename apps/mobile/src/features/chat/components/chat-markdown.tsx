@@ -122,6 +122,7 @@ interface TextPresentation {
   fontScale: number;
   t: MobileTranslate;
   linkFavicons: boolean;
+  remoteContent: boolean;
   direction: TextDirection;
   tone: BubbleTone | undefined;
   chipBackground: string;
@@ -1064,6 +1065,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
             language={token.lang}
             streaming={presentation.streaming}
             tone={presentation.tone}
+            remoteContent={presentation.remoteContent}
           />
         ) : (
           <ChatCodeBlock
@@ -1161,6 +1163,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   agents = NO_AGENTS,
   finished = false,
   linkFavicons = true,
+  remoteContent = false,
   fontWeight,
   inline: inlineOnly = false,
   tone,
@@ -1188,6 +1191,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   selectable?: boolean;
   agents?: readonly MobileAgent[];
   linkFavicons?: boolean;
+  remoteContent?: boolean;
 }) {
   const textReveal = useMotionPreference("textReveal");
   const fontScale = useFontScale();
@@ -1204,13 +1208,13 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => (finished ? finishedReplyReveal(tokens) : createReplyReveal(tokens)),
     [tokens, finished],
   );
-  const { tokens: visibleTokens, flushed } = useReplyPlayback(reveal, playback);
+  const { tokens: visibleTokens, playing } = useReplyPlayback(reveal, playback);
   const themeForeground = useThemeColor("foreground");
   const textColor = String(useCSSVariable("--openbot-text-primary"));
   const chipBackground = tone?.chip ?? withAlpha(textColor, "14");
   const codeColor = tone?.foreground ?? themeForeground;
   const { t } = useText();
-  const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
+  const animateTail = (streaming || playing) && animationEnabled && textReveal;
   const presentation = useMemo<TextPresentation>(
     () => ({
       selectable,
@@ -1224,7 +1228,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       streaming,
       finished,
       animateTail,
-      linkFavicons,
+      linkFavicons: linkFavicons && remoteContent,
+      remoteContent,
       direction: layoutDirection(),
       tone,
       chipBackground,
@@ -1235,6 +1240,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     }),
     [
       linkFavicons,
+      remoteContent,
       selectable,
       compact,
       color,

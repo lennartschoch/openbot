@@ -362,6 +362,7 @@ interface ThreadConfig {
   channelTools: boolean;
   workspaceOnly: boolean;
   excludedFolders: string[];
+  writeAreas: string[];
   excludedInstructionFiles: string[];
   agentId: string | null;
 }
@@ -789,6 +790,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (!launchProcess) return {};
     return {
       spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeThroughLauncher(options, stderr, launchProcess),
+    };
+  }
+
+  #probeProcessSpawner(): Pick<ClaudeSdkLaunch, "spawnClaudeCodeProcess"> {
+    const launchProcess = this.#launchProcess;
+    if (this.#sdkLaunch.spawnClaudeCodeProcess || !launchProcess) return {};
+    return {
+      spawnClaudeCodeProcess: (options: SpawnOptions) =>
+        spawnClaudeThroughLauncher(options, new ClaudeStderrTail(), launchProcess),
     };
   }
 
@@ -1243,6 +1253,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
+      ...this.#probeProcessSpawner(),
       settingSources: userSetup ? ["user", "project", "local"] : [],
       ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
@@ -1480,10 +1491,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     for (;;) {
       yield* this.#threads.opened(threadId);
       const current = this.#threads.get(threadId);
-      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) return;
+      if (current && threadConfigKey(current.config, true) === threadConfigKey(config, true)) {
+        current.config.writeAreas = config.writeAreas;
+        return;
+      }
       if (current) {
         if (current.activeTurn) return yield* providerFailure(new Error(sourceText("error.provider.claudeTurnActive")));
-        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) return;
+        if (threadConfigKey(current.config, false) === threadConfigKey(config, false)) {
+          current.config.writeAreas = config.writeAreas;
+          return;
+        }
         queryLogger.info("Restarting a Claude query.", {
           reason: "configuration-change",
           count: ++this.#queryRestarts,
@@ -1521,6 +1538,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               toolInput,
               config.cwd,
               config.additionalDirectories,
+              config.writeAreas,
             );
             if (outside)
               return yield* this.#requestWriteApprovalEffect(
@@ -1645,7 +1663,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : {}),
     };
     const sandbox = config.workspaceOnly
-      ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
+      ? yield* claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders, config.writeAreas)
       : null;
     const settingsFile =
       Object.keys(signInSettings).length > 0
@@ -1725,7 +1743,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(sandbox && !settingsFile ? { sandbox } : {}),
           ...(config.workspaceOnly
             ? {
-                hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories, config.excludedFolders),
+                hooks: claudeWorkspaceHooks(
+                  config.cwd,
+                  config.additionalDirectories,
+                  config.excludedFolders,
+                  () => config.writeAreas,
+                ),
                 managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
               }
             : {}),
@@ -1826,6 +1849,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     runtime.contextRequest += 1;
+    const writeAreas = readWriteAreas(params);
+    if (writeAreas) runtime.config.writeAreas = writeAreas;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -3282,14 +3307,17 @@ export function claudeOpenBotTools(
         CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${definition.name}`),
       )
     : [];
-  const claudeTool = (definition: (typeof channel)[number], extras?: { alwaysLoad: true }) =>
-    tool(
+  const claudeTool = (definition: (typeof channel)[number], extras?: { alwaysLoad: true }) => {
+    const shape = advertisedZodShape(z.strictObject(definition.shape));
+    const registered = tool(
       definition.name,
       definition.description,
-      advertisedZodShape(z.strictObject(definition.shape)),
+      shape,
       (args) => call(definition.name, args),
       extras,
     );
+    return definition.name === "tool_call" ? { ...registered, inputSchema: z.looseObject(shape) } : registered;
+  };
   return [
     ...visibleToolDefinitions("claude")
       .filter((definition) => definition.name !== "ask_user")
@@ -3635,6 +3663,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
         : [],
+    writeAreas: readWriteAreas(params) ?? [],
     excludedInstructionFiles:
       isRecord(params) && Array.isArray(params.excludedInstructionFiles)
         ? params.excludedInstructionFiles.filter((value): value is string => isString(value))
@@ -3643,7 +3672,13 @@ function readThreadConfig(params: unknown): ThreadConfig {
   };
 }
 
-function threadConfigKey(config: ThreadConfig, withModel: boolean): string {
+function readWriteAreas(params: unknown): string[] | null {
+  return isRecord(params) && Array.isArray(params.writeAreas)
+    ? params.writeAreas.filter((value): value is string => isString(value))
+    : null;
+}
+
+function threadConfigKey({ writeAreas: _, ...config }: ThreadConfig, withModel: boolean): string {
   const fields = {
     ...config,
     model: withModel ? (config.model ?? null) : null,

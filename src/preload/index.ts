@@ -49,6 +49,7 @@ import {
   decodeHostBrowsingMemory,
   decodeHostMemoryReview,
   decodeHostPersonality,
+  decodeHostRemoteChatContent,
   decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
@@ -89,6 +90,7 @@ import {
   decodeRegistryInstallations,
   decodeRegistryInstallResult,
   decodeRegistryOperations,
+  decodeRemoteChatContentChange,
   decodeRemovableRuntimes,
   decodeSaveAgentProfileResult,
   decodeSaveSkillSuggestionResult,
@@ -166,7 +168,7 @@ import {
   decodeAgentDockOffset,
   decodeAgentDockPresentation,
 } from "./agent-dock-decoding";
-import { decodeScopedAgentEvent } from "./agent-event-decoding";
+import { decodeAgentSyncChangedEvent, decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
   decodeAgentDefaults,
@@ -188,6 +190,7 @@ import {
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCreditActivity,
+  decodeCreditMediaCatalog,
   decodeCreditRedeemResult,
   decodeCreditsState,
   decodeCustomAgentCheckResult,
@@ -364,6 +367,7 @@ import {
   decodeInstalledSkillsFromMain,
   decodeMarketplaceAgentDetail,
   decodeMarketplaceAgentPage,
+  decodeNullablePluginCatalog,
   decodeSkillDetail,
   decodeSkillDetails,
   decodeSkillPage,
@@ -726,6 +730,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   respondToBrowserSecret: decodeVoid,
   respondToBrowserTakeover: decodeVoid,
   scopedEvent: decodeScopedAgentEvent,
+  syncChanged: decodeAgentSyncChangedEvent,
 });
 
 const agentFoldersGroup = bridgeGroup(IPC_ENDPOINTS.agentFolders, {
@@ -1063,6 +1068,7 @@ const openbotApi: OpenBotDesktopApi = {
     list: decodeSkillPage,
     get: decodeSkillDetail,
     getBySlug: decodeSkillDetail,
+    pluginCatalog: decodeNullablePluginCatalog,
     listMine: decodeSubmissions,
     choosePackage: decodeSkillPreview,
     submit: decodeSubmission,
@@ -1200,6 +1206,7 @@ const openbotApi: OpenBotDesktopApi = {
   credits: bridgeGroup(IPC_ENDPOINTS.credits, {
     getState: decodeCreditsState,
     getActivity: decodeCreditActivity,
+    getCatalog: decodeCreditMediaCatalog,
     openCheckout: decodeVoid,
     transfer: decodeCreditsState,
     redeem: decodeCreditRedeemResult,
@@ -1388,6 +1395,9 @@ const openbotApi: OpenBotDesktopApi = {
     setSkillLearning: decodeHostSkillLearning,
     getBrowsingMemory: decodeHostBrowsingMemory,
     setBrowsingMemory: decodeHostBrowsingMemory,
+    getRemoteChatContent: decodeHostRemoteChatContent,
+    setRemoteChatContent: decodeHostRemoteChatContent,
+    remoteChatContent: decodeRemoteChatContentChange,
     getMachineAlerts: decodeMachineAlertSettings,
     setMachineAlerts: decodeMachineAlertSettings,
     getPromptCacheTtl: decodePromptCacheTtlSetting,

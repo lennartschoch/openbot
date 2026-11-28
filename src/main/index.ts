@@ -9,6 +9,7 @@ import {
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
+  LOCAL_SERVER_ID,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import { createFormat, localeDirection, resolveLocale, translateFor, withHourCycle } from "@openbot/i18n";
@@ -555,6 +556,7 @@ const {
   forwardRemoteDesktopSessions,
   forwardServers,
   forwardTeamPresence,
+  forwardSyncChanged,
   forwardDirectMessage,
   forwardDirectTyping,
   forwardAttachmentDownload,
@@ -762,6 +764,7 @@ function registerIpcHandlers({
   memoryReview,
   skillLearning,
   browsingMemory,
+  remoteChatContent,
   agentAccess,
   mcpAccess,
   serverAudit,
@@ -794,6 +797,7 @@ function registerIpcHandlers({
   remoteServers,
   centralAuth,
   skills,
+  pluginCatalog,
   hostedSites,
   githubConnector,
   linkAccount,
@@ -925,7 +929,7 @@ function registerIpcHandlers({
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
     ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
-    ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
+    ...skillIpcHandlers({ skills, pluginCatalog, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
       remoteServers,
@@ -1057,6 +1061,7 @@ function registerIpcHandlers({
       memoryReview,
       skillLearning,
       browsingMemory,
+      remoteChatContent,
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
@@ -1682,6 +1687,12 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.agentMemoryLimitPreference, preference);
         }
       });
+      const forwardRemoteChatContent = (serverId: string, enabled: boolean) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          sendToRenderer(window, IPC_ENDPOINTS.hostAdmin.remoteChatContent, { serverId, enabled });
+        }
+      };
+      built.remoteChatContent.onChange(({ enabled }) => forwardRemoteChatContent(LOCAL_SERVER_ID, enabled));
       host.on("changed", onHostChanged);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
@@ -1702,8 +1713,10 @@ if (!hasSingleInstanceLock) {
       });
       remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
+      remoteServers.on("syncChanged", forwardSyncChanged);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      remoteServers.on("remoteChatContent", forwardRemoteChatContent);
       remoteServers.on("attachmentDownload", forwardAttachmentDownload);
       remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
       void Effect.runPromise(

@@ -114,6 +114,7 @@ const agents = {
     failedTurns: [],
   }),
   listConversationReads: () => ({}),
+  listTaskReads: () => [],
 };
 
 const phones = new PushNotificationService({

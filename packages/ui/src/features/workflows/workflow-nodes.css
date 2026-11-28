@@ -843,6 +843,19 @@
   white-space: nowrap;
 }
 
+.wfn-asset-drop {
+  display: contents;
+}
+
+.wfn-asset-audio {
+  width: 100%;
+  height: 36px;
+}
+
+.wfn-arriving {
+  pointer-events: none;
+}
+
 .wfn-asset-file {
   display: flex;
   gap: var(--openbot-space-3);
@@ -902,6 +915,7 @@
 
 .wfn-menu {
   --ui-menu-bg: var(--wfn-glass);
+  --ui-popover-frost-bg: var(--wfn-glass);
   --ui-menu-panel-shadow: 0 0 0 1px var(--wfn-ring-strong);
   --ui-menu-item-hover: var(--wfn-hover);
   --ui-menu-radius: var(--openbot-radius-lg);

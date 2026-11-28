@@ -20,6 +20,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -73,9 +74,14 @@ import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row
 import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
 import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
-import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
+import {
+  ArrivalEntrancesContext,
+  useArrivalEntrance,
+  useMessageArrivals,
+} from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { approvalTitle } from "@/features/chat/model/approval-text";
+import { chatListView } from "@/features/chat/model/chat-list-view";
 import {
   type ChatBubbleMessage,
   type ChatMarkerGroup,
@@ -83,12 +89,11 @@ import {
   chatRowHolding,
   chatRowIndex,
   firstChatRowOf,
-  groupExchangeMarkers,
-  groupRoutineRunMarkers,
   indexChatMessages,
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import {
@@ -107,11 +112,9 @@ import type { PendingApproval } from "@/features/workspace/model/pending-approva
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { type BubbleTone, bubbleTone } from "../model/bubble-tone";
-import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import {
@@ -119,7 +122,7 @@ import {
   messageChipFileNames,
   messageFileDirectory,
   messageFileTarget,
-  messageLinkFileTarget,
+  messageLinkFileTargets,
   messageTargetFileName,
 } from "../model/message-file-target";
 import { messageTime } from "../model/message-time";
@@ -186,7 +189,6 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
 const PROGRESS_UPDATE_ENTRANCE = FadeIn.duration(220)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .reduceMotion(ReduceMotion.System);
-const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
 const BUBBLE_CORNER = { borderCurve: "circular", borderRadius: 22 } as const;
 
@@ -194,7 +196,6 @@ function ChatBubble({
   children,
   agent,
   collapsed = false,
-  animateSize,
   className,
   style,
   fill,
@@ -202,53 +203,21 @@ function ChatBubble({
   agent: boolean;
   fill: string | undefined;
   collapsed?: boolean;
-  animateSize: boolean;
   className: string;
   style: ComponentProps<typeof Animated.View>["style"];
 }>) {
-  const sized = agent && animateSize && !isAndroid;
-  const size = useSharedValue({ width: 0, height: 0, measured: false });
   const shown = useSharedValue(collapsed ? 0 : 1);
   useEffect(() => {
     shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
   }, [collapsed, shown]);
-  const background = useAnimatedStyle(() => {
-    if (!sized) return { opacity: shown.get() };
-    const { width, height, measured } = size.get();
-    return {
-      opacity: shown.get(),
-      width: measured ? withTiming(width, REPLY_SIZE) : width,
-      height: measured ? withTiming(height, REPLY_SIZE) : height,
-    };
-  });
+  const background = useAnimatedStyle(() => ({ opacity: shown.get() }));
   return (
-    <Animated.View
-      className={className}
-      style={[style, BUBBLE_CORNER]}
-      onLayout={
-        sized
-          ? ({ nativeEvent }) => {
-              const previous = size.get();
-              size.set({
-                width: nativeEvent.layout.width,
-                height: nativeEvent.layout.height,
-                measured: previous.measured || previous.width > 0,
-              });
-            }
-          : undefined
-      }
-    >
+    <Animated.View className={className} style={[style, BUBBLE_CORNER]}>
       {agent ? (
         <Animated.View
-          key={sized ? "sized" : "filled"}
           pointerEvents="none"
-          className={fill ? "absolute left-0 top-0" : "absolute left-0 top-0 bg-control/60"}
-          style={[
-            BUBBLE_CORNER,
-            sized ? null : StyleSheet.absoluteFill,
-            fill ? { backgroundColor: fill } : null,
-            background,
-          ]}
+          className={fill ? undefined : "bg-control/60"}
+          style={[BUBBLE_CORNER, StyleSheet.absoluteFill, fill ? { backgroundColor: fill } : null, background]}
         />
       ) : null}
       {children}
@@ -340,7 +309,7 @@ interface MessageRowShared {
   agents: MobileAgent[];
   agentsById: ReadonlyMap<string, MobileAgent>;
   serverId: string;
-  canSend: boolean;
+  remoteContent: boolean;
   muted: ViewStyle["backgroundColor"];
   themeMuted: string;
   foreground: ViewStyle["backgroundColor"];
@@ -351,10 +320,7 @@ interface MessageRowShared {
   plainBubbleFill: string | undefined;
   solidBubbleSurface: string | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
-  animationActive: boolean;
-  playbackActive: boolean;
   screenReaderEnabled: boolean;
-  textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
@@ -364,11 +330,9 @@ interface MessageRowShared {
   deletesAny: boolean;
   canMarkUnread: boolean;
   canPin: boolean;
-  pinnedIds: ReadonlySet<string>;
   sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
   canSelectQuestion: boolean;
-  branchPoints: ReadonlySet<string>;
   listWidth: number;
   fileAgentId: string | undefined;
   openSubagents: ((messageId: string) => void) | undefined;
@@ -525,17 +489,19 @@ function playbackEligible(message: VisibleMessage) {
   );
 }
 
-function playbackEnabled(message: VisibleMessage, shared: MessageRowShared, arriving: boolean) {
-  return playbackEligible(message) && shared.playbackActive && arriving;
-}
-
-function awaitingFirstWord(message: VisibleMessage, shared: MessageRowShared, arriving: boolean, revealed: boolean) {
+function awaitingFirstWord(
+  message: VisibleMessage,
+  playing: boolean,
+  revealed: boolean,
+  progress: ReadonlyMap<string, number>,
+) {
   return (
-    message.kind === "message" &&
-    message.body.trim().length > 0 &&
-    playbackEnabled(message, shared, arriving) &&
+    playing &&
     !revealed &&
-    (shared.replySession.progress.get(message.id) ?? 0) === 0
+    message.kind === "message" &&
+    playbackEligible(message) &&
+    (progress.get(message.id) ?? 0) === 0 &&
+    message.body.trim().length > 0
   );
 }
 
@@ -548,13 +514,27 @@ const MessageRow = memo(function MessageRow({
   outbox,
   selecting = false,
   arriving,
+  animate,
+  playing,
+  playbackResumes,
+  playbackPaused,
   revealed,
+  pinned,
+  branchable,
+  canAnswer,
   shared,
 }: {
   message: MessageRowMessage;
   isFirstUser: boolean;
   arriving: boolean;
+  animate: boolean;
+  playing: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   revealed: boolean;
+  pinned: boolean;
+  branchable: boolean;
+  canAnswer: boolean;
   source?: ChatMessage;
   questionForm?: QuestionPromptController;
   upload?: ChatUpload;
@@ -564,7 +544,8 @@ const MessageRow = memo(function MessageRow({
 }) {
   const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
-  const waiting = awaitingFirstWord(message, shared, arriving, revealed);
+  const waiting = awaitingFirstWord(message, playing, revealed, shared.replySession.progress);
+  const entrance = useArrivalEntrance(message.id, arriving);
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
   const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
   const messageActions = useMessageActions(
@@ -572,7 +553,7 @@ const MessageRow = memo(function MessageRow({
       ? // A progress update is a step of its turn, as on desktop: no reply, reaction or delete.
         {
           messageId: bubble.id,
-          copyText: messageCopyText(bubble),
+          copyText: () => messageCopyText(bubble),
           createdAt: bubble.createdAt,
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
           readAloudId: bubble.id,
@@ -580,12 +561,12 @@ const MessageRow = memo(function MessageRow({
       : bubble
         ? {
             messageId: bubble.id,
-            copyText: messageCopyText(bubble),
+            copyText: () => messageCopyText(bubble),
             createdAt: bubble.createdAt,
             reactions: bubble.reactions,
             onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
             onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
-            onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
+            onBranch: branchable ? () => shared.actions.branch(bubble) : undefined,
             onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
             onDelete:
               shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
@@ -593,10 +574,8 @@ const MessageRow = memo(function MessageRow({
               shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
                 ? () => shared.actions.markUnread(bubble)
                 : undefined,
-            pinned: shared.pinnedIds.has(bubble.id),
-            onTogglePin: shared.canPin
-              ? () => shared.actions.togglePin(bubble, !shared.pinnedIds.has(bubble.id))
-              : undefined,
+            pinned,
+            onTogglePin: shared.canPin ? () => shared.actions.togglePin(bubble, !pinned) : undefined,
             sendToChannel:
               shared.sendChannels.length > 0 && bubble.body.trim()
                 ? {
@@ -615,7 +594,6 @@ const MessageRow = memo(function MessageRow({
     agents,
     agentsById,
     serverId,
-    canSend,
     muted,
     themeMuted,
     foreground,
@@ -630,7 +608,7 @@ const MessageRow = memo(function MessageRow({
     actions,
   } = shared;
   const eligible = playbackEligible(message);
-  const enabled = playbackEnabled(message, shared, arriving);
+  const enabled = eligible && playing;
   const complete = message.kind === "message" && message.status === "completed";
   const playback = useMemo(
     () =>
@@ -640,6 +618,9 @@ const MessageRow = memo(function MessageRow({
             complete,
             progress: replySession.progress,
             enabled,
+            active: playbackResumes,
+            paused: playbackPaused,
+            revealed,
             onWord: (word: string, index: number) => {
               markRevealed(message.id);
               replyHaptics.onWord(word, index);
@@ -651,7 +632,18 @@ const MessageRow = memo(function MessageRow({
             onComplete: replyHaptics.onComplete,
           }
         : undefined,
-    [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
+    [
+      eligible,
+      message.id,
+      complete,
+      replySession.progress,
+      enabled,
+      playbackResumes,
+      playbackPaused,
+      revealed,
+      markRevealed,
+      replyHaptics,
+    ],
   );
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   const fileAgentId = message.kind !== "message" ? undefined : message.speaker ? speaker?.id : shared.fileAgentId;
@@ -672,8 +664,14 @@ const MessageRow = memo(function MessageRow({
         return target ? () => void openFile(target.file, target.written, attachmentOf(target.file)) : null;
       },
       link: (href) => {
-        const target = messageLinkFileTarget(href, fileAgentId);
-        return target ? () => void openFile(target, null, attachmentOf(target)) : null;
+        const target = messageLinkFileTargets(href, fileAgentId);
+        if (!target) return null;
+        return () =>
+          void openFile(
+            target.file,
+            target.written,
+            (target.written && attachmentOf(target.written)) || attachmentOf(target.file),
+          );
       },
     };
   }, [fileBody, fileAgentId, fileAttachments, openFile]);
@@ -709,9 +707,10 @@ const MessageRow = memo(function MessageRow({
     color: textColor,
     tone,
     playback,
-    animationEnabled: shared.animationActive && arriving,
+    animationEnabled: animate,
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
     literalWordStars: message.kind === "message" && message.author === "user",
+    remoteContent: shared.remoteContent,
   };
   const bubbleFor = useCallback(
     (children: ReactNode, key?: string) =>
@@ -721,7 +720,6 @@ const MessageRow = memo(function MessageRow({
           agent={message.author === "agent"}
           fill={plainBubbleFill}
           collapsed={waiting}
-          animateSize={shared.textReveal}
           className={
             message.author === "user"
               ? `max-w-full self-end px-4 py-3 ${userBubbleStyle || memberColor || plainBubbleFill ? "" : "bg-control/60"}`
@@ -746,16 +744,7 @@ const MessageRow = memo(function MessageRow({
           {children}
         </ChatBubble>
       ) : null,
-    [
-      message,
-      waiting,
-      shared.textReveal,
-      shared.listWidth,
-      userBubbleStyle,
-      memberColor,
-      plainBubbleFill,
-      solidBubbleSurface,
-    ],
+    [message, waiting, shared.listWidth, userBubbleStyle, memberColor, plainBubbleFill, solidBubbleSurface],
   );
   const sentTable = useCallback(
     (table: ReactNode, key: string) => (
@@ -803,17 +792,17 @@ const MessageRow = memo(function MessageRow({
         prompt={message.prompt}
         uiBlock={message.uiBlock}
         controller={questionForm}
-        canSend={canSend}
+        canSend={canAnswer}
         onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}
       />
     ) : (
       <Animated.View
         key={message.id}
         entering={
-          arriving && !isFirstUser
+          entrance && !isFirstUser
             ? message.author === "user"
               ? USER_MESSAGE_ENTRANCE
-              : message.progress && shared.playbackActive
+              : message.progress && playing
                 ? PROGRESS_UPDATE_ENTRANCE
                 : undefined
             : undefined
@@ -1011,7 +1000,14 @@ const MessageRow = memo(function MessageRow({
 
 interface RowContextValue {
   shared: MessageRowShared;
-  rowsById: ReadonlyMap<string, VisibleMessage>;
+  rows: readonly VisibleMessage[];
+  canSend: boolean;
+  pinnedIds: ReadonlySet<string>;
+  branchPoints: ReadonlySet<string>;
+  animationActive: boolean;
+  playbackActive: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   arrivals: ReadonlySet<string>;
   revealedIds: ReadonlySet<string>;
   responseIds: ReadonlySet<string>;
@@ -1141,7 +1137,14 @@ interface ChatRowBodyProps {
   outbox: OutboxRowStatus | undefined;
   selecting: boolean;
   arriving: boolean;
+  animate: boolean;
+  playing: boolean;
+  playbackResumes: boolean;
+  playbackPaused: boolean;
   revealed: boolean;
+  pinned: boolean;
+  branchable: boolean;
+  canAnswer: boolean;
   shared: MessageRowShared;
 }
 
@@ -1162,7 +1165,14 @@ const ChatRowBody = memo(function ChatRowBody({
   outbox,
   selecting,
   arriving,
+  animate,
+  playing,
+  playbackResumes,
+  playbackPaused,
   revealed,
+  pinned,
+  branchable,
+  canAnswer,
   shared,
 }: ChatRowBodyProps) {
   const timeReveal = useContext(ChatTimeRevealContext);
@@ -1179,7 +1189,14 @@ const ChatRowBody = memo(function ChatRowBody({
         outbox={outbox}
         selecting={selecting}
         arriving={arriving}
+        animate={animate}
+        playing={playing}
+        playbackResumes={playbackResumes}
+        playbackPaused={playbackPaused}
         revealed={revealed}
+        pinned={pinned}
+        branchable={branchable}
+        canAnswer={canAnswer}
         shared={shared}
       />
     );
@@ -1211,11 +1228,14 @@ const ChatRowBody = memo(function ChatRowBody({
   );
 });
 
-function ChatRow({ item }: { item: VisibleMessage }) {
+function ChatRow({ item, index }: { item: VisibleMessage; index: number }) {
   const row = useContext(RowContext);
   if (!row) return null;
-  const message = row.rowsById.get(item.id) ?? item;
+  const latest = row.rows[index];
+  const message = latest?.id === item.id ? latest : item;
   const response = row.responseIds.has(message.id);
+  const arriving = row.arrivals.has(message.id);
+  const revealed = row.revealedIds.has(message.id);
   return (
     <ChatRowBody
       message={message}
@@ -1237,15 +1257,22 @@ function ChatRow({ item }: { item: VisibleMessage }) {
       upload={row.upload?.messageId === message.id ? row.upload : undefined}
       outbox={row.outboxStatuses?.get(message.id)}
       selecting={message.id === row.selectingMessageId}
-      arriving={row.arrivals.has(message.id)}
-      revealed={row.revealedIds.has(message.id)}
+      arriving={arriving}
+      animate={row.animationActive && (arriving || revealed)}
+      playing={arriving && row.playbackActive}
+      playbackResumes={revealed && row.playbackResumes}
+      playbackPaused={revealed && row.playbackPaused}
+      revealed={revealed}
+      pinned={row.pinnedIds.has(message.id)}
+      branchable={row.branchPoints.has(message.id)}
+      canAnswer={message.kind === "question" && row.canSend}
       shared={row.shared}
     />
   );
 }
 
-function renderRow({ item }: { item: VisibleMessage }) {
-  return <ChatRow item={item} />;
+function renderRow({ item, index }: { item: VisibleMessage; index: number }) {
+  return <ChatRow item={item} index={index} />;
 }
 
 function sameRowStructure(
@@ -1263,10 +1290,41 @@ function sameRowStructure(
   return true;
 }
 
+function useKeptValue<T>(value: T, same: (kept: T, next: T) => boolean): T {
+  const [kept, setKept] = useState(value);
+  if (kept === value || same(kept, value)) return kept;
+  setKept(value);
+  return value;
+}
+
+function useLatest<T>(value: T) {
+  const latest = useRef(value);
+  useLayoutEffect(() => {
+    latest.current = value;
+  });
+  return latest;
+}
+
 function useListRows(rows: VisibleMessage[], type: (message: VisibleMessage) => string): VisibleMessage[] {
-  const kept = useRef(rows);
-  if (kept.current !== rows && !sameRowStructure(kept.current, rows, type)) kept.current = rows;
-  return kept.current;
+  return useKeptValue(rows, (kept, next) => sameRowStructure(kept, next, type));
+}
+
+function sameRowAgents(kept: readonly MobileAgent[], next: readonly MobileAgent[]): boolean {
+  return (
+    kept.length === next.length &&
+    next.every((agent, index) => {
+      const before = kept[index];
+      return (
+        before !== undefined &&
+        before.id === agent.id &&
+        before.serverId === agent.serverId &&
+        before.name === agent.name &&
+        before.avatarSeed === agent.avatarSeed &&
+        before.avatarHue === agent.avatarHue &&
+        before.avatarColor === agent.avatarColor
+      );
+    })
+  );
 }
 
 const ListHeaderContext = createContext<ReactNode>(null);
@@ -1289,12 +1347,6 @@ function openingRows(rows: VisibleMessage[]): VisibleMessage[] {
   const user = rows.findLastIndex((message) => message.kind === "message" && message.author === "user");
   const from = user >= 0 && user >= rows.length - OPENING_ROWS_TO_USER ? Math.min(start, user) : start;
   return from === 0 ? rows : rows.slice(from);
-}
-
-function conversationImages(messages: readonly VisibleMessage[]): AttachmentSummary[] {
-  return messages.flatMap((message) =>
-    message.kind === "message" ? (message.attachments ?? []).filter(isViewableImage) : [],
-  );
 }
 
 function messageCopyText(message: ChatBubbleMessage): string {
@@ -1443,6 +1495,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     [timeOffset],
   );
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
+  const rowAgents = useKeptValue(agents, sameRowAgents);
+  const rowAgentsById = useMemo(() => new Map(rowAgents.map((agent) => [agent.id, agent])), [rowAgents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
     [messages, messageAliases, referenceMessages],
@@ -1514,7 +1568,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     },
     [replySession],
   );
-  const arrivals = useMessageArrivals(replySession.key, messages, watchesArrivals);
+  const { arriving: arrivals, entrances } = useMessageArrivals(replySession.key, messages, watchesArrivals);
   const messageColorMode = useMessageColor((state) => state.mode);
   const customMessageColor = useMessageColor((state) => state.customColor);
   const messageColorStyle = useMessageColor((state) => state.style);
@@ -1557,29 +1611,33 @@ export const ChatMessageList = memo(function ChatMessageList({
   });
 
   const rowShown = useChatRowShown(turnSummaries);
-  const visibleMessages = useMemo(
+  const listView = useMemo(
     () =>
-      groupRoutineRunMarkers(
-        groupExchangeMarkers(
-          messages.filter(
-            (message) =>
-              rowShown(message) ||
-              (message.kind !== "thinking" && (message.id === focusMessageId || message.id === branchDivider?.afterId)),
-          ),
-        ),
-        {
-          unreadMessageIds: unreadLineMessageIds,
-          focusMessageId: focusUnread ? null : focusMessageId,
-          branchRowId: branchDivider?.afterId,
-        },
-      ),
-    [messages, rowShown, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+      chatListView({
+        messages,
+        shown: rowShown,
+        focusMessageId,
+        focusUnread,
+        unreadMessageIds: unreadLineMessageIds,
+        branchRowId: branchDivider?.afterId,
+        text: { t, format },
+        hasOlder,
+        viewableImage: isViewableImage,
+      }),
+    [
+      messages,
+      rowShown,
+      unreadLineMessageIds,
+      focusMessageId,
+      focusUnread,
+      branchDivider?.afterId,
+      t,
+      format,
+      hasOlder,
+    ],
   );
-  const dayLabels = useMemo(
-    () => chatDayLabels(visibleMessages, { t, format }, { hasOlder }),
-    [visibleMessages, t, format, hasOlder],
-  );
-  const images = useMemo(() => conversationImages(visibleMessages), [visibleMessages]);
+  const visibleMessages: VisibleMessage[] = listView.rows;
+  const { dayLabels, images } = listView;
   const [openingShown, setOpeningShown] = useState(false);
   useEffect(() => {
     if (rowsShown || openingShown) return;
@@ -1601,27 +1659,26 @@ export const ChatMessageList = memo(function ChatMessageList({
       : chatRowIndex(rows, focusMessageId);
   const canLoadOlder = online && hasOlder && !olderLoading;
   useFoldScrollAnchor(motion.listRef);
-  const placedFocus = useRef<string | null>(null);
+  const [placedFocus, setPlacedFocus] = useState<string | null>(null);
   const focusId = historyState === "ready" && rowsShown && focusIndex >= 0 ? (rows[focusIndex]?.id ?? null) : null;
-  const focusHandlers = useRef({ openAt: motion.openAt, onFocusPlaced });
-  focusHandlers.current = { openAt: motion.openAt, onFocusPlaced };
+  const focusHandlers = useLatest({ openAt: motion.openAt, onFocusPlaced });
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
-  const highlightShown = useRef(new Set<string>());
+  const [highlightShown] = useState(() => new Set<string>());
   const highlightColor = String(useCSSVariable("--openbot-accent"));
   useEffect(() => {
-    if (!focusId || !motion.listPlaced || placedFocus.current === focusId) return;
-    placedFocus.current = focusId;
+    if (!focusId || !motion.listPlaced || placedFocus === focusId) return;
+    setPlacedFocus(focusId);
     void focusHandlers.current.openAt(focusIndex, focusUnread).then(() => {
       if (!focusUnread) setHighlightedRowId(focusId);
       focusHandlers.current.onFocusPlaced?.();
     });
-  }, [focusId, focusIndex, focusUnread, motion.listPlaced]);
+  }, [focusId, focusIndex, focusUnread, motion.listPlaced, placedFocus, focusHandlers]);
   const unreadRowMissing =
     focusUnread && Boolean(focusMessageId) && historyState === "ready" && rowsShown && focusIndex < 0;
-  const shownWithoutUnread = focusUnread && motion.historyVisible && placedFocus.current === null;
+  const shownWithoutUnread = focusUnread && motion.historyVisible && placedFocus === null;
   useEffect(() => {
     if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
-  }, [unreadRowMissing, shownWithoutUnread]);
+  }, [unreadRowMissing, shownWithoutUnread, focusHandlers]);
   const header = topInset + 84;
   const screen = useWindowDimensions();
   const tailRow = rows[tailIndex];
@@ -1654,7 +1711,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const hasRows = rows.length > 0;
   const onReady = useCallback(() => onListReady(hasRows), [onListReady, hasRows]);
   const selectionArea = useRef<ViewInstance | null>(null);
-  const actionHandlers = useRef({
+  const actionHandlers = useLatest({
     onReply,
     onBranch,
     onReact,
@@ -1667,19 +1724,6 @@ export const ChatMessageList = memo(function ChatMessageList({
     onSelectionChange,
     onSelectQuestion,
   });
-  actionHandlers.current = {
-    onReply,
-    onBranch,
-    onReact,
-    onDeleteMessage,
-    onMarkUnread,
-    markUnreadMessageIds,
-    onTogglePin,
-    onSendToChannel,
-    onSelectText,
-    onSelectionChange,
-    onSelectQuestion,
-  };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
@@ -1697,11 +1741,10 @@ export const ChatMessageList = memo(function ChatMessageList({
         selectionArea.current = view;
       },
     }),
-    [],
+    [actionHandlers],
   );
   const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
-  const dismissSelection = useRef(onDismissSelection);
-  dismissSelection.current = onDismissSelection;
+  const dismissSelection = useLatest(onDismissSelection);
   const onTouchStart = ({ nativeEvent }: GestureResponderEvent) => {
     touchStart.current = { x: nativeEvent.pageX, y: nativeEvent.pageY, time: nativeEvent.timestamp };
   };
@@ -1723,6 +1766,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     });
   };
   const animationActive = animateMessages && motion.responseVisible;
+  const playbackShown = isFocused && appActive && motion.responseVisible;
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
@@ -1735,12 +1779,16 @@ export const ChatMessageList = memo(function ChatMessageList({
   const shownBranchPoints = onBranch ? branchPoints : NO_IDS;
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const messageFiles = useMessageFileOpener(target.serverId);
+  const remoteContent = useRemoteChatContent(target.serverId);
+  const playbackActive = animationActive && textReveal && !screenReaderEnabled;
+  const playbackResumes = playbackShown && textReveal && !screenReaderEnabled;
+  const playbackPaused = !playbackShown && textReveal && !screenReaderEnabled;
   const shared = useMemo<MessageRowShared>(
     () => ({
-      agents,
-      agentsById,
+      agents: rowAgents,
+      agentsById: rowAgentsById,
       serverId: target.serverId,
-      canSend,
+      remoteContent,
       muted,
       themeMuted,
       foreground,
@@ -1751,10 +1799,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       attachmentTint: coloredMessages ? { color: userBubbleColor, foreground: userForeground } : undefined,
       bubbleTone: coloredMessages ? bubbleTone(userForeground) : undefined,
       firstMessageStyle: motion.firstMessageStyle,
-      animationActive,
-      playbackActive: animationActive && textReveal && !screenReaderEnabled,
       screenReaderEnabled,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,
@@ -1764,11 +1809,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       deletesAny: deletesAnyMessage,
       canMarkUnread,
       canPin,
-      pinnedIds: shownPinnedIds,
       sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
-      branchPoints: shownBranchPoints,
       listWidth,
       fileAgentId: target.kind === "agent" ? target.id : undefined,
       openSubagents: onOpenSubagents,
@@ -1777,11 +1820,11 @@ export const ChatMessageList = memo(function ChatMessageList({
       actions,
     }),
     [
-      agents,
-      agentsById,
+      rowAgents,
+      rowAgentsById,
       target.kind,
       target.serverId,
-      canSend,
+      remoteContent,
       muted,
       themeMuted,
       foreground,
@@ -1793,8 +1836,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       solidBubbleSurface,
       motion.firstMessageStyle,
       screenReaderEnabled,
-      animationActive,
-      textReveal,
       replySession,
       markRevealed,
       replyHaptics,
@@ -1804,11 +1845,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       deletesAnyMessage,
       canMarkUnread,
       canPin,
-      shownPinnedIds,
       shownSendChannels,
       canSelectText,
       canSelectQuestion,
-      shownBranchPoints,
       listWidth,
       target.id,
       onOpenSubagents,
@@ -1817,15 +1856,16 @@ export const ChatMessageList = memo(function ChatMessageList({
       actions,
     ],
   );
-  const pendingReveal = visibleMessages.some((message) =>
-    awaitingFirstWord(message, shared, arrivals.has(message.id), revealedIds.has(message.id)),
-  );
+  const pendingReveal =
+    playbackActive &&
+    visibleMessages.some((message) =>
+      awaitingFirstWord(message, arrivals.has(message.id), revealedIds.has(message.id), replySession.progress),
+    );
   const { responseStyle, responseVisible } = motion;
   const promptController = questionForm?.messageId ? questionForm : undefined;
   const responseIds = useMemo(() => new Set(rows.slice(tailIndex + 1).map((row) => row.id)), [rows, tailIndex]);
   const firstUserId = rowsShown && tailIndex === 0 && !hasOlder ? (rows[0]?.id ?? null) : null;
-  const openBranchSource = useRef(onOpenBranchSource);
-  openBranchSource.current = onOpenBranchSource;
+  const openBranchSource = useLatest(onOpenBranchSource);
   const canOpenBranchSource = Boolean(onOpenBranchSource);
   const dividerRowId = useMemo(() => {
     const afterId = branchDivider?.afterId;
@@ -1833,7 +1873,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     return visibleMessages[chatRowHolding(visibleMessages, afterId)]?.id ?? null;
   }, [branchDivider?.afterId, visibleMessages]);
   const unreadLineColor = coloredMessages ? userBubbleColor : undefined;
-  const unreadLineAnimated = useRef(new Set<string>());
+  const [unreadLineAnimated] = useState(() => new Set<string>());
   const unreadLineRowId = useMemo(() => {
     if (!unreadLineMessageIds) return null;
     return visibleMessages[firstChatRowOf(visibleMessages, unreadLineMessageIds)]?.id ?? null;
@@ -1847,7 +1887,7 @@ export const ChatMessageList = memo(function ChatMessageList({
             onOpen: canOpenBranchSource ? () => openBranchSource.current?.() : undefined,
           }
         : null,
-    [dividerRowId, branchDivider, canOpenBranchSource],
+    [dividerRowId, branchDivider, canOpenBranchSource, openBranchSource],
   );
   const [routineGroupsState] = useState<RoutineGroupsState>(() => ({
     collapse: useRoutineCollapsePreference.getState().enabled,
@@ -1858,16 +1898,22 @@ export const ChatMessageList = memo(function ChatMessageList({
     [routineGroupsState],
   );
   const listRows = useListRows(rows, routineRowType);
-  const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
   const unreadLine = useMemo(
-    () => ({ color: unreadLineColor, animated: unreadLineAnimated.current }),
-    [unreadLineColor],
+    () => ({ color: unreadLineColor, animated: unreadLineAnimated }),
+    [unreadLineColor, unreadLineAnimated],
   );
-  const highlight = useMemo(() => ({ color: highlightColor, shown: highlightShown.current }), [highlightColor]);
+  const highlight = useMemo(() => ({ color: highlightColor, shown: highlightShown }), [highlightColor, highlightShown]);
   const rowContext = useMemo<RowContextValue>(
     () => ({
       shared,
-      rowsById,
+      rows,
+      canSend,
+      pinnedIds: shownPinnedIds,
+      branchPoints: shownBranchPoints,
+      animationActive,
+      playbackActive,
+      playbackResumes,
+      playbackPaused,
       arrivals,
       revealedIds,
       responseIds,
@@ -1890,7 +1936,14 @@ export const ChatMessageList = memo(function ChatMessageList({
     }),
     [
       shared,
-      rowsById,
+      rows,
+      canSend,
+      shownPinnedIds,
+      shownBranchPoints,
+      animationActive,
+      playbackActive,
+      playbackResumes,
+      playbackPaused,
       arrivals,
       revealedIds,
       responseIds,
@@ -1984,18 +2037,24 @@ export const ChatMessageList = memo(function ChatMessageList({
   const openTaggedTab = useTaggedTabOpener(target.serverId);
   const activityRows = useActivityPresence(
     (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
+    motion.sendSettling,
   );
 
-  const startReached = useRef(() => {});
-  startReached.current = () => {
-    if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
-  };
-  const onStartReached = useCallback(() => startReached.current(), []);
   const historyVisible = motion.historyVisible;
-  const startListRef = motion.listRef;
+  const startReached = useLatest(() => {
+    if (historyVisible && canLoadOlder && !olderError) onLoadOlder();
+  });
+  const onStartReached = useCallback(() => startReached.current(), [startReached]);
+  const { listRef: startListRef } = motion;
   useEffect(() => {
     if (historyVisible && online && startListRef.current?.getState().isNearStart) startReached.current();
-  }, [historyVisible, online, startListRef]);
+  }, [historyVisible, online, startListRef, startReached]);
+  const sizedFontScale = useRef(screen.fontScale);
+  useLayoutEffect(() => {
+    if (sizedFontScale.current === screen.fontScale) return;
+    sizedFontScale.current = screen.fontScale;
+    startListRef.current?.clearCaches({ mode: "sizes" });
+  }, [screen.fontScale, startListRef]);
   const contentContainerStyle = useMemo(
     () => ({
       paddingLeft: insets.left + LIST_PADDING,
@@ -2180,17 +2239,19 @@ export const ChatMessageList = memo(function ChatMessageList({
             <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
               <RoutineGroupsContext value={routineGroupsState}>
                 <KeptOpenContext value={replySession.keptOpen}>
-                  <RowContext value={rowContext}>
-                    <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                      <ChatTimeRevealContext value={timeReveal}>
-                        <ChatTimesMountedContext value={timesMounted}>
-                          <ListHeaderContext value={listHeader}>
-                            <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                          </ListHeaderContext>
-                        </ChatTimesMountedContext>
-                      </ChatTimeRevealContext>
-                    </ChatSwipeGestureContext>
-                  </RowContext>
+                  <ArrivalEntrancesContext value={entrances}>
+                    <RowContext value={rowContext}>
+                      <ChatSwipeGestureContext value={swipeGesture ?? null}>
+                        <ChatTimeRevealContext value={timeReveal}>
+                          <ChatTimesMountedContext value={timesMounted}>
+                            <ListHeaderContext value={listHeader}>
+                              <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                            </ListHeaderContext>
+                          </ChatTimesMountedContext>
+                        </ChatTimeRevealContext>
+                      </ChatSwipeGestureContext>
+                    </RowContext>
+                  </ArrivalEntrancesContext>
                 </KeptOpenContext>
               </RoutineGroupsContext>
             </HistoryShownContext>
