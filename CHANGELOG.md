@@ -6,6 +6,12 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.81.0-fork.36] - 2026-11-28
+
+### Changed
+
+- Fork builds now ship the upstream OpenBot 0.81.0 release.
+
 ## [0.81.0] - 2026-11-27
 
 ### Added
